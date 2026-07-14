@@ -1,0 +1,9 @@
+export { Btn } from './Btn';
+export { Card } from './Card';
+export { Inp } from './Inp';
+export { Sel } from './Sel';
+export { Pill } from './Pill';
+export { Divider } from './Divider';
+export { SectionTitle } from './SectionTitle';
+export { Skeleton } from './Skeleton';
+export { G2 } from './G2';

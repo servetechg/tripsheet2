@@ -1,0 +1,26 @@
+{
+  "name": "tripsheet-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TripSheet backend orchestrator — start all Nest services with one command",
+  "scripts": {
+    "test": "npm run test --prefix services/driver-service && npm run test --prefix services/fleet-service",
+    "env:copy": "powershell -NoProfile -File scripts/copy-env.ps1",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f postgres redis",
+    "install:all": "npm install --prefix gateway && npm install --prefix services/auth-service && npm install --prefix services/company-service && npm install --prefix services/driver-service && npm install --prefix services/fleet-service && npm install --prefix services/manifest-service && npm install --prefix services/tripsheet-service",
+    "start:dev": "concurrently -n gateway,auth,company,driver,fleet,manifest,tripsheet -c blue,magenta,cyan,green,yellow,red,white \"npm run start:dev --prefix gateway\" \"npm run start:dev --prefix services/auth-service\" \"npm run start:dev --prefix services/company-service\" \"npm run start:dev --prefix services/driver-service\" \"npm run start:dev --prefix services/fleet-service\" \"npm run start:dev --prefix services/manifest-service\" \"npm run start:dev --prefix services/tripsheet-service\"",
+    "start:gateway": "npm run start:dev --prefix gateway",
+    "start:auth": "npm run start:dev --prefix services/auth-service",
+    "start:company": "npm run start:dev --prefix services/company-service",
+    "start:driver": "npm run start:dev --prefix services/driver-service",
+    "start:fleet": "npm run start:dev --prefix services/fleet-service",
+    "start:manifest": "npm run start:dev --prefix services/manifest-service",
+    "start:tripsheet": "npm run start:dev --prefix services/tripsheet-service",
+    "build:all": "npm run build --prefix gateway && npm run build --prefix services/auth-service && npm run build --prefix services/company-service && npm run build --prefix services/driver-service && npm run build --prefix services/fleet-service && npm run build --prefix services/manifest-service && npm run build --prefix services/tripsheet-service"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

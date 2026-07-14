@@ -1,0 +1,45 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CarrierProfile {
+  id              String   @id @default(cuid())
+  companyId       String   @unique
+  cbsaCarrierCode String   @default("")
+  scacCode        String   @default("")
+  dotNumber       String   @default("")
+  csnNumber       String   @default("")
+  fastLane        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Manifest {
+  id               String   @id @default(cuid())
+  companyId        String
+  type             String // ACI | ACE
+  status           String   @default("draft") // draft|submitted|accepted|rejected|cancelled
+  crn              String?
+  loadId           String?
+  driverId         String?
+  truckId          String?
+  trailerId        String?
+  portOfEntry      String?
+  estimatedArrival String?
+  shipments        Json     @default("[]")
+  rejectionReason  String?
+  submittedAt      String?
+  acceptedAt       String?
+  rejectedAt       String?
+  // store extra form fields as JSON
+  formData         Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([companyId])
+}

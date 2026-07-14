@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Builds
+dist/
+**/dist/
+dist-ssr/
+build/
+coverage/
+**/coverage/
+*.tsbuildinfo
+
+# Environment & secrets (keep *.example)
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.p12
+credentials.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local / Vite
+*.local
+.vite/
+
+# Prisma
+**/prisma/*.db
+**/prisma/*.db-journal
+
+# Uploads / temp (local disks)
+uploads/
+tmp/
+temp/
+
+# Test / cache
+.nyc_output/
+.cache/
+.turbo/
+.parcel-cache/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Nested package lock noise is OK to commit; ignore Nest CLI generated junk
+**/nest-cli.compiled.js

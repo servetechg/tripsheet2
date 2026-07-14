@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TripSheet {
+  id        String   @id @default(cuid())
+  companyId String
+  driverId  String
+  header    Json // { truckNo, startDate, endDate, driver1, driver2 }
+  trips     Json     @default("[]") // legs
+  expenses  Json     @default("[]")
+  notes     String   @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+}

@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Driver {
+  id             String           @id @default(cuid())
+  companyId      String
+  userId         String? // auth-service user id when linked
+  name           String
+  email          String
+  phone          String?
+  dob            String?
+  licenseNo      String?
+  citizenship    String?
+  address        String?
+  emergencyName  String?
+  emergencyPhone String?
+  fastCard       String?
+  notes          String?
+  sin            String?
+  active         Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  documents      DriverDocument[]
+  contracts      Contract[]
+
+  @@unique([companyId, email])
+  @@index([companyId])
+}
+
+model DriverDocument {
+  id                 String   @id @default(cuid())
+  driverId           String
+  companyId          String
+  type               String // license, abstract, medical, __contract__, etc.
+  fileName           String
+  fileSize           Int?
+  fileType           String?
+  /// Cloudinary (or CDN) HTTPS URL — preferred Phase 2 storage
+  fileUrl            String?
+  cloudinaryPublicId String?
+  /// Legacy Phase 1 inline base64 data URL (only used when Cloudinary is off)
+  fileData           String?
+  uploadedAt         String
+  expiryDate         String?
+  notes              String?
+  status             String   @default("uploaded")
+  driver             Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([driverId])
+  @@index([companyId])
+}
+
+model Contract {
+  id              String   @id @default(cuid())
+  driverId        String
+  companyId       String
+  driverName      String?
+  companyName     String?
+  startDate       String?
+  payType         String?
+  payRate         String?
+  payUnit         String?
+  teamRate        String?
+  detentionRate   String?
+  waitRate        String?
+  fuelSurcharge   String?
+  vacationPct     String?
+  trialDays       String?
+  noticeDays      String?
+  benefits        String?
+  signedByDriver  Boolean  @default(false)
+  signedByAdmin   Boolean  @default(false)
+  signedAt        String?
+  driverSignature String?
+  adminSignature  String?
+  payload         Json? // full form snapshot
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+}
+
+model Invite {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  companyId   String
+  status      String   @default("pending") // pending|completed|expired
+  driverId    String?
+  createdAt   String
+  completedAt String?
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+}

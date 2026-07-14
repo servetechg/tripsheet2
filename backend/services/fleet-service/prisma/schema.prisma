@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  companyId String
+  type      String // truck | trailer
+  unitNo    String
+  year      String?
+  make      String?
+  model     String?
+  vin       String?
+  plate     String?
+  status    String   @default("active") // active | inactive
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, unitNo])
+  @@index([companyId])
+}
+
+model Load {
+  id          String   @id @default(cuid())
+  companyId   String
+  driverId    String?
+  truckId     String?
+  trailerId   String?
+  status      String   @default("assigned") // assigned|in_transit|delivered|cancelled
+  origin      String
+  destination String
+  pickupTime  String?
+  eta         String?
+  tripNo      String?
+  notes       String?
+  truckNo     String?
+  trailerNo   String?
+  lat         Float?
+  lng         Float?
+  speed       Float?
+  heading     String?
+  lastUpdate  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([status])
+}
