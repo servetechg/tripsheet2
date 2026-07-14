@@ -82,9 +82,11 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173 — sign-in requires **● Live API**.
+Open http://localhost:5173 — sign-in requires the API gateway (no offline/demo login).
 
-## Demo accounts
+## Local seed users
+
+Created by backend `npm run seed` for empty databases (not shown in the UI):
 
 | Role | Email | Password |
 |------|-------|----------|

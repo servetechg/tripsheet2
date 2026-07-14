@@ -9,7 +9,6 @@ import type {
   Invite,
   LoadStatus,
 } from '@tripsheet/shared';
-import type { SeedUser } from '@/data/seed';
 
 export type Setter<T> = Dispatch<SetStateAction<T>>;
 
@@ -92,5 +91,4 @@ export type {
   DriverDocument,
   Invite,
   LoadStatus,
-  SeedUser,
 };
