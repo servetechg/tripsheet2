@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, SectionTitle, Pill, G2 } from '@/components/ui';
+import { Btn, Card, Inp, SectionTitle, Pill, G2, Icons, StatsGrid } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
@@ -122,42 +122,93 @@ export function AssetsTab({
     }
   };
 
+  const activeTrucks = myTrucks.filter((a: any) => a.status === 'active').length;
+  const activeTrailers = myTrailers.filter((a: any) => a.status === 'active').length;
+  const inUse = loads.filter((l: any) =>
+    ['assigned', 'in_transit'].includes(l.status),
+  ).length;
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: G.text }}>Assets</div>
+        <div style={{ fontSize: 14, color: G.muted, marginTop: 4 }}>
+          Maintain trucks and trailers in your fleet.
+        </div>
+      </div>
+
+      <StatsGrid
+        items={[
+          {
+            label: 'Trucks',
+            value: myTrucks.length,
+            accent: G.primary,
+            icon: Icons.truck({ size: 20 }),
+            subtitle: `${activeTrucks} active`,
+          },
+          {
+            label: 'Trailers',
+            value: myTrailers.length,
+            accent: G.info,
+            icon: Icons.inventory({ size: 20 }),
+            subtitle: `${activeTrailers} active`,
+          },
+          {
+            label: 'In Use',
+            value: inUse,
+            accent: G.warning || G.gold,
+            icon: Icons.play({ size: 20 }),
+            subtitle: 'On active loads',
+          },
+          {
+            label: 'Fleet Total',
+            value: myTrucks.length + myTrailers.length,
+            accent: G.success,
+            icon: Icons.dashboard({ size: 20 }),
+          },
+        ]}
+      />
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {[
-          ['trucks', '🚛 TRUCKS'],
-          ['trailers', '📦 TRAILERS'],
-        ].map(([id, label]) => (
+          { id: 'trucks', label: 'Trucks', icon: Icons.truck({ size: 16 }) },
+          { id: 'trailers', label: 'Trailers', icon: Icons.inventory({ size: 16 }) },
+        ].map((t) => (
           <button
-            key={id}
+            key={t.id}
+            type="button"
+            className="ts-btn"
             onClick={() => {
-              setAssetTab(id);
+              setAssetTab(t.id);
               setShow(false);
             }}
             style={{
-              background: assetTab === id ? G.gold : 'transparent',
-              color: assetTab === id ? G.onGold : G.muted,
-              border: `1px solid ${assetTab === id ? G.gold : G.border}`,
-              borderRadius: 8,
-              padding: '9px 18px',
-              fontSize: 11,
-              fontWeight: 700,
+              background: assetTab === t.id ? G.primary : G.card,
+              color: assetTab === t.id ? G.onPrimary : G.muted2,
+              border: `1px solid ${assetTab === t.id ? G.primary : G.border}`,
+              borderRadius: 10,
+              padding: '9px 16px',
+              fontSize: 13,
+              fontWeight: 600,
               cursor: 'pointer',
-              letterSpacing: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontFamily: 'inherit',
             }}
           >
-            {label}
+            {t.icon}
+            {t.label}
           </button>
         ))}
         <Btn
-          style={{ marginLeft: 'auto' }}
+          style={{ marginLeft: 'auto', textTransform: 'none', letterSpacing: 0 }}
           onClick={() => {
             setShow(true);
             setErr('');
           }}
         >
-          + ADD {assetTab === 'trucks' ? 'TRUCK' : 'TRAILER'}
+          Add {assetTab === 'trucks' ? 'Truck' : 'Trailer'}
         </Btn>
       </div>
 
@@ -251,11 +302,24 @@ export function AssetsTab({
       )}
 
       {list.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 50 }}>
-          <div style={{ fontSize: 36 }}>
-            {assetTab === 'trucks' ? '🚛' : '📦'}
+        <Card style={{ textAlign: 'center', padding: 50 }} hover={false}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: G.primaryBg,
+              color: G.primary,
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto',
+            }}
+          >
+            {assetTab === 'trucks'
+              ? Icons.truck({ size: 24 })
+              : Icons.inventory({ size: 24 })}
           </div>
-          <div style={{ color: G.muted, marginTop: 10 }}>
+          <div style={{ color: G.muted, marginTop: 10, fontSize: 14 }}>
             No {assetTab} added yet.
           </div>
         </Card>

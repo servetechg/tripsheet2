@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { G } from '@/lib/theme';
+import { G, RADIUS } from '@/lib/theme';
+import { Icons, StatsGrid, Btn } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { manifestsApi, carrierProfilesApi } from '@/lib/api';
 import { CarrierProfileForm } from './CarrierProfileForm';
@@ -349,100 +350,95 @@ export function EManifestTab({
 
   return (
     <div style={{ padding: '0 2px' }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 8,
-          marginBottom: 16,
-        }}
-      >
-        {[
-          ['ACI Filed', aciCount, G.info],
-          ['ACE Filed', aceCount, G.purple],
-          ['Accepted', acceptedCount, G.success],
-          ['Pending', pendingCount, G.gold],
-        ].map(([l, v, c]) => (
-          <div
-            key={l as string}
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: 10,
-              padding: '12px 8px',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 900, color: c as string }}>
-              {v as number}
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.5,
-                color: G.muted,
-                marginTop: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              {l as string}
-            </div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: G.text }}>eManifest</div>
+        <div style={{ fontSize: 14, color: G.muted, marginTop: 4 }}>
+          File ACI / ACE border manifests and manage carrier profile.
+        </div>
       </div>
 
+      <StatsGrid
+        items={[
+          {
+            label: 'ACI Filed',
+            value: aciCount,
+            accent: G.info,
+            icon: Icons.flag({ size: 20 }),
+            subtitle: 'Canada-bound',
+          },
+          {
+            label: 'ACE Filed',
+            value: aceCount,
+            accent: G.purple,
+            icon: Icons.passport({ size: 20 }),
+            subtitle: 'US-bound',
+          },
+          {
+            label: 'Accepted',
+            value: acceptedCount,
+            accent: G.success,
+            icon: Icons.checkCircle({ size: 20 }),
+          },
+          {
+            label: 'Pending',
+            value: pendingCount,
+            accent: G.warning || G.gold,
+            icon: Icons.schedule({ size: 20 }),
+          },
+        ]}
+      />
+
       <div
-        style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}
+        style={{ display: 'flex', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}
       >
-        <button
+        <Btn
+          variant="info"
           onClick={() => setSubTab('new_aci')}
           style={{
-            background: G.infoTint,
-            border: `1px solid ${G.info}`,
-            color: G.info,
-            borderRadius: 8,
-            padding: '10px 18px',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            letterSpacing: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            letterSpacing: 0,
+            textTransform: 'none',
           }}
         >
-          🛃 + ACI eManifest{' '}
-          <span style={{ fontSize: 10, opacity: 0.7 }}>(Canada-bound)</span>
-        </button>
-        <button
+          {Icons.add({ size: 18 })}
+          ACI eManifest
+          <span style={{ fontSize: 12, opacity: 0.75, fontWeight: 500 }}>
+            (Canada-bound)
+          </span>
+        </Btn>
+        <Btn
+          variant="purple"
           onClick={() => setSubTab('new_ace')}
           style={{
-            background: G.purpleBg,
-            border: `1px solid ${G.purple}`,
-            color: G.purple,
-            borderRadius: 8,
-            padding: '10px 18px',
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: 'pointer',
-            letterSpacing: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            letterSpacing: 0,
+            textTransform: 'none',
           }}
         >
-          🦅 + ACE eManifest{' '}
-          <span style={{ fontSize: 10, opacity: 0.7 }}>(US-bound)</span>
-        </button>
-        <button
+          {Icons.add({ size: 18 })}
+          ACE eManifest
+          <span style={{ fontSize: 12, opacity: 0.75, fontWeight: 500 }}>
+            (US-bound)
+          </span>
+        </Btn>
+        <Btn
+          variant="outline"
           onClick={() => setSubTab('profile')}
           style={{
-            background: 'transparent',
-            border: `1px solid ${G.border2}`,
-            color: G.muted,
-            borderRadius: 8,
-            padding: '10px 18px',
-            fontSize: 12,
-            cursor: 'pointer',
-            letterSpacing: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            letterSpacing: 0,
+            textTransform: 'none',
           }}
         >
-          ⚙️ CARRIER PROFILE
-        </button>
+          {Icons.settings({ size: 18 })}
+          Carrier Profile
+        </Btn>
       </div>
 
       {subTab === 'profile' && (
@@ -455,13 +451,13 @@ export function EManifestTab({
 
       <div
         style={{
-          fontSize: 10,
-          letterSpacing: 3,
-          color: G.muted,
-          marginBottom: 10,
+          fontSize: 14,
+          fontWeight: 600,
+          color: G.text,
+          marginBottom: 12,
         }}
       >
-        ALL MANIFESTS ({manifests.length})
+        All Manifests ({manifests.length})
       </div>
 
       {manifests.length === 0 && (
@@ -469,13 +465,26 @@ export function EManifestTab({
           style={{
             background: G.card,
             border: `1px solid ${G.border}`,
-            borderRadius: 12,
+            borderRadius: RADIUS.lg,
             padding: 50,
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 10 }}>🛃</div>
-          <div style={{ color: G.muted }}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: G.primaryBg,
+              color: G.primary,
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto 12px',
+            }}
+          >
+            {Icons.passport({ size: 24 })}
+          </div>
+          <div style={{ color: G.muted, fontSize: 14 }}>
             No eManifests yet. Create your first ACI or ACE manifest above.
           </div>
         </div>

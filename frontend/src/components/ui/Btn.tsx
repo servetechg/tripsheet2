@@ -1,8 +1,9 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
-import { G } from '@/lib/theme';
+import { G, RADIUS } from '@/lib/theme';
 
 export type BtnVariant =
   | 'gold'
+  | 'primary'
   | 'outline'
   | 'ghost'
   | 'danger'
@@ -19,60 +20,94 @@ export interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 export function Btn({
-  variant = 'gold',
+  variant = 'primary',
   full,
   size = 'md',
   children,
   style: sx,
+  className,
   ...p
 }: BtnProps) {
   const sizes = {
-    sm: { padding: '7px 14px', fontSize: 11 },
-    md: { padding: '11px 20px', fontSize: 12 },
-    lg: { padding: '14px 24px', fontSize: 14 },
+    sm: { padding: '8px 14px', fontSize: 12 },
+    md: { padding: '10px 18px', fontSize: 14 },
+    lg: { padding: '12px 22px', fontSize: 15 },
   };
   const sz = sizes[size] || sizes.md;
+  const primary = {
+    background: G.primary,
+    color: G.onPrimary,
+    border: 'none',
+    fontWeight: 600,
+    borderRadius: RADIUS.md,
+    cursor: 'pointer',
+    letterSpacing: 0.1,
+    boxShadow: '0 1px 2px rgba(37, 99, 235, 0.25)',
+    whiteSpace: 'nowrap' as const,
+  };
   const variants: Record<BtnVariant, CSSProperties> = {
-    gold: {
-      background: G.gold, color: G.onGold, border: 'none', fontWeight: 800,
-      borderRadius: 9, cursor: 'pointer', letterSpacing: 1, textTransform: 'uppercase',
-      transition: 'opacity .15s', whiteSpace: 'nowrap',
-    },
+    primary,
+    gold: primary,
     outline: {
-      background: 'transparent', color: G.muted2, border: `1px solid ${G.border2}`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', transition: 'all .15s', whiteSpace: 'nowrap',
+      background: G.card,
+      color: G.text,
+      border: `1px solid ${G.border}`,
+      fontWeight: 500,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
     ghost: {
-      background: G.goldBg, color: G.gold, border: `1px solid ${G.gold}44`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', whiteSpace: 'nowrap',
+      background: G.primaryBg,
+      color: G.primary,
+      border: `1px solid transparent`,
+      fontWeight: 600,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
     danger: {
-      background: G.dangerBg, color: G.danger, border: `1px solid ${G.danger}33`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', whiteSpace: 'nowrap',
+      background: G.dangerBg,
+      color: G.danger,
+      border: `1px solid ${G.danger}33`,
+      fontWeight: 600,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
     success: {
-      background: G.successBg, color: G.success, border: `1px solid ${G.success}33`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', whiteSpace: 'nowrap',
+      background: G.successBg,
+      color: G.success,
+      border: `1px solid ${G.success}33`,
+      fontWeight: 600,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
     info: {
-      background: G.infoBg, color: G.info, border: `1px solid ${G.info}33`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', whiteSpace: 'nowrap',
+      background: G.infoBg,
+      color: G.info,
+      border: `1px solid ${G.info}33`,
+      fontWeight: 600,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
     purple: {
-      background: G.purpleBg, color: G.purple, border: `1px solid ${G.purple}33`,
-      fontWeight: 700, borderRadius: 9, cursor: 'pointer', letterSpacing: 1,
-      textTransform: 'uppercase', whiteSpace: 'nowrap',
+      background: G.purpleBg,
+      color: G.purple,
+      border: `1px solid ${G.purple}33`,
+      fontWeight: 600,
+      borderRadius: RADIUS.md,
+      cursor: 'pointer',
+      whiteSpace: 'nowrap',
     },
   };
   return (
     <button
+      className={`ts-btn${className ? ` ${className}` : ''}`}
       style={{
-        ...(variants[variant] || variants.gold),
+        ...(variants[variant] || variants.primary),
         ...sz,
         ...(full ? { width: '100%', textAlign: 'center' as const } : {}),
         ...sx,

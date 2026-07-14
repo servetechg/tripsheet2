@@ -7,3 +7,7 @@ export { Divider } from './Divider';
 export { SectionTitle } from './SectionTitle';
 export { Skeleton } from './Skeleton';
 export { G2 } from './G2';
+export { Icons, Icon } from './Icons';
+export type { IconName } from './Icons';
+export { StatCard, StatsGrid } from './StatCard';
+export type { StatItem } from './StatCard';

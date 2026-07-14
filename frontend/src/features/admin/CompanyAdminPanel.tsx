@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Skeleton } from '@/components/ui';
+import { Skeleton, Icons } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { AppShell } from '@/components/layout/AppShell';
+import { DashboardTab } from '@/features/dashboard/DashboardTab';
 import { DispatchTab } from '@/features/dispatch/DispatchTab';
 import { TrackTab } from '@/features/tracking/TrackTab';
 import { EManifestTab } from '@/features/manifests/EManifestTab';
@@ -35,7 +36,7 @@ export function CompanyAdminPanel({
   apiEnabled,
   refreshAll,
 }: any) {
-  const [tab, setTab] = useState('dispatch');
+  const [tab, setTab] = useState('dashboard');
   const [adminPreview, setAdminPreview] = useState<any>(null);
   const sn = company.shortName;
 
@@ -62,17 +63,18 @@ export function CompanyAdminPanel({
   };
 
   const TABS = [
-    { id: 'dispatch', icon: '🚚', label: 'Dispatch' },
-    { id: 'track', icon: '📍', label: 'Track' },
-    { id: 'emanifest', icon: '🛃', label: 'eManifest' },
-    { id: 'drivers', icon: '👤', label: 'Drivers' },
-    { id: 'assets', icon: '🔧', label: 'Assets' },
-    { id: 'sheets', icon: '📋', label: 'Sheets' },
+    { id: 'dashboard', icon: Icons.dashboard({ size: 20 }), label: 'Dashboard' },
+    { id: 'dispatch', icon: Icons.truck({ size: 20 }), label: 'Dispatch' },
+    { id: 'track', icon: Icons.location({ size: 20 }), label: 'Track' },
+    { id: 'emanifest', icon: Icons.passport({ size: 20 }), label: 'eManifest' },
+    { id: 'drivers', icon: Icons.person({ size: 20 }), label: 'Drivers' },
+    { id: 'assets', icon: Icons.build({ size: 20 }), label: 'Assets' },
+    { id: 'sheets', icon: Icons.description({ size: 20 }), label: 'Sheets' },
   ];
 
   const STATUS_COLOR = {
     assigned: G.info,
-    in_transit: G.gold,
+    in_transit: G.warning || G.gold,
     delivered: G.success,
     cancelled: G.danger,
   };
@@ -103,22 +105,27 @@ export function CompanyAdminPanel({
       onTabChange={setTab}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Btn
-            variant="outline"
-            onClick={onLogout}
-            style={{ fontSize: 11, padding: '8px 14px' }}
-          >
-            LOGOUT
-          </Btn>
-        </div>
-      }
+      userName={adminUser?.name}
+      userRole="Company Admin"
+      onLogout={onLogout}
     >
       {tabLoading ? (
         <Skeleton rows={4} />
       ) : (
         <>
+          {tab === 'dashboard' && (
+            <DashboardTab
+              company={company}
+              sheets={mySheets}
+              loads={myLoads}
+              drivers={myDrivers}
+              trucks={myTrucks}
+              trailers={myTrailers}
+              users={users}
+              onNavigate={setTab}
+              onViewSheet={setAdminPreview}
+            />
+          )}
           {tab === 'dispatch' && (
             <DispatchTab
               company={company}

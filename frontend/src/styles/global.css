@@ -15,6 +15,9 @@ body,
 
 body {
   font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-text);
+  background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -27,6 +30,119 @@ textarea {
 }
 
 @keyframes ts-shimmer {
-  0% { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+
+@keyframes ts-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ts-card {
+  transition: box-shadow 0.2s var(--ease-out), transform 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out);
+}
+
+.ts-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+.ts-btn {
+  transition: background 0.15s var(--ease-out), transform 0.12s var(--ease-out),
+    box-shadow 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
+    opacity 0.15s var(--ease-out);
+}
+
+.ts-btn:hover:not(:disabled) {
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-sm);
+}
+
+.ts-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.ts-nav-item {
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out),
+    border-color 0.15s var(--ease-out);
+}
+
+.ts-table-wrap {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.ts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.ts-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted);
+  padding: 12px 16px;
+  background: var(--table-header-bg, #f8fafc);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.ts-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.ts-table tbody tr:nth-child(even) td {
+  background: var(--table-stripe-bg, #fafbfc);
+}
+
+.ts-table tbody tr {
+  transition: background 0.15s var(--ease-out);
+}
+
+.ts-table tbody tr:hover td {
+  background: var(--table-hover-bg, #eff6ff);
+}
+
+.ts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.ts-stat-enter {
+  animation: ts-fade-up 0.35s var(--ease-out) both;
+}
+
+@media (max-width: 900px) {
+  .ts-dash-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ts-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .ts-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
 }

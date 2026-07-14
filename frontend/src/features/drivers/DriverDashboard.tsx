@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Pill, SectionTitle, Skeleton } from '@/components/ui';
+import { Btn, Card, Pill, SectionTitle, Skeleton, Icons } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { uid } from '@/lib/uid';
 import { notify } from '@/components/feedback/Toast';
@@ -251,10 +251,10 @@ export function DriverDashboard({
     );
 
   const TABS = [
-    { id: 'sheets', icon: '📋', label: 'Sheets' },
-    { id: 'docs', icon: '📁', label: 'My Docs' },
-    { id: 'contract', icon: '📄', label: 'Contract' },
-    { id: 'status', icon: '🚛', label: 'My Load' },
+    { id: 'sheets', icon: Icons.description({ size: 20 }), label: 'Sheets' },
+    { id: 'docs', icon: Icons.folder({ size: 20 }), label: 'My Docs' },
+    { id: 'contract', icon: Icons.article({ size: 20 }), label: 'Contract' },
+    { id: 'status', icon: Icons.truck({ size: 20 }), label: 'My Load' },
   ];
 
   return (
@@ -266,18 +266,9 @@ export function DriverDashboard({
       onTabChange={setTab}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: G.muted }}>{user.name}</span>
-          <Btn
-            variant="outline"
-            onClick={onLogout}
-            style={{ fontSize: 11, padding: '8px 14px' }}
-          >
-            LOGOUT
-          </Btn>
-        </div>
-      }
+      userName={user.name}
+      userRole="Driver"
+      onLogout={onLogout}
     >
       {tabLoading ? (
         <Skeleton rows={3} />

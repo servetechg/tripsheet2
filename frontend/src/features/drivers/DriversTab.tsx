@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Icons, StatsGrid } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
@@ -265,6 +265,44 @@ export function DriversTab({
 
   return (
     <div>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: G.text }}>Drivers</div>
+        <div style={{ fontSize: 14, color: G.muted, marginTop: 4 }}>
+          Manage roster, invites, and driver readiness.
+        </div>
+      </div>
+
+      <StatsGrid
+        items={[
+          {
+            label: 'Total Drivers',
+            value: drivers.length,
+            accent: G.primary,
+            icon: Icons.people({ size: 20 }),
+          },
+          {
+            label: 'On Trip',
+            value: loads.filter((l: any) =>
+              ['assigned', 'in_transit'].includes(l.status),
+            ).length,
+            accent: G.warning || G.gold,
+            icon: Icons.truck({ size: 20 }),
+          },
+          {
+            label: 'Pending Invites',
+            value: pendingInvites.length,
+            accent: G.info,
+            icon: Icons.schedule({ size: 20 }),
+          },
+          {
+            label: 'Completed Invites',
+            value: completedInvites.length,
+            accent: G.success,
+            icon: Icons.checkCircle({ size: 20 }),
+          },
+        ]}
+      />
+
       <div
         style={{
           display: 'flex',
@@ -275,24 +313,34 @@ export function DriversTab({
           gap: 8,
         }}
       >
-        <div style={{ fontSize: 10, letterSpacing: 3, color: G.muted }}>
-          DRIVERS ({drivers.length})
+        <div style={{ fontSize: 14, fontWeight: 600, color: G.text }}>
+          Roster ({drivers.length})
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn
             variant="ghost"
             onClick={createInvite}
-            style={{ fontSize: 11, padding: '8px 16px' }}
+            style={{
+              fontSize: 13,
+              padding: '8px 16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              textTransform: 'none',
+              letterSpacing: 0,
+            }}
           >
-            🔗 SEND INVITE LINK
+            {Icons.add({ size: 16 })}
+            Send Invite Link
           </Btn>
           <Btn
             onClick={() => {
               resetForm();
               setShow(true);
             }}
+            style={{ textTransform: 'none', letterSpacing: 0 }}
           >
-            + ADD MANUALLY
+            Add Manually
           </Btn>
         </div>
       </div>

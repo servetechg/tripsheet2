@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2, Icons } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank } from '@/lib/format';
@@ -128,7 +128,7 @@ export function SuperAdminPanel({
     );
   };
 
-  const TABS = [{ id: 'companies', icon: '🏢', label: 'Companies' }];
+  const TABS = [{ id: 'companies', icon: Icons.business({ size: 20 }), label: 'Companies' }];
 
   return (
     <AppShell
@@ -139,11 +139,9 @@ export function SuperAdminPanel({
       onTabChange={setTab}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <Btn variant="outline" size="sm" onClick={onLogout}>
-          LOGOUT
-        </Btn>
-      }
+      userName="Super Admin"
+      userRole="Platform"
+      onLogout={onLogout}
     >
       {ok && <OkBox msg={ok} />}
 

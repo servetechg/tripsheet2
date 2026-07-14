@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Icons, StatsGrid } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
@@ -203,70 +203,38 @@ export function DispatchTab({
     {
       label: 'In Transit',
       value: loads.filter((l: any) => l.status === 'in_transit').length,
-      color: G.gold,
+      accent: G.warning || G.gold,
+      icon: Icons.play({ size: 20 }),
     },
     {
       label: 'Assigned',
       value: loads.filter((l: any) => l.status === 'assigned').length,
-      color: G.info,
+      accent: G.info,
+      icon: Icons.schedule({ size: 20 }),
     },
     {
       label: 'Delivered',
       value: loads.filter((l: any) => l.status === 'delivered').length,
-      color: G.success,
+      accent: G.success,
+      icon: Icons.checkCircle({ size: 20 }),
     },
     {
       label: 'Cancelled',
       value: loads.filter((l: any) => l.status === 'cancelled').length,
-      color: G.danger,
+      accent: G.danger,
+      icon: Icons.cancel({ size: 20 }),
     },
   ];
 
   return (
     <div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
-        {stats.map((s) => (
-          <div
-            key={s.label}
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: 12,
-              padding: '14px 12px',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 900,
-                color: s.color,
-                lineHeight: 1,
-              }}
-            >
-              {s.value}
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.5,
-                color: G.muted,
-                marginTop: 5,
-                textTransform: 'uppercase',
-              }}
-            >
-              {s.label}
-            </div>
-          </div>
-        ))}
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 20, fontWeight: 600, color: G.text }}>Dispatch</div>
+        <div style={{ fontSize: 14, color: G.muted, marginTop: 4 }}>
+          Assign loads and manage trip status across your fleet.
+        </div>
       </div>
+      <StatsGrid items={stats} />
 
       <div
         style={{
@@ -288,8 +256,20 @@ export function DispatchTab({
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {onEManifest && (
-            <Btn variant="ghost" size="sm" onClick={onEManifest}>
-              🛃 eManifest
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={onEManifest}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                textTransform: 'none',
+                letterSpacing: 0,
+              }}
+            >
+              {Icons.passport({ size: 16 })}
+              eManifest
             </Btn>
           )}
           <Btn
@@ -298,8 +278,16 @@ export function DispatchTab({
               resetForm();
               setShow(true);
             }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              textTransform: 'none',
+              letterSpacing: 0,
+            }}
           >
-            + Assign Load
+            {Icons.add({ size: 16 })}
+            Assign Load
           </Btn>
         </div>
       </div>
@@ -351,7 +339,7 @@ export function DispatchTab({
                       background: selected
                         ? G.goldBg
                         : canDispatch
-                          ? '#0a0a0e'
+                          ? G.card2
                           : G.dangerBg,
                       border: `1px solid ${
                         selected
@@ -504,11 +492,24 @@ export function DispatchTab({
       )}
 
       {loads.length === 0 ? (
-        <Card style={{ textAlign: 'center', padding: 60 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚚</div>
-          <div style={{ color: G.muted }}>
+        <Card style={{ textAlign: 'center', padding: 60 }} hover={false}>
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 14,
+              background: G.primaryBg,
+              color: G.primary,
+              display: 'grid',
+              placeItems: 'center',
+              margin: '0 auto 12px',
+            }}
+          >
+            {Icons.truck({ size: 24 })}
+          </div>
+          <div style={{ color: G.muted, fontSize: 14 }}>
             No loads yet. Click{' '}
-            <strong style={{ color: G.gold }}>+ Assign Load</strong> to get
+            <strong style={{ color: G.primary }}>Assign Load</strong> to get
             started.
           </div>
         </Card>

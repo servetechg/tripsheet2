@@ -12,7 +12,7 @@ import type {
 
 export type Setter<T> = Dispatch<SetStateAction<T>>;
 
-export type NavTab = { id: string; icon: string; label: string };
+export type NavTab = { id: string; icon: ReactNode; label: string };
 
 export type ManifestShipment = {
   id?: string;
