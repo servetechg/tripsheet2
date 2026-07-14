@@ -161,7 +161,6 @@ export function SuperAdminPanel({
           </div>
           <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
             {companies.length} registered
-            {apiEnabled ? ' · live' : ' · demo'}
           </div>
         </div>
         <Btn

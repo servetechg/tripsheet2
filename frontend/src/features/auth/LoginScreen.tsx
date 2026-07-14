@@ -82,15 +82,6 @@ export function LoginScreen({
           >
             Fleet Management Portal
           </div>
-          <div
-            style={{
-              fontSize: 10,
-              color: apiEnabled ? G.success : G.danger,
-              marginTop: 8,
-            }}
-          >
-            {apiEnabled ? '● Live API' : '○ API offline'}
-          </div>
         </div>
 
         {!apiEnabled && (
@@ -152,66 +143,6 @@ export function LoginScreen({
           >
             {loading ? 'SIGNING IN...' : 'SIGN IN →'}
           </Btn>
-        </div>
-
-        <div style={{ marginTop: 20 }}>
-          <div
-            style={{
-              fontSize: 9,
-              letterSpacing: 3,
-              color: G.muted,
-              textAlign: 'center',
-              marginBottom: 10,
-            }}
-          >
-            DEMO ACCOUNTS — TAP TO FILL
-          </div>
-          {[
-            {
-              role: '⚡ Super Admin',
-              email: 'admin@tripsheet.io',
-              pass: 'admin123',
-              color: G.gold,
-            },
-            {
-              role: '🏢 Company Admin',
-              email: 'admin@mkx.ca',
-              pass: 'mkx123',
-              color: G.info,
-            },
-            {
-              role: '🚛 Driver',
-              email: 'divyam@mkx.ca',
-              pass: 'driver123',
-              color: G.success,
-            },
-          ].map((a) => (
-            <div
-              key={a.role}
-              onClick={() => {
-                setEmail(a.email);
-                setPass(a.pass);
-                setErr('');
-              }}
-              style={{
-                background: G.card,
-                border: `1px solid ${G.border}`,
-                borderRadius: 10,
-                padding: '11px 14px',
-                marginBottom: 7,
-                cursor: 'pointer',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                opacity: apiEnabled ? 1 : 0.5,
-              }}
-            >
-              <span style={{ fontSize: 12, color: a.color, fontWeight: 700 }}>
-                {a.role}
-              </span>
-              <span style={{ fontSize: 10, color: G.muted }}>{a.email}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
