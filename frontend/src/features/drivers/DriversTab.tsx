@@ -6,8 +6,9 @@ import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { invitesApi, authApi, driversApi } from '@/lib/api';
+import { invitesApi, authApi, driversApi, notificationsApi } from '@/lib/api';
 import { DriverProfile } from './DriverProfile';
+import { matchesDriverRef } from '@/lib/driverIds';
 
 export function DriversTab({
   company,
@@ -28,6 +29,7 @@ export function DriversTab({
   const [show, setShow] = useState(false);
   const [editDriver, setEditDriver] = useState<any>(null);
   const [generatedLink, setGeneratedLink] = useState<any>(null);
+  const [invitePhone, setInvitePhone] = useState('');
   const [busy, setBusy] = useState(false);
 
   const createInvite = async () => {
@@ -35,8 +37,9 @@ export function DriversTab({
       if (apiEnabled) {
         const invite = await invitesApi.create(company.id);
         const token = invite.token;
-        const base = window.location.href.split('?')[0];
-        setGeneratedLink(`${base}?invite=${token}`);
+        setGeneratedLink(
+          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
+        );
         await refreshAll?.();
       } else {
         const token = uid() + uid();
@@ -48,8 +51,9 @@ export function DriversTab({
           createdAt: new Date().toLocaleDateString('en-CA'),
         };
         setInvites((p: any[]) => [...p, invite]);
-        const base = window.location.href.split('?')[0];
-        setGeneratedLink(`${base}?invite=${token}`);
+        setGeneratedLink(
+          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
+        );
       }
     } catch (e: any) {
       notify(e?.message || 'Failed to create invite', 'error');
@@ -259,6 +263,8 @@ export function DriversTab({
           setView('list');
           setSD(null);
         }}
+        apiEnabled={apiEnabled}
+        refreshAll={refreshAll}
       />
     );
   }
@@ -359,12 +365,58 @@ export function DriversTab({
               📋 COPY
             </button>
           </div>
+          {apiEnabled && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginBottom: 10,
+                flexWrap: 'wrap',
+                alignItems: 'flex-end',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <Inp
+                  label="SMS invite to phone"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  placeholder="+1..."
+                />
+              </div>
+              <Btn
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  if (!invitePhone.trim()) {
+                    notify('Enter a phone number', 'error');
+                    return;
+                  }
+                  try {
+                    await notificationsApi.sendSms({
+                      to: invitePhone.trim(),
+                      body: `${company.name || 'TripSheet'}: complete onboarding ${generatedLink}`,
+                      companyId: company.id,
+                      meta: { type: 'invite' },
+                    });
+                    notify('Invite SMS queued');
+                  } catch (e: any) {
+                    notify(e?.message || 'SMS failed', 'error');
+                  }
+                }}
+              >
+                Send SMS
+              </Btn>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: G.muted }}>
             Driver opens this link → fills profile → uploads documents → signs
             contract → you see completed profile here.
           </div>
           <button
-            onClick={() => setGeneratedLink(null)}
+            onClick={() => {
+              setGeneratedLink(null);
+              setInvitePhone('');
+            }}
             style={{
               background: 'transparent',
               border: 'none',
@@ -691,11 +743,14 @@ export function DriversTab({
       ) : (
         drivers.map((d: any) => {
           const active = loads.find(
-            (l: any) => l.driverId === d.id && l.status === 'in_transit',
+            (l: any) =>
+              matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
           );
-          const sc = sheets.filter((s: any) => s.driverId === d.id).length;
-          const myDocs = (driverDocs || []).filter(
-            (doc: any) => doc.driverId === d.id,
+          const sc = sheets.filter((s: any) =>
+            matchesDriverRef(s.driverId, d),
+          ).length;
+          const myDocs = (driverDocs || []).filter((doc: any) =>
+            matchesDriverRef(doc.driverId, d),
           );
           const missing = DRIVER_DOC_TYPES.filter(
             (t) =>
@@ -709,7 +764,7 @@ export function DriversTab({
           ).length;
           return (
             <Card
-              key={d.id}
+              key={d.driverRecordId || d.id}
               style={{ cursor: 'pointer' }}
               onClick={() => {
                 setSD(d);

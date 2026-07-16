@@ -19,8 +19,12 @@ export function SuperAdminPanel({
   onToggleTheme,
   apiEnabled,
   refreshAll,
+  activeTab,
+  onTabChange,
 }: any) {
   const [tab, setTab] = useState('companies');
+  const currentTab = activeTab || tab;
+  const changeTab = onTabChange || setTab;
   const [show, setShow] = useState(false);
   const [ok, setOk] = useState('');
   const [err, setErr] = useState('');
@@ -135,8 +139,8 @@ export function SuperAdminPanel({
       logo="TS"
       subtitle="Super Admin"
       tabs={TABS}
-      activeTab={tab}
-      onTabChange={setTab}
+      activeTab={currentTab}
+      onTabChange={changeTab}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
       topRight={

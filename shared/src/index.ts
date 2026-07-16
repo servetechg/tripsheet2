@@ -5,4 +5,6 @@ export * from './driver-doc-types';
 export * from './pay-types';
 export * from './asset-types';
 export * from './invite-status';
+export * from './settlement-status';
+export * from './notification-channel';
 export * from './models';

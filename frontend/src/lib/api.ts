@@ -35,6 +35,10 @@ export async function api<T>(
     } catch {
       body = text;
     }
+    if (res.status === 401) {
+      localStorage.removeItem('ts_token');
+      window.dispatchEvent(new Event('ts:auth-expired'));
+    }
     const msg =
       typeof body === 'object' && body && 'message' in body
         ? String((body as { message: unknown }).message)
@@ -243,6 +247,45 @@ export const tripSheetsApi = {
   update: (id: string, body: unknown) =>
     api(`/trip-sheets/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => api(`/trip-sheets/${id}`, { method: 'DELETE' }),
+};
+
+export const settlementsApi = {
+  list: (params: { companyId: string; driverId?: string; status?: string }) => {
+    const q = new URLSearchParams({ companyId: params.companyId });
+    if (params.driverId) q.set('driverId', params.driverId);
+    if (params.status) q.set('status', params.status);
+    return api<any[]>(`/settlements?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/settlements', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: unknown) =>
+    api(`/settlements/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  approve: (id: string) =>
+    api(`/settlements/${id}/approve`, { method: 'POST' }),
+  pay: (id: string) => api(`/settlements/${id}/pay`, { method: 'POST' }),
+  remove: (id: string) => api(`/settlements/${id}`, { method: 'DELETE' }),
+};
+
+export const reportsApi = {
+  summary: (companyId: string) =>
+    api<any>(`/reports/summary?companyId=${encodeURIComponent(companyId)}`),
+};
+
+export const notificationsApi = {
+  list: (companyId: string, limit = 50) =>
+    api<any[]>(
+      `/notifications?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    ),
+  sendSms: (body: {
+    to: string;
+    body: string;
+    companyId?: string;
+    meta?: Record<string, unknown>;
+  }) =>
+    api('/notifications/sms', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };
 
 export function setToken(token: string | null) {

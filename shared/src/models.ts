@@ -6,6 +6,11 @@ import type { DocStatus, DriverDocTypeId } from './driver-doc-types';
 import { CONTRACT_DOC_TYPE } from './driver-doc-types';
 import type { PayTypeId } from './pay-types';
 import type { InviteStatus } from './invite-status';
+import type { SettlementStatus } from './settlement-status';
+import type {
+  NotificationChannel,
+  NotificationStatus,
+} from './notification-channel';
 
 export interface Company {
   id: string;
@@ -172,6 +177,66 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string;
   user: AuthUser;
+}
+
+export interface SettlementLine {
+  label: string;
+  amount: number;
+  source?: string;
+}
+
+export interface Settlement {
+  id: string;
+  companyId: string;
+  driverId: string;
+  driverName?: string;
+  periodStart: string;
+  periodEnd: string;
+  status: SettlementStatus;
+  currency: string;
+  totalAmount: number;
+  lines: SettlementLine[];
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CompanyReportSummary {
+  companyId: string;
+  generatedAt: string;
+  loads: {
+    total: number;
+    assigned: number;
+    inTransit: number;
+    delivered: number;
+    cancelled: number;
+  };
+  fleet: {
+    trucks: number;
+    trailers: number;
+    activeAssets: number;
+  };
+  drivers: number;
+  tripSheets: number;
+  expenseTotal: number;
+  settlements: {
+    draft: number;
+    approved: number;
+    paid: number;
+    paidAmount: number;
+  };
+}
+
+export interface NotificationRecord {
+  id: string;
+  companyId?: string | null;
+  channel: NotificationChannel;
+  to: string;
+  body: string;
+  status: NotificationStatus;
+  providerId?: string | null;
+  meta?: Record<string, unknown>;
+  createdAt: string;
 }
 
 export type { ManifestStatus, ManifestType };

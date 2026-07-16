@@ -6,7 +6,8 @@ import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { loadsApi, driversApi } from '@/lib/api';
+import { loadsApi, driversApi, notificationsApi } from '@/lib/api';
+import { matchesDriverRef } from '@/lib/driverIds';
 
 export function DispatchTab({
   company,
@@ -72,15 +73,6 @@ export function DispatchTab({
   };
 
   const DISPATCH_REQUIRED = ['license', 'abstract', 'medical'];
-  const checkDriverDocs = (driverId: string) => {
-    const dd = (driverDocs || []).filter(
-      (d: any) => d.driverId === driverId && d.status !== 'expired',
-    );
-    return DISPATCH_REQUIRED.filter(
-      (id) => !dd.find((d: any) => d.type === id),
-    );
-  };
-
   const assertDispatchReady = async (driverId: string) => {
     if (apiEnabled) {
       try {
@@ -93,6 +85,21 @@ export function DispatchTab({
       }
     }
     return checkDriverDocs(driverId);
+  };
+
+  const checkDriverDocs = (driverId: string) => {
+    const driver =
+      drivers.find((d: any) => d.id === driverId) ||
+      users.find((u: any) => u.id === driverId);
+    const dd = (driverDocs || []).filter(
+      (d: any) =>
+        (driver
+          ? matchesDriverRef(d.driverId, driver)
+          : d.driverId === driverId) && d.status !== 'expired',
+    );
+    return DISPATCH_REQUIRED.filter(
+      (id) => !dd.find((d: any) => d.type === id),
+    );
   };
 
   const payloadFromForm = () => {
@@ -139,6 +146,21 @@ export function DispatchTab({
             heading: 'E',
             lastUpdate: 'just now',
           });
+          const driver =
+            drivers.find((d: any) => d.id === body.driverId) ||
+            users.find((u: any) => u.id === body.driverId);
+          if (driver?.phone) {
+            try {
+              await notificationsApi.sendSms({
+                to: String(driver.phone),
+                body: `${company.shortName || 'TripSheet'}: new load ${body.origin} → ${body.destination}`,
+                companyId: company.id,
+                meta: { type: 'load_assigned', driverId: body.driverId },
+              });
+            } catch {
+              /* SMS optional — do not block dispatch */
+            }
+          }
         }
         await refreshAll?.();
       } else if (editLoad) {

@@ -11,6 +11,8 @@ NestJS microservice foundation for TripSheet.
 | Fleet | 3004 | `services/fleet-service/` |
 | Manifest | 3005 | `services/manifest-service/` |
 | TripSheet | 3006 | `services/tripsheet-service/` |
+| Accounting | 3007 | `services/accounting-service/` |
+| Notification | 3008 | `services/notification-service/` |
 
 ## Prerequisites
 
@@ -27,8 +29,8 @@ docker compose up -d
 
 This starts:
 
-- **Postgres** on `localhost:5432` with databases: `auth_db`, `company_db`, `driver_db`, `fleet_db`, `manifest_db`, `tripsheet_db`
-- **Redis** on `localhost:6379`
+- **Postgres** on `localhost:5432` with databases: `auth_db`, `company_db`, `driver_db`, `fleet_db`, `manifest_db`, `tripsheet_db`, `accounting_db`, `notification_db`
+- **Redis** on `localhost:6379` (used by notification-service SMS rate limiting)
 
 Credentials (default): user `tripsheet` / password `tripsheet`
 
@@ -45,7 +47,11 @@ Copy-Item services\driver-service\.env.example services\driver-service\.env
 Copy-Item services\fleet-service\.env.example services\fleet-service\.env
 Copy-Item services\manifest-service\.env.example services\manifest-service\.env
 Copy-Item services\tripsheet-service\.env.example services\tripsheet-service\.env
+Copy-Item services\accounting-service\.env.example services\accounting-service\.env
+Copy-Item services\notification-service\.env.example services\notification-service\.env
 ```
+
+Or from `backend/`: `npm run env:copy`
 
 ## 3. Install dependencies
 
@@ -59,7 +65,11 @@ cd services/driver-service && npm install && cd ../..
 cd services/fleet-service && npm install && cd ../..
 cd services/manifest-service && npm install && cd ../..
 cd services/tripsheet-service && npm install && cd ../..
+cd services/accounting-service && npm install && cd ../..
+cd services/notification-service && npm install && cd ../..
 ```
+
+Or from `backend/`: `npm run install:all`
 
 ## 4. Prisma migrate & seed
 

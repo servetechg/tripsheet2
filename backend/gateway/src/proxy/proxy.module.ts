@@ -13,9 +13,20 @@ import { InvitesProxyController } from './invites.proxy.controller';
 import { DocumentsProxyController } from './documents.proxy.controller';
 import { ContractsProxyController } from './contracts.proxy.controller';
 import { CarrierProfilesProxyController } from './carrier-profiles.proxy.controller';
+import { SettlementsProxyController } from './settlements.proxy.controller';
+import { ReportsProxyController } from './reports.proxy.controller';
+import { NotificationsProxyController } from './notifications.proxy.controller';
 
 @Module({
-  imports: [HttpModule, ConfigModule],
+  imports: [
+    HttpModule.register({
+      timeout: 120000,
+      maxRedirects: 3,
+      maxBodyLength: 30 * 1024 * 1024,
+      maxContentLength: 30 * 1024 * 1024,
+    }),
+    ConfigModule,
+  ],
   controllers: [
     AuthProxyController,
     CompaniesProxyController,
@@ -28,6 +39,9 @@ import { CarrierProfilesProxyController } from './carrier-profiles.proxy.control
     DocumentsProxyController,
     ContractsProxyController,
     CarrierProfilesProxyController,
+    SettlementsProxyController,
+    ReportsProxyController,
+    NotificationsProxyController,
   ],
   providers: [ProxyService],
 })

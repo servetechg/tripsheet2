@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Settlement {
+  id          String   @id @default(cuid())
+  companyId   String
+  driverId    String
+  driverName  String   @default("")
+  periodStart DateTime
+  periodEnd   DateTime
+  status      String   @default("draft") // draft | approved | paid
+  currency    String   @default("CAD")
+  totalAmount Float    @default(0)
+  lines       Json     @default("[]") // [{label, amount, source?}]
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([driverId])
+  @@index([status])
+}

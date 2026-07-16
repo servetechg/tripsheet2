@@ -13,7 +13,10 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
 
   const handleFile = (file) => {
     if (!file) return;
-    if (file.size > 5*1024*1024) { setErr("File too large. Max 5MB."); return; }
+    if (file.size > 2 * 1024 * 1024) {
+      setErr('File too large. Max 2MB per document.');
+      return;
+    }
     const ok = ["application/pdf","image/jpeg","image/png","image/webp"];
     if (!ok.includes(file.type)) { setErr("Only PDF, JPG, PNG or WEBP accepted."); return; }
     setErr("");
@@ -22,7 +25,13 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
       const result = e.target?.result;
       if (typeof result !== 'string') return;
       setPreview(result);
-      setFileInfo({ name:file.name, size:(file.size/1024).toFixed(1)+"KB", fileType:file.type, data:result });
+      setFileInfo({
+        name: file.name,
+        size: file.size,
+        displaySize: `${(file.size / 1024).toFixed(1)} KB`,
+        fileType: file.type,
+        data: result,
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -57,7 +66,10 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
                 ? <img src={fileInfo.data} alt="preview" style={{ maxWidth:"100%",maxHeight:180,borderRadius:8,objectFit:"contain" }} />
                 : <div style={{ fontSize:48 }}>📄</div>}
               <div style={{ fontSize:12,color:G.success,fontWeight:700 }}>✓ {fileInfo.name}</div>
-              <div style={{ fontSize:11,color:G.muted }}>{fileInfo.size}</div>
+              <div style={{ fontSize: 11, color: G.muted }}>
+                {fileInfo.displaySize ||
+                  `${(Number(fileInfo.size) / 1024).toFixed(1)} KB`}
+              </div>
               <button onClick={()=>fileRef.current?.click()} style={{ background:"transparent",border:`1px solid ${G.muted}`,color:G.muted,borderRadius:6,padding:"5px 12px",fontSize:11,cursor:"pointer",marginTop:4 }}>Change file</button>
             </>
           ) : (
@@ -67,7 +79,9 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
               <button onClick={()=>fileRef.current?.click()} style={{ background:G.gold,color:G.onGold,border:"none",borderRadius:8,padding:"10px 24px",fontSize:13,fontWeight:800,cursor:"pointer",letterSpacing:1 }}>
                 📂 BROWSE FILES
               </button>
-              <div style={{ fontSize:10,color:G.muted,marginTop:4 }}>PDF · JPG · PNG · WEBP · Max 5MB</div>
+              <div style={{ fontSize: 10, color: G.muted, marginTop: 4 }}>
+                PDF · JPG · PNG · WEBP · Max 2MB
+              </div>
             </>
           )}
         </div>

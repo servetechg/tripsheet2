@@ -6,7 +6,9 @@ $targets = @(
   'services\driver-service',
   'services\fleet-service',
   'services\manifest-service',
-  'services\tripsheet-service'
+  'services\tripsheet-service',
+  'services\accounting-service',
+  'services\notification-service'
 )
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
