@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
-import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { useState } from 'react';
+import { G } from '@/lib/theme';
+import { Btn, Inp, Sel } from '@/components/ui';
 import { blank } from '@/lib/format';
-import { uid } from '@/lib/uid';
-import { DRIVER_DOC_TYPES, PAY_TYPES, DISPATCH_REQUIRED_DOCS, DOC_STATUS_COLOR } from '@/lib/docTypes';
+import { PAY_TYPES } from '@/lib/docTypes';
 
 export function AdminWageModal({ driver, company, existingContract, onSave, onClose }: any) {
   const today = new Date().toLocaleDateString("en-CA");
@@ -19,8 +18,8 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
     trialDays:     existingContract?.trialDays     || "90",
     noticeDays:    existingContract?.noticeDays    || "14",
     benefits:      existingContract?.benefits      || "",
-    deductions:    existingContract?.deductions    || "",
-    notes:         existingContract?.notes         || "",
+    deductions:    existingContract?.deductions || existingContract?.payload?.deductions || "",
+    notes:         existingContract?.notes || existingContract?.payload?.notes || "",
     startDate:     existingContract?.startDate     || today,
     signedByAdmin: true,
     signedByDriver: existingContract?.signedByDriver || false,
@@ -31,11 +30,11 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
 
   const save = () => {
     if (blank(f.payRate)) { setErr("Pay rate is required."); return; }
+    // Do not invent or reuse document ids — parent decides create vs update
     onSave({
-      id:          existingContract?.id || uid(),
+      ...(existingContract?.id ? { id: existingContract.id } : {}),
       ...f,
-      type:        "__contract__",
-      driverId:    driver.id,
+      driverId:    driver.driverRecordId || driver.id,
       companyId:   company.id,
       driverName:  driver.name,
       companyName: company.name,
@@ -43,7 +42,6 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
       updatedAt:   today,
       signedByAdmin: true,
     });
-    onClose();
   };
 
   return (

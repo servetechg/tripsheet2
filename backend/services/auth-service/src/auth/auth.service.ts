@@ -77,6 +77,35 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
+  /**
+   * Invite / service retries: create user, or return existing if same email.
+   * Only for internal service calls — not for public registration.
+   */
+  async createUserOrGet(dto: CreateUserDto) {
+    const email = dto.email.toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      const data: Prisma.UserUpdateInput = {};
+      if (dto.name && dto.name !== existing.name) data.name = dto.name;
+      if (dto.companyId !== undefined && dto.companyId !== existing.companyId) {
+        data.companyId = dto.companyId;
+      }
+      if (dto.role && dto.role !== existing.role) data.role = dto.role;
+      if (dto.password?.length) {
+        data.passwordHash = await bcrypt.hash(dto.password, 10);
+      }
+      if (Object.keys(data).length > 0) {
+        const updated = await this.prisma.user.update({
+          where: { id: existing.id },
+          data,
+        });
+        return this.toPublicUser(updated);
+      }
+      return this.toPublicUser(existing);
+    }
+    return this.createUser(dto);
+  }
+
   async listUsers(companyId?: string) {
     const users = await this.prisma.user.findMany({
       where: companyId ? { companyId } : undefined,

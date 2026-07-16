@@ -10,6 +10,8 @@ import { DriversTab } from '@/features/drivers/DriversTab';
 import { AssetsTab } from '@/features/assets/AssetsTab';
 import { AdminSheetsTab } from '@/features/trip-sheets/AdminSheetsTab';
 import { PrintPreview } from '@/features/trip-sheets/PrintPreview';
+import { ReportsTab } from '@/features/reports/ReportsTab';
+import { AccountingTab } from '@/features/accounting/AccountingTab';
 
 export function CompanyAdminPanel({
   company,
@@ -34,8 +36,11 @@ export function CompanyAdminPanel({
   onToggleTheme,
   apiEnabled,
   refreshAll,
+  activeTab,
+  onTabChange,
 }: any) {
-  const [tab, setTab] = useState('dispatch');
+  const tab = activeTab || 'dispatch';
+  const setTab = onTabChange || (() => {});
   const [adminPreview, setAdminPreview] = useState<any>(null);
   const sn = company.shortName;
 
@@ -68,6 +73,8 @@ export function CompanyAdminPanel({
     { id: 'drivers', icon: '👤', label: 'Drivers' },
     { id: 'assets', icon: '🔧', label: 'Assets' },
     { id: 'sheets', icon: '📋', label: 'Sheets' },
+    { id: 'reports', icon: '📊', label: 'Reports' },
+    { id: 'accounting', icon: '💰', label: 'Accounting' },
   ];
 
   const STATUS_COLOR = {
@@ -190,6 +197,17 @@ export function CompanyAdminPanel({
               users={users}
               company={company}
               onViewPdf={setAdminPreview}
+            />
+          )}
+          {tab === 'reports' && (
+            <ReportsTab company={company} apiEnabled={apiEnabled} />
+          )}
+          {tab === 'accounting' && (
+            <AccountingTab
+              company={company}
+              drivers={myDrivers}
+              sheets={mySheets}
+              apiEnabled={apiEnabled}
             />
           )}
         </>

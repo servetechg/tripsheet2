@@ -9,7 +9,7 @@ tripsheet/
 ├── frontend/     # React + Vite + TypeScript
 ├── backend/      # NestJS microservices + API gateway
 │   ├── gateway/              # :3000
-│   └── services/             # auth, company, driver, fleet, manifest, tripsheet
+│   └── services/             # auth, company, driver, fleet, manifest, tripsheet, accounting, notification
 └── shared/       # Shared TS enums & types
 ```
 
@@ -20,14 +20,15 @@ tripsheet/
 | **0 — Foundation** | Done | Monorepo split, TS frontend, Nest scaffold |
 | **1 — Core ops** | Done | Live APIs for all current features + FE wiring |
 | **2 — Hardening** | Done | Cloudinary uploads, service tests, API-required UI, stricter TS |
-| 3 — Later | Pending | Accounting, SMS, reports |
+| **3 — Ops extensions** | Done | Accounting settlements, SMS notifications (Redis), company reports |
 
-## Phase 2 highlights
+## Phase 3 highlights
 
-- **Cloudinary** for driver documents (`fileUrl` + `cloudinaryPublicId`; no huge base64 in DB when configured)
-- **Jest tests** for load assign/status rules and dispatch-ready doc gate
-- **Live API required** — offline seed login removed; login shows reconnect UI if gateway is down
-- Frontend `strict` + `strictNullChecks` enabled (`noImplicitAny` still gradual)
+- **accounting-service** (`:3007`) — driver settlements (draft → approved → paid) + ops report summary
+- **notification-service** (`:3008`) — SMS via Twilio or simulated; Redis rate-limit with in-memory fallback
+- Company Admin tabs: **Reports**, **Accounting**
+- Invite SMS + load-assign SMS (when driver has a phone)
+- Infra: Redis (already in Compose) used by notifications; LB remains a deploy concern
 
 ## Quick start
 
@@ -45,12 +46,25 @@ npm run env:copy
 npm run install:all
 ```
 
-Set Cloudinary on `services/driver-service/.env`:
+If Postgres was created before Phase 3, create the new DBs once:
+```bash
+npm run dbs:phase3
+```
+
+Set Cloudinary on `services/driver-service/.env` (optional but recommended):
 ```
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 CLOUDINARY_FOLDER=tripsheet/documents
+```
+
+Optional Twilio on `services/notification-service/.env` (without it, SMS is simulated and logged):
+```
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_FROM_NUMBER=...
+REDIS_URL=redis://localhost:6379
 ```
 
 Migrate + seed (first time / after schema changes):
@@ -61,6 +75,8 @@ cd services/driver-service && npx prisma migrate dev && npm run seed && cd ../..
 cd services/fleet-service && npx prisma migrate dev && npm run seed && cd ../..
 cd services/manifest-service && npx prisma migrate dev && npm run seed && cd ../..
 cd services/tripsheet-service && npx prisma migrate dev && cd ../..
+cd services/accounting-service && npx prisma migrate dev && cd ../..
+cd services/notification-service && npx prisma migrate dev && cd ../..
 ```
 
 Start all Nest apps:

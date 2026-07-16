@@ -15,6 +15,10 @@ import {
   documentsApi,
   contractsApi,
 } from '@/lib/api';
+import {
+  driverRecordIdOf,
+  matchesDriverRef,
+} from '@/lib/driverIds';
 
 export function DriverDashboard({
   user,
@@ -29,26 +33,34 @@ export function DriverDashboard({
   onToggleTheme,
   apiEnabled,
   refreshAll,
+  activeTab,
+  onTabChange,
 }: any) {
-  const [tab, setTab] = useState('sheets');
+  const tab = activeTab || 'sheets';
+  const setTab = onTabChange || (() => {});
   const [formOpen, setForm] = useState(false);
   const [editSheet, setEditSheet] = useState<any>(null);
   const [previewS, setPreview] = useState<any>(null);
   const sn = company.shortName;
+  const recordId = driverRecordIdOf(user);
   const mySheets = sheets.filter(
-    (s: any) => s.companyId === company.id && s.driverId === user.id,
+    (s: any) =>
+      s.companyId === company.id && matchesDriverRef(s.driverId, user),
   );
   const sortedSheets = [...mySheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
   const myLoad = loads.find(
-    (l: any) => l.driverId === user.id && l.status === 'in_transit',
+    (l: any) =>
+      matchesDriverRef(l.driverId, user) && l.status === 'in_transit',
   );
   const myDocs = (driverDocs || []).filter(
-    (d: any) => d.driverId === user.id && d.type !== '__contract__',
+    (d: any) =>
+      matchesDriverRef(d.driverId, user) && d.type !== '__contract__',
   );
   const localContract = (driverDocs || []).find(
-    (d: any) => d.driverId === user.id && d.type === '__contract__',
+    (d: any) =>
+      matchesDriverRef(d.driverId, user) && d.type === '__contract__',
   );
   const [apiContract, setApiContract] = useState<any>(null);
   const myContract = apiEnabled ? apiContract || localContract : localContract;
@@ -61,13 +73,13 @@ export function DriverDashboard({
     let cancelled = false;
     (async () => {
       try {
-        const list = await contractsApi.list(user.id);
+        const list = await contractsApi.list(recordId);
         if (!cancelled && Array.isArray(list) && list.length) {
           const c = list[0];
           setApiContract({
             ...c,
             type: '__contract__',
-            driverId: user.id,
+            driverId: recordId,
             companyId: company.id,
             signedByDriver: !!c.signedByDriver || !!c.driverSignedAt,
             driverSignedAt: c.driverSignedAt,
@@ -81,12 +93,12 @@ export function DriverDashboard({
     return () => {
       cancelled = true;
     };
-  }, [apiEnabled, tab, user.id, company.id]);
+  }, [apiEnabled, tab, recordId, company.id]);
 
   const saveDoc = async (typeId: string, fileData: any) => {
     const nd = {
       id: uid(),
-      driverId: user.id,
+      driverId: recordId,
       companyId: company.id,
       type: typeId,
       fileName: fileData.name,
@@ -101,7 +113,7 @@ export function DriverDashboard({
     try {
       if (apiEnabled) {
         await documentsApi.upsert({
-          driverId: user.id,
+          driverId: recordId,
           companyId: company.id,
           type: typeId,
           fileName: fileData.name,
@@ -117,7 +129,7 @@ export function DriverDashboard({
       } else {
         setDriverDocs((p: any[]) => {
           const ex = p.findIndex(
-            (d) => d.driverId === user.id && d.type === typeId,
+            (d) => matchesDriverRef(d.driverId, user) && d.type === typeId,
           );
           if (ex >= 0) {
             const n = [...p];
@@ -179,13 +191,13 @@ export function DriverDashboard({
       if (apiEnabled && myContract?.id) {
         await contractsApi.sign(myContract.id, { role: 'driver' });
         await refreshAll?.();
-        const list = await contractsApi.list(user.id);
+        const list = await contractsApi.list(recordId);
         if (Array.isArray(list) && list.length) {
           const c = list[0];
           setApiContract({
             ...c,
             type: '__contract__',
-            driverId: user.id,
+            driverId: recordId,
             companyId: company.id,
             signedByDriver: true,
             driverSignedAt:
@@ -196,7 +208,7 @@ export function DriverDashboard({
       } else {
         setDriverDocs((p: any[]) =>
           p.map((d) =>
-            d.driverId === user.id && d.type === '__contract__'
+            matchesDriverRef(d.driverId, user) && d.type === '__contract__'
               ? {
                   ...d,
                   signedByDriver: true,
