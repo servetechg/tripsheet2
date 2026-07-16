@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 
 export function DocUploadModal({ docType, onUpload, onClose }: any) {
   const [expiry,   setExpiry]   = useState("");
@@ -46,7 +46,19 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
       <div style={{ background:G.card,border:`1px solid ${G.border}`,borderRadius:16,padding:24,width:"100%",maxWidth:460,maxHeight:"92vh",overflow:"auto" }}>
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
-            <div style={{ fontSize:15,fontWeight:700,color:G.text }}>{docType.icon} {docType.label}</div>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: G.text,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {Icons.docs({ size: 16, color: G.text })}
+              {docType.label}
+            </div>
             <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>Select file from your device</div>
           </div>
           <button onClick={onClose} style={{ background:"transparent",border:`1px solid ${G.border}`,color:G.muted,borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16 }}>✕</button>
@@ -64,7 +76,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
             <>
               {fileInfo.fileType.startsWith("image/")
                 ? <img src={fileInfo.data} alt="preview" style={{ maxWidth:"100%",maxHeight:180,borderRadius:8,objectFit:"contain" }} />
-                : <div style={{ fontSize:48 }}>📄</div>}
+                : <div>{Icons.docs({ size: 48, color: G.muted })}</div>}
               <div style={{ fontSize:12,color:G.success,fontWeight:700 }}>✓ {fileInfo.name}</div>
               <div style={{ fontSize: 11, color: G.muted }}>
                 {fileInfo.displaySize ||
@@ -74,10 +86,11 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
             </>
           ) : (
             <>
-              <div style={{ fontSize:36 }}>📁</div>
+              <div>{Icons.upload({ size: 36, color: G.muted })}</div>
               <div style={{ fontSize:13,color:G.muted }}>Drag & drop here, or</div>
-              <button onClick={()=>fileRef.current?.click()} style={{ background:G.gold,color:G.onGold,border:"none",borderRadius:8,padding:"10px 24px",fontSize:13,fontWeight:800,cursor:"pointer",letterSpacing:1 }}>
-                📂 BROWSE FILES
+              <button onClick={()=>fileRef.current?.click()} style={{ background:G.gold,color:G.onGold,border:"none",borderRadius:8,padding:"10px 24px",fontSize:13,fontWeight:800,cursor:"pointer",letterSpacing:1, display:'inline-flex', alignItems:'center', gap:6 }}>
+                {Icons.upload({ size: 16, color: G.onGold })}
+                BROWSE FILES
               </button>
               <div style={{ fontSize: 10, color: G.muted, marginTop: 4 }}>
                 PDF · JPG · PNG · WEBP · Max 2MB
@@ -95,7 +108,10 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
         <Inp label="Notes (optional)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Renewed Mar 2026, verified original" />
 
         <div style={{ display:"flex",gap:10 }}>
-          <Btn full onClick={submit} style={{ padding:14,opacity:fileInfo?1:0.5 }}>⬆️ UPLOAD DOCUMENT</Btn>
+          <Btn full onClick={submit} style={{ padding:14,opacity:fileInfo?1:0.5, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            {Icons.upload({ size: 16, color: G.onGold })}
+            UPLOAD DOCUMENT
+          </Btn>
           <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
         </div>
       </div>

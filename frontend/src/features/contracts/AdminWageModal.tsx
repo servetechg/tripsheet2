@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Inp, Sel } from '@/components/ui';
+import { Btn, Inp, Sel, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { PAY_TYPES } from '@/lib/docTypes';
 
@@ -51,7 +51,19 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
         {/* Header */}
         <div style={{ background:G.card,borderBottom:`2px solid ${G.gold}`,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center" }}>
           <div>
-            <div style={{ fontSize:14,fontWeight:700,color:G.text }}>💰 SET DRIVER WAGE</div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: G.text,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {Icons.contract({ size: 16, color: G.text })}
+              SET DRIVER WAGE
+            </div>
             <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>{driver.name} · {company.name}</div>
           </div>
           <button onClick={onClose} style={{ background:"transparent",border:`1px solid ${G.border}`,color:G.muted,borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16 }}>✕</button>
@@ -68,7 +80,7 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
             <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
               {PAY_TYPES.map(p=>(
                 <button key={p.id} onClick={()=>upd("payType",p.id)} style={{ background:f.payType===p.id?G.gold:"transparent",color:f.payType===p.id?G.onGold:G.muted,border:`1px solid ${f.payType===p.id?G.gold:G.border2}`,borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer" }}>
-                  {p.icon} {p.label}
+                  {p.label}
                 </button>
               ))}
             </div>
@@ -80,13 +92,13 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
             <div style={{ display:"grid",gridTemplateColumns:"2fr 1fr",gap:12 }}>
               <Inp label={`Rate (${pt.unit})`} value={f.payRate} onChange={e=>upd("payRate",e.target.value)} placeholder="e.g. 0.65" type="number" />
               <Sel label="Currency" value={f.payUnit} onChange={e=>upd("payUnit",e.target.value)}>
-                <option value="CAD">🍁 CAD</option>
-                <option value="USD">🇺🇸 USD</option>
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
               </Sel>
             </div>
             {f.payRate&&(
               <div style={{ background:`${G.gold}11`,border:`1px solid ${G.gold}33`,borderRadius:8,padding:"10px 14px",fontSize:15,fontWeight:900,color:G.gold }}>
-                {pt.icon} {f.payUnit} {f.payRate} {pt.unit}
+                {f.payUnit} {f.payRate} {pt.unit}
               </div>
             )}
           </div>
@@ -115,13 +127,19 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
           {/* Status */}
           <div style={{ background:G.card2,border:`1px solid ${G.border}`,borderRadius:10,padding:"12px 14px",fontSize:11,color:G.muted }}>
             <div style={{ color:G.text,fontWeight:700,marginBottom:4 }}>Signature Status</div>
-            <div>🏢 Company: <span style={{ color:G.success }}>✓ Auto-signed by admin</span></div>
-            <div style={{ marginTop:4 }}>👤 Driver: {f.signedByDriver ? <span style={{ color:G.success }}>✓ Signed</span> : <span style={{ color:G.gold }}>Pending — driver will sign via their dashboard</span>}</div>
+            <div>Company: <span style={{ color:G.success }}>Auto-signed by admin</span></div>
+            <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              {Icons.driver({ size: 14, color: G.muted })}
+              Driver: {f.signedByDriver ? <span style={{ color:G.success }}>Signed</span> : <span style={{ color:G.gold }}>Pending — driver will sign via their dashboard</span>}
+            </div>
           </div>
         </div>
 
         <div style={{ padding:"14px 20px",borderTop:`1px solid ${G.border}`,display:"flex",gap:10,background:G.inset }}>
-          <Btn onClick={save} style={{ flex:1,padding:13 }}>💾 SAVE WAGE & TERMS</Btn>
+          <Btn onClick={save} style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            {Icons.save({ size: 16, color: G.onGold })}
+            SAVE WAGE & TERMS
+          </Btn>
           <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
         </div>
       </div>

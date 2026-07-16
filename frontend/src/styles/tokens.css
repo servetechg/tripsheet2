@@ -5,12 +5,22 @@
   --space-lg: 16px;
   --space-xl: 24px;
   --space-xxl: 32px;
-  --radius-sm: 7px;
-  --radius-md: 9px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
   --radius-lg: 12px;
   --radius-xl: 14px;
-  --radius-xxl: 18px;
-  --radius-pill: 20px;
+  --radius-xxl: 16px;
+  --radius-pill: 999px;
   --font-ui: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
   --font-mono: 'DM Mono', 'Courier New', monospace;
+  --color-primary: #2563EB;
+  --color-secondary: #1E40AF;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-danger: #DC2626;
+  --color-bg: #F8FAFC;
+  --color-card: #FFFFFF;
+  --color-text: #0F172A;
+  --color-muted: #64748B;
+  --color-border: #E2E8F0;
 }

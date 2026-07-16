@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G, pagePlain } from '@/lib/theme';
-import { Card, Pill, SectionTitle } from '@/components/ui';
+import { Card, Pill, SectionTitle, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
@@ -196,10 +196,33 @@ export function DriverProfile({
         : 'Wage set'
     : 'No Wage';
   const stats = [
-    ['Trips', mySheets.length, G.gold],
-    ['Loads', myLoads.length, G.info],
-    ['Docs', fileDocs.length, G.success],
-    ['Missing', missingDocs, missingDocs > 0 ? G.danger : G.success],
+    {
+      label: 'Trips',
+      value: mySheets.length,
+      color: G.warning,
+      icon: Icons.sheets({ size: 18, color: G.warning }),
+    },
+    {
+      label: 'Loads',
+      value: myLoads.length,
+      color: G.info,
+      icon: Icons.dispatch({ size: 18, color: G.info }),
+    },
+    {
+      label: 'Docs',
+      value: fileDocs.length,
+      color: G.success,
+      icon: Icons.docs({ size: 18, color: G.success }),
+    },
+    {
+      label: 'Missing',
+      value: missingDocs,
+      color: missingDocs > 0 ? G.danger : G.success,
+      icon: Icons.alert({
+        size: 18,
+        color: missingDocs > 0 ? G.danger : G.success,
+      }),
+    },
   ];
 
   return (
@@ -257,9 +280,13 @@ export function DriverProfile({
               fontSize: 11,
               fontWeight: 800,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            💰 {myContract?.payRate ? 'EDIT WAGE' : 'SET WAGE'}
+            {Icons.contract({ size: 16, color: G.gold })}
+            {myContract?.payRate ? 'EDIT WAGE' : 'SET WAGE'}
           </button>
           <button
             type="button"
@@ -273,9 +300,13 @@ export function DriverProfile({
               fontSize: 11,
               fontWeight: 800,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            ✏️ EDIT
+            {Icons.edit({ size: 16, color: G.onGold })}
+            EDIT
           </button>
         </div>
       </div>
@@ -300,11 +331,10 @@ export function DriverProfile({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 28,
                 flexShrink: 0,
               }}
             >
-              👤
+              {Icons.driver({ size: 32, color: G.gold })}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 20, fontWeight: 900, color: G.text }}>
@@ -337,43 +367,32 @@ export function DriverProfile({
                         : G.danger
                   }
                 >
-                  📄 {contractStatus}
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    {Icons.contract({ size: 12, color: 'currentColor' })}
+                    {contractStatus}
+                  </span>
                 </Pill>
               </div>
             </div>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4,1fr)',
-                gap: 8,
-                minWidth: 260,
-              }}
-            >
-              {stats.map(([l, v, c]) => (
-                <div
-                  key={String(l)}
-                  style={{
-                    background: G.card2,
-                    borderRadius: 8,
-                    padding: '10px 6px',
-                    textAlign: 'center',
-                  }}
-                >
-                  <div style={{ fontSize: 20, fontWeight: 900, color: c as string }}>
-                    {v}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 8,
-                      letterSpacing: 1,
-                      color: G.muted,
-                      marginTop: 1,
-                    }}
-                  >
-                    {l}
-                  </div>
-                </div>
-              ))}
+            <div style={{ minWidth: 260, flex: 1, maxWidth: 420 }}>
+              <StatsGrid columns={4} style={{ marginBottom: 0, gap: 8 }}>
+                {stats.map((s) => (
+                  <StatCard
+                    key={s.label}
+                    label={s.label}
+                    value={s.value}
+                    accent={s.color}
+                    icon={s.icon}
+                    style={{ padding: '12px 12px 10px' }}
+                  />
+                ))}
+              </StatsGrid>
             </div>
           </div>
         </Card>
@@ -449,11 +468,11 @@ export function DriverProfile({
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           {(
             [
-              ['documents', '📁 DOCUMENTS'],
-              ['trips', '📋 TRIP SHEETS'],
-              ['loads', '🚚 LOAD HISTORY'],
+              ['documents', 'DOCUMENTS', Icons.docs],
+              ['trips', 'TRIP SHEETS', Icons.sheets],
+              ['loads', 'LOAD HISTORY', Icons.dispatch],
             ] as const
-          ).map(([id, label]) => (
+          ).map(([id, label, Icon]) => (
             <button
               key={id}
               type="button"
@@ -468,8 +487,15 @@ export function DriverProfile({
                 fontWeight: 700,
                 cursor: 'pointer',
                 letterSpacing: 1,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
+              {Icon({
+                size: 16,
+                color: docTab === id ? G.onGold : G.muted,
+              })}
               {label}
             </button>
           ))}
@@ -488,7 +514,7 @@ export function DriverProfile({
                 color: G.muted,
               }}
             >
-              📎 Upload images or PDFs. Files are stored via Cloudinary when
+              Upload images or PDFs. Files are stored via Cloudinary when
               configured (otherwise securely in the API).{' '}
               <span style={{ color: G.gold }}>Required docs</span> marked with *.
             </div>
@@ -508,7 +534,7 @@ export function DriverProfile({
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 22 }}>📄</span>
+                {Icons.contract({ size: 22, color: G.muted })}
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>
                     Employment Contract (wage)
@@ -547,9 +573,13 @@ export function DriverProfile({
                   fontSize: 11,
                   fontWeight: 800,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
                 }}
               >
-                {myContract?.payRate ? '💰 EDIT WAGE' : '💰 SET WAGE'}
+                {Icons.contract({ size: 16, color: G.onGold })}
+                {myContract?.payRate ? 'EDIT WAGE' : 'SET WAGE'}
               </button>
             </div>
 
@@ -600,7 +630,7 @@ export function DriverProfile({
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <span style={{ fontSize: 22 }}>{docType.icon}</span>
+                      {Icons.docs({ size: 22, color: G.muted })}
                       <div>
                         <div
                           style={{
@@ -659,9 +689,13 @@ export function DriverProfile({
                               fontSize: 11,
                               cursor: 'pointer',
                               fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
                             }}
                           >
-                            👁 VIEW
+                            {Icons.eye({ size: 16, color: G.gold })}
+                            VIEW
                           </button>
                           <button
                             type="button"
@@ -674,9 +708,12 @@ export function DriverProfile({
                               padding: '5px 12px',
                               fontSize: 11,
                               cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
                             }}
                           >
-                            🗑
+                            {Icons.trash({ size: 16, color: G.danger })}
                           </button>
                         </>
                       )}
@@ -693,9 +730,13 @@ export function DriverProfile({
                           fontSize: 11,
                           cursor: 'pointer',
                           fontWeight: 800,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
                       >
-                        {doc ? '↑ REPLACE' : '↑ UPLOAD'}
+                        {Icons.upload({ size: 16, color: G.onGold })}
+                        {doc ? 'REPLACE' : 'UPLOAD'}
                       </button>
                     </div>
                   </div>
@@ -719,7 +760,7 @@ export function DriverProfile({
             </div>
             {mySheets.length === 0 ? (
               <Card style={{ textAlign: 'center', padding: 40 }}>
-                <div style={{ fontSize: 30 }}>📋</div>
+                <div>{Icons.sheets({ size: 36, color: G.muted })}</div>
                 <div style={{ color: G.muted, marginTop: 8 }}>
                   No trip sheets yet.
                 </div>
@@ -788,7 +829,7 @@ export function DriverProfile({
             </div>
             {myLoads.length === 0 ? (
               <Card style={{ textAlign: 'center', padding: 40 }}>
-                <div style={{ fontSize: 30 }}>🚚</div>
+                <div>{Icons.dispatch({ size: 36, color: G.muted })}</div>
                 <div style={{ color: G.muted, marginTop: 8 }}>No loads yet.</div>
               </Card>
             ) : (
@@ -829,11 +870,33 @@ export function DriverProfile({
                           {String(l.status).replace('_', ' ').toUpperCase()}
                         </Pill>
                       </div>
-                      <div style={{ fontSize: 12, color: G.text }}>
-                        🚛 {l.truckNo || '—'} · 📦 {l.trailerNo || '—'}
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: G.text,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {Icons.truck({ size: 14, color: G.text })}
+                        {l.truckNo || '—'}
+                        <span>·</span>
+                        {Icons.trailer({ size: 14, color: G.text })}
+                        {l.trailerNo || '—'}
                       </div>
-                      <div style={{ fontSize: 11, color: G.muted }}>
-                        📍 {l.origin} → {l.destination}
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: G.muted,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        {Icons.pin({ size: 14, color: G.muted })}
+                        {l.origin} → {l.destination}
                       </div>
                     </div>
                   </div>

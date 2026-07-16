@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { G, SPACE, RADIUS, FONT_UI } from '@/lib/theme';
 import { uid } from '@/lib/uid';
+import { Icons } from '@/components/ui/Icons';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -19,6 +20,12 @@ export function notify(msg: string, type: ToastType = 'success'): void {
   _toastSubscribers.forEach((fn) => fn(toast));
 }
 
+function toastIcon(type: ToastType, color: string): ReactNode {
+  if (type === 'error') return Icons.alert({ size: 16, color });
+  if (type === 'info') return Icons.bell({ size: 16, color });
+  return Icons.completed({ size: 16, color });
+}
+
 export function ToastHost() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   useEffect(() => {
@@ -35,11 +42,6 @@ export function ToastHost() {
     };
   }, []);
   if (!toasts.length) return null;
-  const ICONS: Record<string, string> = {
-    success: '✓',
-    error: '⚠️',
-    info: 'ℹ️',
-  };
   return (
     <div
       style={{
@@ -73,9 +75,7 @@ export function ToastHost() {
               gap: SPACE.sm,
             }}
           >
-            <span style={{ color: c, fontWeight: 800, flexShrink: 0 }}>
-              {ICONS[t.type] || ICONS.success}
-            </span>
+            <span style={{ flexShrink: 0, marginTop: 1 }}>{toastIcon(t.type, c)}</span>
             <span style={{ flex: 1 }}>{t.msg}</span>
           </div>
         );

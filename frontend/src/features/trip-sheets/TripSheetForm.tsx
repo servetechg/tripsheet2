@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { PrintPreview } from './PrintPreview';
@@ -95,7 +95,7 @@ export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any)
               <div>
                 <div style={{ fontSize:10,letterSpacing:2,color:G.muted,marginBottom:6,textTransform:"uppercase" }}>Currency</div>
                 <div style={{ display:"flex",borderRadius:8,overflow:"hidden",border:`1px solid ${G.border2}` }}>
-                  {["CAD","USD"].map(c=><button key={c} onClick={()=>updE(e.id,"currency",c)} style={{ flex:1,padding:"11px",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:e.currency===c?G.gold:G.card2,color:e.currency===c?G.onGold:G.muted }}>{c==="CAD"?"🍁 CAD":"🇺🇸 USD"}</button>)}
+                  {["CAD","USD"].map(c=><button key={c} onClick={()=>updE(e.id,"currency",c)} style={{ flex:1,padding:"11px",border:"none",cursor:"pointer",fontWeight:700,fontSize:12,background:e.currency===c?G.gold:G.card2,color:e.currency===c?G.onGold:G.muted }}>{c}</button>)}
                 </div>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any)
       </div>
 
       <div style={{ position:"fixed",bottom:0,left:0,right:0,background:G.card,borderTop:`1px solid ${G.border}`,padding:"12px 16px",display:"flex",gap:12,zIndex:300,paddingBottom:"env(safe-area-inset-bottom)" }}>
-        <Btn variant="ghost" style={{ flex:1,padding:13 }} onClick={()=>setPreview(true)}>👁 VIEW / PDF</Btn>
+        <Btn variant="ghost" style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }} onClick={()=>setPreview(true)}>{Icons.eye({ size: 16, color: G.muted })} VIEW / PDF</Btn>
         <Btn style={{ flex:1,padding:13, opacity:saving?0.6:1 }} onClick={save}>{saving?"SAVING…":"SAVE SHEET"}</Btn>
       </div>
     </div>

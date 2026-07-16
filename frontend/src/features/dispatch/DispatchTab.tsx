@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
@@ -225,70 +225,47 @@ export function DispatchTab({
     {
       label: 'In Transit',
       value: loads.filter((l: any) => l.status === 'in_transit').length,
-      color: G.gold,
+      color: G.warning,
+      subtitle: 'Currently moving',
+      icon: Icons.running({ size: 20, color: G.warning }),
     },
     {
       label: 'Assigned',
       value: loads.filter((l: any) => l.status === 'assigned').length,
       color: G.info,
+      subtitle: 'Ready to start',
+      icon: Icons.assigned({ size: 20, color: G.info }),
     },
     {
       label: 'Delivered',
       value: loads.filter((l: any) => l.status === 'delivered').length,
       color: G.success,
+      subtitle: 'Completed loads',
+      icon: Icons.completed({ size: 20, color: G.success }),
     },
     {
       label: 'Cancelled',
       value: loads.filter((l: any) => l.status === 'cancelled').length,
       color: G.danger,
+      subtitle: 'Stopped loads',
+      icon: Icons.cancelled({ size: 20, color: G.danger }),
     },
   ];
 
   return (
     <div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 10,
-          marginBottom: 20,
-        }}
-      >
+      <StatsGrid>
         {stats.map((s) => (
-          <div
+          <StatCard
             key={s.label}
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: 12,
-              padding: '14px 12px',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                fontSize: 28,
-                fontWeight: 900,
-                color: s.color,
-                lineHeight: 1,
-              }}
-            >
-              {s.value}
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.5,
-                color: G.muted,
-                marginTop: 5,
-                textTransform: 'uppercase',
-              }}
-            >
-              {s.label}
-            </div>
-          </div>
+            label={s.label}
+            value={s.value}
+            subtitle={s.subtitle}
+            accent={s.color}
+            icon={s.icon}
+          />
         ))}
-      </div>
+      </StatsGrid>
 
       <div
         style={{
@@ -310,8 +287,18 @@ export function DispatchTab({
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {onEManifest && (
-            <Btn variant="ghost" size="sm" onClick={onEManifest}>
-              🛃 eManifest
+            <Btn
+              variant="ghost"
+              size="sm"
+              onClick={onEManifest}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {Icons.emanifest({ size: 16, color: G.muted })}
+              eManifest
             </Btn>
           )}
           <Btn
@@ -401,9 +388,17 @@ export function DispatchTab({
                       </div>
                       {!canDispatch && (
                         <div
-                          style={{ fontSize: 10, color: G.danger, marginTop: 2 }}
+                          style={{
+                            fontSize: 10,
+                            color: G.danger,
+                            marginTop: 2,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}
                         >
-                          ⛔ Missing:{' '}
+                          {Icons.alert({ size: 12, color: G.danger })}
+                          Missing:{' '}
                           {missing
                             .map(
                               (id: string) =>
@@ -527,7 +522,9 @@ export function DispatchTab({
 
       {loads.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 60 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚚</div>
+          <div style={{ marginBottom: 12 }}>
+            {Icons.dispatch({ size: 36, color: G.muted })}
+          </div>
           <div style={{ color: G.muted }}>
             No loads yet. Click{' '}
             <strong style={{ color: G.gold }}>+ Assign Load</strong> to get
@@ -606,11 +603,34 @@ export function DispatchTab({
                   >
                     {driver?.name || '—'}
                   </div>
-                  <div style={{ fontSize: 11, color: G.muted }}>
-                    🚛 {l.truckNo || '—'} &nbsp;·&nbsp; 📦 {l.trailerNo || '—'}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: G.muted,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {Icons.truck({ size: 14, color: G.muted })}
+                    {l.truckNo || '—'}
+                    <span>·</span>
+                    {Icons.trailer({ size: 14, color: G.muted })}
+                    {l.trailerNo || '—'}
                   </div>
-                  <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                    📍 {l.origin} → {l.destination}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: G.muted,
+                      marginTop: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    {Icons.pin({ size: 14, color: G.muted })}
+                    {l.origin} → {l.destination}
                   </div>
                   {l.pickupTime && (
                     <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
@@ -670,8 +690,18 @@ export function DispatchTab({
                         ✕ Cancel
                       </Btn>
                     )}
-                    <Btn variant="outline" size="sm" onClick={onTrack}>
-                      📍 Track
+                    <Btn
+                      variant="outline"
+                      size="sm"
+                      onClick={onTrack}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      {Icons.track({ size: 16, color: G.muted })}
+                      Track
                     </Btn>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -680,16 +710,27 @@ export function DispatchTab({
                         variant="ghost"
                         size="sm"
                         onClick={() => openEdit(l)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
                       >
-                        ✏️ Edit
+                        {Icons.edit({ size: 16, color: G.muted })}
+                        Edit
                       </Btn>
                     )}
                     <Btn
                       variant="danger"
                       size="sm"
                       onClick={() => deleteLoad(l.id)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
                     >
-                      🗑
+                      {Icons.trash({ size: 16, color: G.danger })}
                     </Btn>
                   </div>
                 </div>

@@ -8,7 +8,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { G, pageCentered } from '@/lib/theme';
-import { Btn } from '@/components/ui';
+import { Btn, Icons } from '@/components/ui';
 import { ToastHost } from '@/components/feedback/Toast';
 import { useAppData, type AppUser } from '@/context/AppDataContext';
 import { useSession } from '@/context/SessionContext';
@@ -173,7 +173,9 @@ function InviteRoute() {
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
           <div style={{ fontSize: 14, color: G.muted, marginBottom: 12 }}>
             {data.apiError ||
               'API is offline — invite onboarding requires the live gateway.'}
@@ -252,7 +254,9 @@ function InviteRoute() {
           textAlign: 'center',
         }}
       >
-        <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
+        <div style={{ marginBottom: 12 }}>
+          {Icons.cancelled({ size: 36, color: G.danger })}
+        </div>
         <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
           This invite link is invalid or has already been used.
         </div>
@@ -310,11 +314,11 @@ function CompanyWorkspace() {
   const { user, logout, themeMode, toggleTheme } = useSession();
   const { tab: rawTab } = useParams();
   const navigate = useNavigate();
-  const tab = isCompanyAdminTab(rawTab) ? rawTab : 'dispatch';
+  const tab = isCompanyAdminTab(rawTab) ? rawTab : 'dashboard';
 
   useEffect(() => {
     if (!isCompanyAdminTab(rawTab)) {
-      navigate(appTabPath('dispatch'), { replace: true });
+      navigate(appTabPath('dashboard'), { replace: true });
     }
   }, [rawTab, navigate]);
 
@@ -350,7 +354,9 @@ function CompanyWorkspace() {
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
           <div style={{ color: G.muted, marginBottom: 20 }}>
             Company inactive or not assigned. Contact your administrator.
           </div>
@@ -451,7 +457,9 @@ function DriverWorkspace() {
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
           <div style={{ color: G.muted, marginBottom: 20 }}>
             Company inactive or not assigned. Contact your administrator.
           </div>

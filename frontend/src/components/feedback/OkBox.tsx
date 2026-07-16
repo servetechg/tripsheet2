@@ -1,4 +1,5 @@
 import { G } from '@/lib/theme';
+import { Icons } from '@/components/ui/Icons';
 
 export interface OkBoxProps {
   msg?: string | null;
@@ -21,7 +22,7 @@ export function OkBox({ msg }: OkBoxProps) {
         gap: 8,
       }}
     >
-      <span>✓</span>
+      {Icons.completed({ size: 16, color: G.success })}
       <span>{msg}</span>
     </div>
   );

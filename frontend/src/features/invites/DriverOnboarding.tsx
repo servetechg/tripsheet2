@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { G, page } from '@/lib/theme';
-import { Btn, Inp, Sel, G2 } from '@/components/ui';
+import { Btn, Inp, Sel, G2, Icons } from '@/components/ui';
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
 import { uid } from '@/lib/uid';
@@ -51,10 +52,6 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
   const [err, setErr] = useState('');
   const [profileErr, setProfileErr] = useState('');
   const [uploading, setUploading] = useState<any>(null);
-
-  const sn = company.shortName || 'TS';
-  const accent = sn.slice(-1);
-  const base = sn.slice(0, -1);
 
   const upd = (k: keyof Profile, v: string) =>
     setProfile((x) => ({ ...x, [k]: v }));
@@ -134,10 +131,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            {base}
-            <span style={{ color: G.gold }}>{accent}</span>
-          </div>
+          <BrandLogo variant="full" height={26} style={{ maxWidth: 150 }} />
           <div style={{ fontSize: 10, letterSpacing: 2, color: G.muted }}>
             DRIVER ONBOARDING
           </div>
@@ -165,7 +159,9 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
       <div style={{ maxWidth: 600, margin: '0 auto' }}>
         {step === 1 && (
           <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>👋</div>
+            <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'center' }}>
+              {Icons.drivers({ size: 48, color: G.gold })}
+            </div>
             <div
               style={{
                 fontSize: 22,
@@ -204,11 +200,11 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
             >
               {(
                 [
-                  ['1', 'Fill your profile', '👤'],
-                  ['2', 'Upload your documents', '📁'],
-                  ['3', 'Review & sign contract', '📄'],
+                  ['1', 'Fill your profile', Icons.driver],
+                  ['2', 'Upload your documents', Icons.docs],
+                  ['3', 'Review & sign contract', Icons.contract],
                 ] as const
-              ).map(([n, l, ic]) => (
+              ).map(([n, l, Icon]) => (
                 <div
                   key={n}
                   style={{
@@ -238,8 +234,17 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                   >
                     {n}
                   </div>
-                  <span style={{ fontSize: 13, color: G.text }}>
-                    {ic} {l}
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: G.text,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    {Icon({ size: 16, color: G.muted })}
+                    {l}
                   </span>
                 </div>
               ))}
@@ -261,9 +266,13 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                 fontWeight: 700,
                 color: G.white,
                 marginBottom: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              👤 Your Profile
+              {Icons.driver({ size: 16, color: G.white })}
+              Your Profile
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 20 }}>
               Fill in your personal details. This creates your login account.
@@ -426,9 +435,13 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                 fontWeight: 700,
                 color: G.white,
                 marginBottom: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              📁 Upload Documents
+              {Icons.docs({ size: 16, color: G.white })}
+              Upload Documents
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 4 }}>
               Upload clear photos or PDFs of your documents.
@@ -468,7 +481,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 20 }}>{docType.icon}</span>
+                    {Icons.docs({ size: 20, color: G.muted })}
                     <div>
                       <div
                         style={{ fontSize: 13, fontWeight: 600, color: G.text }}
@@ -511,9 +524,16 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                       fontSize: 11,
                       fontWeight: 800,
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                   >
-                    {doc ? '↑ REPLACE' : '↑ UPLOAD'}
+                    {Icons.upload({
+                      size: 16,
+                      color: doc ? G.muted : G.onGold,
+                    })}
+                    {doc ? 'REPLACE' : 'UPLOAD'}
                   </button>
                 </div>
               );
@@ -551,7 +571,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 18 }}>{docType.icon}</span>
+                    {Icons.docs({ size: 18, color: G.muted })}
                     <div>
                       <div
                         style={{
@@ -579,9 +599,13 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                       padding: '6px 12px',
                       fontSize: 11,
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                   >
-                    {doc ? '↑ REPLACE' : '↑ UPLOAD'}
+                    {Icons.upload({ size: 16, color: doc ? G.success : G.muted })}
+                    {doc ? 'REPLACE' : 'UPLOAD'}
                   </button>
                 </div>
               );
@@ -617,9 +641,13 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                 fontWeight: 700,
                 color: G.white,
                 marginBottom: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
               }}
             >
-              📄 Employment Contract
+              {Icons.contract({ size: 16, color: G.white })}
+              Employment Contract
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 20 }}>
               Review your employment terms set by {company.name} and sign below.
@@ -742,7 +770,9 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+                <div style={{ marginBottom: 8 }}>
+                  {Icons.pending({ size: 24, color: G.gold })}
+                </div>
                 <div style={{ fontSize: 13, color: G.muted }}>
                   Your employer hasn't set contract terms yet.
                 </div>
@@ -805,7 +835,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
             >
               {contract.signedByDriver ? (
                 <>
-                  <div style={{ fontSize: 28 }}>✅</div>
+                  <div>{Icons.completed({ size: 28, color: G.success })}</div>
                   <div
                     style={{
                       fontSize: 14,
@@ -824,7 +854,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                 </>
               ) : (
                 <>
-                  <div style={{ fontSize: 28 }}>✍️</div>
+                  <div>{Icons.contract({ size: 28, color: G.muted })}</div>
                   <div
                     style={{
                       fontSize: 14,
@@ -873,7 +903,7 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
                   opacity: contract.signedByDriver ? 1 : 0.5,
                 }}
               >
-                ✓ SUBMIT APPLICATION
+                SUBMIT APPLICATION
               </Btn>
             </div>
           </div>
@@ -881,7 +911,9 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
 
         {step === 5 && (
           <div style={{ textAlign: 'center', padding: '40px 24px' }}>
-            <div style={{ fontSize: 56, marginBottom: 16 }}>🎉</div>
+            <div style={{ marginBottom: 16 }}>
+              {Icons.completed({ size: 56, color: G.success })}
+            </div>
             <div
               style={{
                 fontSize: 22,
