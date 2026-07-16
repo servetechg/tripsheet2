@@ -30,3 +30,58 @@ textarea {
   0% { background-position: -300px 0; }
   100% { background-position: 300px 0; }
 }
+
+@keyframes ts-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ts-stat-card:hover,
+.ts-card-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
+.ts-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  opacity: 0.96;
+}
+
+.ts-btn:active:not(:disabled) {
+  transform: translateY(0);
+  opacity: 0.9;
+}
+
+.ts-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.ts-icon-btn:hover {
+  transform: translateY(-1px);
+  border-color: #2563EB55 !important;
+}
+
+.ts-nav-item:hover {
+  background: rgba(37, 99, 235, 0.06) !important;
+}
+
+.ts-table-row:hover {
+  background: rgba(37, 99, 235, 0.05) !important;
+}
+
+.ts-bar {
+  transform-origin: bottom;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ts-stat-card,
+  .ts-btn,
+  .ts-icon-btn,
+  .ts-nav-item,
+  .ts-dashboard {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Skeleton } from '@/components/ui';
+import { Skeleton } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { AppShell } from '@/components/layout/AppShell';
 import { DispatchTab } from '@/features/dispatch/DispatchTab';
@@ -12,6 +12,7 @@ import { AdminSheetsTab } from '@/features/trip-sheets/AdminSheetsTab';
 import { PrintPreview } from '@/features/trip-sheets/PrintPreview';
 import { ReportsTab } from '@/features/reports/ReportsTab';
 import { AccountingTab } from '@/features/accounting/AccountingTab';
+import { DashboardTab } from '@/features/dashboard/DashboardTab';
 
 export function CompanyAdminPanel({
   company,
@@ -39,7 +40,7 @@ export function CompanyAdminPanel({
   activeTab,
   onTabChange,
 }: any) {
-  const tab = activeTab || 'dispatch';
+  const tab = activeTab || 'dashboard';
   const setTab = onTabChange || (() => {});
   const [adminPreview, setAdminPreview] = useState<any>(null);
   const sn = company.shortName;
@@ -67,14 +68,15 @@ export function CompanyAdminPanel({
   };
 
   const TABS = [
-    { id: 'dispatch', icon: '🚚', label: 'Dispatch' },
-    { id: 'track', icon: '📍', label: 'Track' },
-    { id: 'emanifest', icon: '🛃', label: 'eManifest' },
-    { id: 'drivers', icon: '👤', label: 'Drivers' },
-    { id: 'assets', icon: '🔧', label: 'Assets' },
-    { id: 'sheets', icon: '📋', label: 'Sheets' },
-    { id: 'reports', icon: '📊', label: 'Reports' },
-    { id: 'accounting', icon: '💰', label: 'Accounting' },
+    { id: 'dashboard', icon: 'dashboard', label: 'Dashboard' },
+    { id: 'dispatch', icon: 'dispatch', label: 'Dispatch' },
+    { id: 'track', icon: 'track', label: 'Track' },
+    { id: 'emanifest', icon: 'emanifest', label: 'eManifest' },
+    { id: 'drivers', icon: 'drivers', label: 'Drivers' },
+    { id: 'assets', icon: 'assets', label: 'Assets' },
+    { id: 'sheets', icon: 'sheets', label: 'Sheets' },
+    { id: 'reports', icon: 'reports', label: 'Reports' },
+    { id: 'accounting', icon: 'accounting', label: 'Accounting' },
   ];
 
   const STATUS_COLOR = {
@@ -108,24 +110,27 @@ export function CompanyAdminPanel({
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
+      userName={adminUser?.name}
+      userEmail={adminUser?.email}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Btn
-            variant="outline"
-            onClick={onLogout}
-            style={{ fontSize: 11, padding: '8px 14px' }}
-          >
-            LOGOUT
-          </Btn>
-        </div>
-      }
+      onLogout={onLogout}
     >
       {tabLoading ? (
         <Skeleton rows={4} />
       ) : (
         <>
+          {tab === 'dashboard' && (
+            <DashboardTab
+              company={company}
+              loads={myLoads}
+              sheets={mySheets}
+              drivers={myDrivers}
+              trucks={myTrucks}
+              users={users}
+              onNavigate={setTab}
+            />
+          )}
           {tab === 'dispatch' && (
             <DispatchTab
               company={company}

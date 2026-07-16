@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
+import { StatCard, StatsGrid, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { manifestsApi, carrierProfilesApi } from '@/lib/api';
 import { CarrierProfileForm } from './CarrierProfileForm';
@@ -349,52 +350,42 @@ export function EManifestTab({
 
   return (
     <div style={{ padding: '0 2px' }}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4,1fr)',
-          gap: 8,
-          marginBottom: 16,
-        }}
-      >
-        {[
-          ['ACI Filed', aciCount, G.info],
-          ['ACE Filed', aceCount, G.purple],
-          ['Accepted', acceptedCount, G.success],
-          ['Pending', pendingCount, G.gold],
-        ].map(([l, v, c]) => (
-          <div
-            key={l as string}
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: 10,
-              padding: '12px 8px',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 22, fontWeight: 900, color: c as string }}>
-              {v as number}
-            </div>
-            <div
-              style={{
-                fontSize: 9,
-                letterSpacing: 1.5,
-                color: G.muted,
-                marginTop: 2,
-                textTransform: 'uppercase',
-              }}
-            >
-              {l as string}
-            </div>
-          </div>
-        ))}
-      </div>
+      <StatsGrid>
+        <StatCard
+          label="ACI Filed"
+          value={aciCount}
+          subtitle="Canada bound"
+          accent={G.info}
+          icon={Icons.emanifest({ size: 20, color: G.info })}
+        />
+        <StatCard
+          label="ACE Filed"
+          value={aceCount}
+          subtitle="US bound"
+          accent={G.purple}
+          icon={Icons.docs({ size: 20, color: G.purple })}
+        />
+        <StatCard
+          label="Accepted"
+          value={acceptedCount}
+          subtitle="Cleared filings"
+          accent={G.success}
+          icon={Icons.completed({ size: 20, color: G.success })}
+        />
+        <StatCard
+          label="Pending"
+          value={pendingCount}
+          subtitle="Awaiting response"
+          accent={G.warning}
+          icon={Icons.pending({ size: 20, color: G.warning })}
+        />
+      </StatsGrid>
 
       <div
         style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}
       >
         <button
+          type="button"
           onClick={() => setSubTab('new_aci')}
           style={{
             background: G.infoTint,
@@ -405,13 +396,20 @@ export function EManifestTab({
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
-            letterSpacing: 1,
+            letterSpacing: 0.3,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
           }}
         >
-          🛃 + ACI eManifest{' '}
-          <span style={{ fontSize: 10, opacity: 0.7 }}>(Canada-bound)</span>
+          {Icons.plus({ size: 16, color: G.info })}
+          ACI eManifest
+          <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 600 }}>
+            (Canada-bound)
+          </span>
         </button>
         <button
+          type="button"
           onClick={() => setSubTab('new_ace')}
           style={{
             background: G.purpleBg,
@@ -422,13 +420,20 @@ export function EManifestTab({
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
-            letterSpacing: 1,
+            letterSpacing: 0.3,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
           }}
         >
-          🦅 + ACE eManifest{' '}
-          <span style={{ fontSize: 10, opacity: 0.7 }}>(US-bound)</span>
+          {Icons.plus({ size: 16, color: G.purple })}
+          ACE eManifest
+          <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 600 }}>
+            (US-bound)
+          </span>
         </button>
         <button
+          type="button"
           onClick={() => setSubTab('profile')}
           style={{
             background: 'transparent',
@@ -438,10 +443,15 @@ export function EManifestTab({
             padding: '10px 18px',
             fontSize: 12,
             cursor: 'pointer',
-            letterSpacing: 1,
+            letterSpacing: 0.3,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            fontWeight: 600,
           }}
         >
-          ⚙️ CARRIER PROFILE
+          {Icons.settings({ size: 16, color: G.muted })}
+          Carrier profile
         </button>
       </div>
 
@@ -474,7 +484,9 @@ export function EManifestTab({
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 36, marginBottom: 10 }}>🛃</div>
+          <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'center' }}>
+            {Icons.emanifest({ size: 36, color: G.muted })}
+          </div>
           <div style={{ color: G.muted }}>
             No eManifests yet. Create your first ACI or ACE manifest above.
           </div>

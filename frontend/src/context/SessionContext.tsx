@@ -36,6 +36,11 @@ function readTheme(): ThemeMode {
   return raw === 'light' || raw === 'dark' ? raw : 'dark';
 }
 
+function commitTheme(mode: ThemeMode) {
+  applyTheme(mode);
+  localStorage.setItem(THEME_KEY, mode);
+}
+
 function toAppUser(u: {
   id: string;
   email: string;
@@ -55,12 +60,11 @@ function toAppUser(u: {
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
-  const [themeMode, setThemeMode] = useState<ThemeMode>(() => readTheme());
-
-  useEffect(() => {
-    applyTheme(themeMode);
-    localStorage.setItem(THEME_KEY, themeMode);
-  }, [themeMode]);
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const mode = readTheme();
+    commitTheme(mode);
+    return mode;
+  });
 
   const logout = useCallback(() => {
     setToken(null);
@@ -72,7 +76,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'));
+    setThemeMode((m) => {
+      const next: ThemeMode = m === 'dark' ? 'light' : 'dark';
+      // Apply before re-render so inline styles reading `G` pick up new tokens
+      commitTheme(next);
+      return next;
+    });
   }, []);
 
   // Restore session from JWT on first load / refresh

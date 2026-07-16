@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 
 export function PrintPreview({ company, header, trips, expenses, notes, onBack }: any) {
   const ref = useRef<any>(null);
@@ -158,7 +158,7 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
               {t.notes && (
                 <tr key={t.id+"_n"} style={{ background:"#fffbe6" }}>
                   <td colSpan={6} style={{ fontSize:8.5, padding:"4px 10px", color:"#555", fontStyle:"italic", borderBottom:"1px solid #e8e0c0" }}>
-                    📝 {t.notes}
+                    {t.notes}
                   </td>
                 </tr>
               )}
@@ -251,7 +251,10 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
       <div style={{ background:"#111", borderBottom:"2px solid #D4A017", padding:"11px 16px", display:"flex", gap:12, alignItems:"center", position:"sticky", top:0, zIndex:100 }}>
         <Btn onClick={onBack} style={{ padding:"9px 16px", fontSize:12 }}>← BACK</Btn>
         <span style={{ fontSize:11, fontWeight:700, color:"#D4A017", flex:1, letterSpacing:2 }}>TRIP SHEET · A4 PREVIEW</span>
-        <Btn onClick={doPrint} style={{ padding:"9px 20px", fontSize:12 }}>🖨 PRINT / SAVE PDF</Btn>
+        <Btn onClick={doPrint} style={{ padding:"9px 20px", fontSize:12, display:'inline-flex', alignItems:'center', gap:6 }}>
+          {Icons.print({ size: 16, color: '#fff' })}
+          PRINT / SAVE PDF
+        </Btn>
       </div>
 
       {/* A4 page — 210mm wide, shadow, white background */}

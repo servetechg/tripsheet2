@@ -1,4 +1,5 @@
 import { G } from '@/lib/theme';
+import { Icons } from '@/components/ui/Icons';
 
 export interface ErrBoxProps {
   msg?: string | null;
@@ -21,7 +22,7 @@ export function ErrBox({ msg }: ErrBoxProps) {
         gap: 8,
       }}
     >
-      <span>⚠️</span>
+      {Icons.alert({ size: 16, color: G.danger })}
       <span>{msg}</span>
     </div>
   );

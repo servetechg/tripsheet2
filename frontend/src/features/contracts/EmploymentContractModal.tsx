@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { DRIVER_DOC_TYPES, PAY_TYPES, DISPATCH_REQUIRED_DOCS, DOC_STATUS_COLOR } from '@/lib/docTypes';
@@ -63,7 +63,7 @@ h2{font-size:11pt;margin:16px 0 8px;border-bottom:1px solid #ddd;padding-bottom:
 </div>
 <h2>COMPENSATION</h2>
 <div class="rate-box">
-  <div style="font-size:10pt;color:#888">${pt.icon} ${pt.label}</div>
+  <div style="font-size:10pt;color:#888">${pt.label}</div>
   <div style="font-size:20pt;font-weight:900;color:#D4A017;margin-top:4px">${f.payUnit} ${f.payRate||"—"} <span style="font-size:11pt;font-weight:400;color:#888">${pt.unit}</span></div>
 </div>
 <div class="grid">
@@ -98,7 +98,19 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
         {/* Header */}
         <div style={{ background:G.card,borderBottom:`2px solid ${G.gold}`,padding:"14px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0 }}>
           <div>
-            <div style={{ fontSize:14,fontWeight:700,color:G.text }}>📄 EMPLOYMENT CONTRACT</div>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: G.text,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {Icons.contract({ size: 16, color: G.text })}
+              EMPLOYMENT CONTRACT
+            </div>
             <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>{driver.name} · {company.name}</div>
           </div>
           <button onClick={onClose} style={{ background:"transparent",border:`1px solid ${G.border}`,color:G.muted,borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16 }}>✕</button>
@@ -114,7 +126,7 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
             <div style={{ display:"flex",gap:8,flexWrap:"wrap" }}>
               {PAY_TYPES.map(p=>(
                 <button key={p.id} onClick={()=>upd("payType",p.id)} style={{ background:f.payType===p.id?G.gold:"transparent",color:f.payType===p.id?G.onGold:G.muted,border:`1px solid ${f.payType===p.id?G.gold:G.border2}`,borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:700,cursor:"pointer" }}>
-                  {p.icon} {p.label}
+                  {p.label}
                 </button>
               ))}
             </div>
@@ -126,13 +138,13 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
             <div style={{ display:"grid",gridTemplateColumns:"2fr 1fr",gap:12 }}>
               <Inp label={`Rate (${pt.unit})`} value={f.payRate} onChange={e=>upd("payRate",e.target.value)} placeholder="e.g. 0.65" type="number" />
               <Sel label="Currency" value={f.payUnit} onChange={e=>upd("payUnit",e.target.value)}>
-                <option value="CAD">🍁 CAD</option>
-                <option value="USD">🇺🇸 USD</option>
+                <option value="CAD">CAD</option>
+                <option value="USD">USD</option>
               </Sel>
             </div>
             {f.payRate && (
               <div style={{ background:`${G.gold}11`,border:`1px solid ${G.gold}33`,borderRadius:8,padding:"10px 14px",fontSize:14,fontWeight:800,color:G.gold }}>
-                {pt.icon} {f.payUnit} {f.payRate} {pt.unit}
+                {f.payUnit} {f.payRate} {pt.unit}
               </div>
             )}
           </div>
@@ -164,13 +176,13 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
           <div style={{ fontSize:10,letterSpacing:2,color:G.muted,marginBottom:10,paddingBottom:6,borderBottom:`1px solid ${G.border}` }}>E-SIGNATURES</div>
           <div style={{ display:"flex",gap:12,marginBottom:8 }}>
             <div onClick={()=>upd("signedByAdmin",!f.signedByAdmin)} style={{ flex:1,background:f.signedByAdmin?`${G.success}22`:G.card2,border:`2px solid ${f.signedByAdmin?G.success:G.border2}`,borderRadius:10,padding:"12px",cursor:"pointer",textAlign:"center" }}>
-              <div style={{ fontSize:22 }}>🏢</div>
-              <div style={{ fontSize:11,fontWeight:700,color:f.signedByAdmin?G.success:G.muted,marginTop:4 }}>{f.signedByAdmin?"✓ SIGNED":"TAP TO SIGN"}</div>
+              <div>{Icons.companies({ size: 22, color: f.signedByAdmin ? G.success : G.muted })}</div>
+              <div style={{ fontSize:11,fontWeight:700,color:f.signedByAdmin?G.success:G.muted,marginTop:4 }}>{f.signedByAdmin?"SIGNED":"TAP TO SIGN"}</div>
               <div style={{ fontSize:10,color:G.muted }}>{company.name}</div>
             </div>
             <div onClick={()=>upd("signedByDriver",!f.signedByDriver)} style={{ flex:1,background:f.signedByDriver?`${G.success}22`:G.card2,border:`2px solid ${f.signedByDriver?G.success:G.border2}`,borderRadius:10,padding:"12px",cursor:"pointer",textAlign:"center" }}>
-              <div style={{ fontSize:22 }}>👤</div>
-              <div style={{ fontSize:11,fontWeight:700,color:f.signedByDriver?G.success:G.muted,marginTop:4 }}>{f.signedByDriver?"✓ SIGNED":"TAP TO SIGN"}</div>
+              <div>{Icons.driver({ size: 22, color: f.signedByDriver ? G.success : G.muted })}</div>
+              <div style={{ fontSize:11,fontWeight:700,color:f.signedByDriver?G.success:G.muted,marginTop:4 }}>{f.signedByDriver?"SIGNED":"TAP TO SIGN"}</div>
               <div style={{ fontSize:10,color:G.muted }}>{driver.name}</div>
             </div>
           </div>
@@ -178,8 +190,14 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
 
         {/* Footer */}
         <div style={{ padding:"14px 20px",borderTop:`1px solid ${G.border}`,display:"flex",gap:10,background:G.inset,flexShrink:0 }}>
-          <Btn onClick={save} style={{ flex:1,padding:13 }}>💾 SAVE CONTRACT</Btn>
-          <Btn variant="ghost" onClick={doPrint} style={{ padding:"12px 18px" }}>🖨 PRINT PDF</Btn>
+          <Btn onClick={save} style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+            {Icons.save({ size: 16, color: G.onGold })}
+            SAVE CONTRACT
+          </Btn>
+          <Btn variant="ghost" onClick={doPrint} style={{ padding:"12px 18px", display:'inline-flex', alignItems:'center', gap:6 }}>
+            {Icons.print({ size: 16, color: G.muted })}
+            PRINT PDF
+          </Btn>
           <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
         </div>
       </div>

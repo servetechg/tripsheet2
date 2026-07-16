@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
@@ -81,7 +81,22 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <Btn variant="outline" onClick={onBack} style={{ padding:"7px 14px", fontSize:11 }}>← BACK</Btn>
           <div>
-            <span style={{ fontSize:13, fontWeight:700, color: isACI?G.info:G.purple }}>{isACI?"🛃 ACI eManifest":"🦅 ACE eManifest"}</span>
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: isACI ? G.info : G.purple,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {Icons.emanifest({
+                size: 16,
+                color: isACI ? G.info : G.purple,
+              })}
+              {isACI ? 'ACI eManifest' : 'ACE eManifest'}
+            </span>
             <span style={{ fontSize:10, color:G.muted, marginLeft:8 }}>{isACI?"Canada-bound (CBSA)":"US-bound (CBP)"}</span>
           </div>
         </div>
@@ -251,9 +266,9 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         </div>
 
         {/* Compliance reminder */}
-        {formErr && <div style={{ background:G.errTint, border:`1px solid ${G.danger}44`, borderRadius:10, padding:"12px 16px", marginBottom:12, fontSize:12, color:G.errText, fontWeight:700 }}>⚠️ {formErr}</div>}
+        {formErr && <div style={{ background:G.errTint, border:`1px solid ${G.danger}44`, borderRadius:10, padding:"12px 16px", marginBottom:12, fontSize:12, color:G.errText, fontWeight:700, display:'flex', alignItems:'center', gap:6 }}>{Icons.alert({ size: 16, color: G.errText })}{formErr}</div>}
         <div style={{ background:G.successTint, border:`1px solid ${G.success}33`, borderRadius:10, padding:"12px 16px", marginBottom:16, fontSize:11, color:G.muted, lineHeight:1.7 }}>
-          <div style={{ color:G.success, fontWeight:700, marginBottom:4 }}>✓ COMPLIANCE CHECKLIST</div>
+          <div style={{ color:G.success, fontWeight:700, marginBottom:4, display:'inline-flex', alignItems:'center', gap:6 }}>{Icons.completed({ size: 14, color: G.success })}COMPLIANCE CHECKLIST</div>
           <div>• Submit at least <strong style={{ color:G.gold }}>1 hour</strong> before arriving at border {carrier.fastLane?"(30 min — FAST eligible)":""}</div>
           <div>• CRN must start with your carrier code: <strong style={{ color: isACI?G.info:G.purple }}>{carrierCode}</strong></div>
           <div>• Each shipment needs a unique {isACI?"CCN/PARS":"PAPS"} number — never reuse</div>

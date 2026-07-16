@@ -10,14 +10,14 @@ export function Pill({ color, children, small }: PillProps) {
   return (
     <span
       style={{
-        background: color + '18',
+        background: color + '14',
         color,
-        border: `1px solid ${color}33`,
-        borderRadius: 20,
-        padding: small ? '2px 8px' : '3px 10px',
-        fontSize: small ? 9 : 10,
-        fontWeight: 700,
-        letterSpacing: 1,
+        border: `1px solid ${color}28`,
+        borderRadius: 999,
+        padding: small ? '3px 9px' : '4px 11px',
+        fontSize: small ? 10 : 11,
+        fontWeight: 600,
+        letterSpacing: 0.3,
         whiteSpace: 'nowrap',
         display: 'inline-block',
       }}

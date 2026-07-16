@@ -132,7 +132,7 @@ export function SuperAdminPanel({
     );
   };
 
-  const TABS = [{ id: 'companies', icon: '🏢', label: 'Companies' }];
+  const TABS = [{ id: 'companies', icon: 'companies', label: 'Companies' }];
 
   return (
     <AppShell
@@ -141,13 +141,10 @@ export function SuperAdminPanel({
       tabs={TABS}
       activeTab={currentTab}
       onTabChange={changeTab}
+      userName="Super Admin"
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <Btn variant="outline" size="sm" onClick={onLogout}>
-          LOGOUT
-        </Btn>
-      }
+      onLogout={onLogout}
     >
       {ok && <OkBox msg={ok} />}
 

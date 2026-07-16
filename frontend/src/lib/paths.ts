@@ -10,6 +10,7 @@ export const PATHS = {
 
 export const SUPER_ADMIN_TABS = ['companies'] as const;
 export const COMPANY_ADMIN_TABS = [
+  'dashboard',
   'dispatch',
   'track',
   'emanifest',
@@ -27,7 +28,7 @@ export type DriverTab = (typeof DRIVER_TABS)[number];
 
 export function homePathForRole(role: string): string {
   if (role === 'superadmin') return `${PATHS.admin}/companies`;
-  if (role === 'company_admin') return `${PATHS.app}/dispatch`;
+  if (role === 'company_admin') return `${PATHS.app}/dashboard`;
   if (role === 'driver') return `${PATHS.driver}/sheets`;
   return PATHS.login;
 }
@@ -36,7 +37,7 @@ export function adminTabPath(tab: string = 'companies') {
   return `${PATHS.admin}/${tab}`;
 }
 
-export function appTabPath(tab: string = 'dispatch') {
+export function appTabPath(tab: string = 'dashboard') {
   return `${PATHS.app}/${tab}`;
 }
 
