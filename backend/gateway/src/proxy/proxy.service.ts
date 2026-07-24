@@ -62,11 +62,14 @@ export class ProxyService {
         throw err;
       }
       this.logger.warn(`Proxy failed ${method} ${url}: ${String(err)}`);
-      return {
-        message: 'not implemented',
-        detail: 'Upstream service unavailable or not ready',
-        target: url,
-      };
+      throw new HttpException(
+        {
+          message: 'Upstream service unavailable',
+          detail: 'Upstream service unavailable or not ready',
+          target: url,
+        },
+        503,
+      );
     }
   }
 }
