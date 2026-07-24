@@ -1,0 +1,31 @@
+# Edge reverse proxy (stable). Only this stack binds host 80/443.
+# Usage:
+#   docker compose -f deploy/compose.edge.yml --env-file /opt/tripsheet/secrets/edge.env up -d
+
+name: tripsheet-edge
+
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+      ACTIVE_COLOR: ${ACTIVE_COLOR:-blue}
+      CADDY_ACME_EMAIL: ${CADDY_ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - tripsheet-net
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  tripsheet-net:
+    external: true
