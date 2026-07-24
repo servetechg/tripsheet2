@@ -1,0 +1,24 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model NotificationLog {
+  id         String   @id @default(cuid())
+  companyId  String?
+  channel    String   @default("sms")
+  to         String
+  body       String
+  status     String
+  providerId String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([channel])
+  @@index([createdAt])
+}

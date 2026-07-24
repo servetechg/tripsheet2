@@ -21,7 +21,7 @@ export function CarrierProfileForm({ carrier, onSave, onClose }: any) {
         <label htmlFor="fast" style={{ fontSize:12, color:G.text, cursor:"pointer" }}>FAST Lane eligible (30-min pre-arrival instead of 1hr)</label>
       </div>
       <div style={{ background:G.successTint, border:`1px solid ${G.success}33`, borderRadius:8, padding:"10px 14px", marginBottom:14, fontSize:11, color:G.muted }}>
-        ℹ️ <strong style={{ color:G.success }}>Note:</strong> Real EDI submission requires registration with CBSA (ACI) and CBP (ACE). This module simulates the full workflow. To get live, contact CBSA TCCU or a certified software provider.
+        <strong style={{ color:G.success }}>Note:</strong> Real EDI submission requires registration with CBSA (ACI) and CBP (ACE). This module simulates the full workflow. To get live, contact CBSA TCCU or a certified software provider.
       </div>
       <div style={{ display:"flex", gap:10 }}>
         <Btn onClick={()=>{ onSave(f); onClose(); }}>SAVE PROFILE</Btn>

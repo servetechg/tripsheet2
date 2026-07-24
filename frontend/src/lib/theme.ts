@@ -1,38 +1,44 @@
 import type { CSSProperties } from 'react';
 
 export const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
-export const RADIUS = { sm: 7, md: 9, lg: 12, xl: 14, xxl: 18, pill: 20 } as const;
+export const RADIUS = { sm: 8, md: 10, lg: 12, xl: 14, xxl: 16, pill: 999 } as const;
 
 export const THEMES = {
   dark: {
     mode: 'dark' as const,
-    bg: '#07070a', card: '#0f0f14', card2: '#14141a', border: '#1c1c24', border2: '#252530',
-    gold: '#D4A017', onGold: '#000000', goldLight: '#f0c030', goldDim: '#7a5608', goldBg: 'rgba(212,160,23,0.08)',
-    text: '#eeeef2', muted: '#8a8a9c', muted2: '#a8a8ba',
-    danger: '#e0453a', dangerBg: 'rgba(224,69,58,0.08)',
-    success: '#25a85a', successBg: 'rgba(37,168,90,0.08)',
-    info: '#4a8ff5', infoBg: 'rgba(74,143,245,0.08)',
-    purple: '#8b5cf6', purpleBg: 'rgba(139,92,246,0.08)',
+    bg: '#0B1220', card: '#111827', card2: '#1F2937', border: '#1E293B', border2: '#334155',
+    gold: '#3B82F6', onGold: '#FFFFFF', goldLight: '#60A5FA', goldDim: '#1E40AF', goldBg: 'rgba(37,99,235,0.14)',
+    text: '#F8FAFC', muted: '#94A3B8', muted2: '#CBD5E1',
+    danger: '#DC2626', dangerBg: 'rgba(220,38,38,0.12)',
+    success: '#16A34A', successBg: 'rgba(22,163,74,0.12)',
+    warning: '#F59E0B', warningBg: 'rgba(245,158,11,0.12)',
+    info: '#2563EB', infoBg: 'rgba(37,99,235,0.14)',
+    purple: '#7C3AED', purpleBg: 'rgba(124,58,237,0.12)',
     white: '#ffffff', black: '#000000',
-    skeleton: '#1c1c24', skeletonShine: 'rgba(255,255,255,0.06)',
-    infoTint: '#0a1a2a', successTint: '#0a1a0a', goldTint: '#1a1508', inset: '#0a0a0a',
-    strip: '#000000', stripText: '#ffffff', errTint: '#1a0000', errText: '#f88',
-    overlay: 'rgba(0,0,0,0.86)',
+    skeleton: '#1E293B', skeletonShine: 'rgba(255,255,255,0.06)',
+    infoTint: '#0F1B33', successTint: '#0C1F14', goldTint: '#0F1B33', inset: '#0A101C',
+    strip: '#020617', stripText: '#ffffff', errTint: '#2A0F0F', errText: '#FCA5A5',
+    overlay: 'rgba(2,6,23,0.78)',
+    shadow: '0 4px 16px rgba(2,6,23,0.35)',
+    shadowHover: '0 8px 28px rgba(2,6,23,0.45)',
   },
   light: {
     mode: 'light' as const,
-    bg: '#eef1f5', card: '#ffffff', card2: '#f5f7fa', border: '#e2e6ec', border2: '#cdd3dc',
-    gold: '#b07a09', onGold: '#ffffff', goldLight: '#c99012', goldDim: '#8a5f06', goldBg: 'rgba(176,122,9,0.12)',
-    text: '#1a1d24', muted: '#5c6472', muted2: '#3a4150',
-    danger: '#c8352a', dangerBg: 'rgba(200,53,42,0.09)',
-    success: '#12894a', successBg: 'rgba(18,137,74,0.10)',
-    info: '#2166c4', infoBg: 'rgba(33,102,196,0.10)',
-    purple: '#7040c9', purpleBg: 'rgba(112,64,201,0.10)',
+    bg: '#F8FAFC', card: '#FFFFFF', card2: '#F1F5F9', border: '#E2E8F0', border2: '#CBD5E1',
+    gold: '#2563EB', onGold: '#FFFFFF', goldLight: '#3B82F6', goldDim: '#1E40AF', goldBg: 'rgba(37,99,235,0.08)',
+    text: '#0F172A', muted: '#64748B', muted2: '#475569',
+    danger: '#DC2626', dangerBg: 'rgba(220,38,38,0.08)',
+    success: '#16A34A', successBg: 'rgba(22,163,74,0.08)',
+    warning: '#F59E0B', warningBg: 'rgba(245,158,11,0.10)',
+    info: '#2563EB', infoBg: 'rgba(37,99,235,0.08)',
+    purple: '#7C3AED', purpleBg: 'rgba(124,58,237,0.08)',
     white: '#ffffff', black: '#000000',
-    skeleton: '#e4e8ee', skeletonShine: 'rgba(0,0,0,0.045)',
-    infoTint: '#eaf1fb', successTint: '#e8f5ee', goldTint: '#faf3e2', inset: '#f0f2f6',
-    strip: '#1a1d24', stripText: '#ffffff', errTint: '#fdeceb', errText: '#c8352a',
-    overlay: 'rgba(20,22,28,0.55)',
+    skeleton: '#E2E8F0', skeletonShine: 'rgba(15,23,42,0.04)',
+    infoTint: '#EFF6FF', successTint: '#F0FDF4', goldTint: '#EFF6FF', inset: '#F1F5F9',
+    strip: '#0F172A', stripText: '#ffffff', errTint: '#FEF2F2', errText: '#DC2626',
+    overlay: 'rgba(15,23,42,0.45)',
+    shadow: '0 4px 16px rgba(15,23,42,0.06)',
+    shadowHover: '0 10px 28px rgba(15,23,42,0.10)',
   },
 } as const;
 
@@ -43,11 +49,22 @@ export const G: ThemeTokens = { ...THEMES.dark };
 
 export function applyTheme(mode: ThemeMode | string): void {
   Object.assign(G, THEMES[(mode as ThemeMode)] || THEMES.dark);
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.theme = (mode as ThemeMode) in THEMES ? mode : 'dark';
+  }
 }
 
 export const FONT_UI =
   "'Inter','Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,sans-serif";
 export const FONT_MONO = "'DM Mono','Courier New',monospace";
+
+export const TYPE = {
+  dashboardTitle: { fontSize: 28, fontWeight: 700, letterSpacing: -0.4, lineHeight: 1.2 },
+  sectionTitle: { fontSize: 20, fontWeight: 600, letterSpacing: -0.2, lineHeight: 1.3 },
+  cardTitle: { fontSize: 16, fontWeight: 500, lineHeight: 1.35 },
+  body: { fontSize: 14, fontWeight: 400, lineHeight: 1.5 },
+  small: { fontSize: 12, fontWeight: 400, lineHeight: 1.4 },
+} as const;
 
 export const page = (): CSSProperties => ({
   fontFamily: FONT_UI, background: G.bg, minHeight: '100vh', color: G.text,
@@ -62,10 +79,11 @@ export const pageCentered = (): CSSProperties => ({
 
 export const inputBase = (): CSSProperties => ({
   width: '100%', background: G.card2, border: `1px solid ${G.border2}`,
-  borderRadius: 9, padding: '12px 14px', color: G.text, fontSize: 13,
+  borderRadius: RADIUS.md, padding: '11px 14px', color: G.text, fontSize: 14,
   outline: 'none', boxSizing: 'border-box', WebkitAppearance: 'none', fontFamily: 'inherit',
+  transition: 'border-color .15s, box-shadow .15s',
 });
 export const labelBase = (): CSSProperties => ({
-  display: 'block', fontSize: 10, letterSpacing: 2, color: G.muted,
-  marginBottom: 5, textTransform: 'uppercase', fontWeight: 600,
+  display: 'block', fontSize: 12, letterSpacing: 0.3, color: G.muted,
+  marginBottom: 6, fontWeight: 500,
 });

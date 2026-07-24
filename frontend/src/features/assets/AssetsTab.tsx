@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, SectionTitle, Pill, G2 } from '@/components/ui';
+import { Btn, Card, Inp, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
@@ -37,6 +37,8 @@ export function AssetsTab({
     (a: any) => a.companyId === company.id && a.type === 'trailer',
   );
   const list = assetTab === 'trucks' ? myTrucks : myTrailers;
+  const activeCount = list.filter((a: any) => a.status === 'active').length;
+  const inactiveCount = list.length - activeCount;
 
   const add = async () => {
     if (blank(f.unitNo)) {
@@ -124,11 +126,43 @@ export function AssetsTab({
 
   return (
     <div>
+      <StatsGrid>
+        <StatCard
+          label="Trucks"
+          value={myTrucks.length}
+          subtitle="Power units"
+          accent={G.info}
+          icon={Icons.truck({ size: 20, color: G.info })}
+        />
+        <StatCard
+          label="Trailers"
+          value={myTrailers.length}
+          subtitle="Equipment"
+          accent={G.purple}
+          icon={Icons.assets({ size: 20, color: G.purple })}
+        />
+        <StatCard
+          label="Active"
+          value={activeCount}
+          subtitle={`Current ${assetTab}`}
+          accent={G.success}
+          icon={Icons.completed({ size: 20, color: G.success })}
+        />
+        <StatCard
+          label="Inactive"
+          value={inactiveCount}
+          subtitle={`Current ${assetTab}`}
+          accent={G.muted}
+          icon={Icons.pending({ size: 20, color: G.muted })}
+        />
+      </StatsGrid>
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        {[
-          ['trucks', '🚛 TRUCKS'],
-          ['trailers', '📦 TRAILERS'],
-        ].map(([id, label]) => (
+        {(
+          [
+            ['trucks', 'TRUCKS', Icons.truck],
+            ['trailers', 'TRAILERS', Icons.trailer],
+          ] as const
+        ).map(([id, label, Icon]) => (
           <button
             key={id}
             onClick={() => {
@@ -145,8 +179,15 @@ export function AssetsTab({
               fontWeight: 700,
               cursor: 'pointer',
               letterSpacing: 1,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
+            {Icon({
+              size: 16,
+              color: assetTab === id ? G.onGold : G.muted,
+            })}
             {label}
           </button>
         ))}
@@ -252,8 +293,11 @@ export function AssetsTab({
 
       {list.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
-          <div style={{ fontSize: 36 }}>
-            {assetTab === 'trucks' ? '🚛' : '📦'}
+          <div>
+            {(assetTab === 'trucks' ? Icons.truck : Icons.trailer)({
+              size: 36,
+              color: G.muted,
+            })}
           </div>
           <div style={{ color: G.muted, marginTop: 10 }}>
             No {assetTab} added yet.
@@ -355,9 +399,13 @@ export function AssetsTab({
                     fontSize: 11,
                     cursor: 'pointer',
                     fontWeight: 700,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
                   }}
                 >
-                  🗑 REMOVE
+                  {Icons.trash({ size: 16, color: G.danger })}
+                  REMOVE
                 </button>
               </div>
             </div>

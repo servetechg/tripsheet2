@@ -1,33 +1,511 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { G, pageCentered, applyTheme, type ThemeMode } from '@/lib/theme';
-import { Btn } from '@/components/ui';
+import {
+  Navigate,
+  Route,
+  Routes,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
+import { G, pageCentered } from '@/lib/theme';
+import { Btn, Icons } from '@/components/ui';
 import { ToastHost } from '@/components/feedback/Toast';
-import { useAppData, type AppUser, setToken } from '@/context/AppDataContext';
+import { useAppData, type AppUser } from '@/context/AppDataContext';
+import { useSession } from '@/context/SessionContext';
 import { LoginScreen } from '@/features/auth/LoginScreen';
 import { SuperAdminPanel } from '@/features/companies/SuperAdminPanel';
 import { CompanyAdminPanel } from '@/features/admin/CompanyAdminPanel';
 import { DriverDashboard } from '@/features/drivers/DriverDashboard';
 import { DriverOnboarding } from '@/features/invites/DriverOnboarding';
-import { invitesApi, authApi, companiesApi } from '@/lib/api';
+import { invitesApi, companiesApi, setToken } from '@/lib/api';
+import {
+  PATHS,
+  homePathForRole,
+  isCompanyAdminTab,
+  isDriverTab,
+  isSuperAdminTab,
+  adminTabPath,
+  appTabPath,
+  driverTabPath,
+} from '@/lib/paths';
 
-/** Role / invite session switcher — live API required (Phase 2). */
-export function AppRoutes() {
+function BootSplash({ label = 'Loading…' }: { label?: string }) {
+  return (
+    <div style={{ ...pageCentered() }}>
+      <div style={{ color: G.muted, fontSize: 14 }}>{label}</div>
+    </div>
+  );
+}
+
+function RequireAuth({
+  roles,
+  children,
+}: {
+  roles: string[];
+  children: ReactNode;
+}) {
+  const { user, bootstrapping } = useSession();
+  if (bootstrapping) return <BootSplash label="Restoring session…" />;
+  if (!user) return <Navigate to={PATHS.login} replace />;
+  if (!roles.includes(user.role)) {
+    return <Navigate to={homePathForRole(user.role)} replace />;
+  }
+  return <>{children}</>;
+}
+
+function RootRedirect() {
+  const { user, bootstrapping } = useSession();
+  if (bootstrapping) return <BootSplash label="Restoring session…" />;
+  if (!user) return <Navigate to={PATHS.login} replace />;
+  return <Navigate to={homePathForRole(user.role)} replace />;
+}
+
+function LoginRoute() {
   const data = useAppData();
-  const [session, setSession] = useState<AppUser | null>(null);
-  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
+  const { user, bootstrapping, login, themeMode, toggleTheme } = useSession();
+  const navigate = useNavigate();
+
+  if (bootstrapping) return <BootSplash label="Restoring session…" />;
+  if (user) return <Navigate to={homePathForRole(user.role)} replace />;
+
+  return (
+    <LoginScreen
+      onLogin={(u: AppUser) => {
+        login(u);
+        navigate(homePathForRole(u.role), { replace: true });
+      }}
+      themeMode={themeMode}
+      onToggleTheme={toggleTheme}
+      apiEnabled={data.apiEnabled}
+      apiError={data.apiError}
+      onRetryApi={() => void data.refreshAll()}
+    />
+  );
+}
+
+function InviteRoute() {
+  const data = useAppData();
+  const [search] = useSearchParams();
+  const navigate = useNavigate();
+  const inviteToken = search.get('invite');
   const [inviteState, setInviteState] = useState<{
     loading: boolean;
     invite: any | null;
     company: any | null;
     error: boolean;
-  }>({ loading: false, invite: null, company: null, error: false });
+  }>({ loading: true, invite: null, company: null, error: false });
 
-  applyTheme(themeMode);
-  const toggleTheme = () => setThemeMode((m) => (m === 'dark' ? 'light' : 'dark'));
-  const logout = () => {
-    setToken(null);
-    setSession(null);
-  };
+  useEffect(() => {
+    if (!inviteToken) {
+      setInviteState({
+        loading: false,
+        invite: null,
+        company: null,
+        error: true,
+      });
+      return;
+    }
+    if (!data.apiEnabled) {
+      // Wait until initial API ping finishes before failing
+      if (!data.loading) {
+        setInviteState({
+          loading: false,
+          invite: null,
+          company: null,
+          error: true,
+        });
+      }
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setInviteState((s) =>
+        s.invite ? s : { ...s, loading: true },
+      );
+      try {
+        const inv = await invitesApi.byToken(inviteToken);
+        const co = await companiesApi.get(inv.companyId);
+        if (!cancelled) {
+          setInviteState({
+            loading: false,
+            invite: inv,
+            company: co,
+            error: false,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setInviteState({
+            loading: false,
+            invite: null,
+            company: null,
+            error: true,
+          });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Only re-fetch when token or API availability changes — not on every data.loading flip
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken, data.apiEnabled]);
+
+  if (!inviteToken) {
+    return <Navigate to={PATHS.login} replace />;
+  }
+
+  // Don't remount the form when background refresh sets data.loading
+  if (inviteState.loading || (!inviteState.invite && data.loading)) {
+    return <BootSplash label="Loading invite…" />;
+  }
+
+  if (!data.apiEnabled) {
+    return (
+      <div style={{ ...pageCentered() }}>
+        <div
+          style={{
+            background: G.card,
+            border: `1px solid ${G.danger}44`,
+            borderRadius: 16,
+            padding: 40,
+            maxWidth: 400,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
+          <div style={{ fontSize: 14, color: G.muted, marginBottom: 12 }}>
+            {data.apiError ||
+              'API is offline — invite onboarding requires the live gateway.'}
+          </div>
+          <Btn size="sm" onClick={() => void data.refreshAll()}>
+            Retry
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  if (inviteState.invite && inviteState.company) {
+    const invite = inviteState.invite;
+    const company = inviteState.company;
+    return (
+      <DriverOnboarding
+        invite={invite}
+        company={company}
+        onComplete={async (profile: any, docs: any, contract: any) => {
+          // Auth user is created inside driver-service via internal auth API
+          // (invite flow has no JWT — do not call authApi.createUser here).
+          await invitesApi.complete(inviteToken, {
+            profile: {
+              name: profile.name,
+              email: profile.email,
+              password: profile.password,
+              phone: profile.phone,
+              dob: profile.dob,
+              licenseNo: profile.licenseNo,
+              citizenship: profile.citizenship,
+              address: profile.address,
+              emergencyName: profile.emergencyName,
+              emergencyPhone: profile.emergencyPhone,
+              fastCard: profile.fastCard,
+              notes: profile.notes,
+            },
+            docs: (docs || []).map((d: any) => ({
+              type: d.type,
+              fileName: d.fileName,
+              fileSize:
+                typeof d.fileSize === 'number'
+                  ? d.fileSize
+                  : undefined,
+              fileType: d.fileType,
+              fileData: d.fileData,
+              uploadedAt: d.uploadedAt,
+              expiryDate: d.expiryDate || undefined,
+              notes: d.notes || undefined,
+              status: d.status || 'uploaded',
+            })),
+            contract: {
+              ...contract,
+              driverName: profile.name,
+              companyName: company.name,
+              signedByDriver: true,
+              signedAt: new Date().toISOString(),
+            },
+          });
+          setToken(null);
+          navigate(PATHS.login, { replace: true });
+        }}
+      />
+    );
+  }
+
+  return (
+    <div style={{ ...pageCentered() }}>
+      <div
+        style={{
+          background: G.card,
+          border: `1px solid ${G.danger}44`,
+          borderRadius: 16,
+          padding: 40,
+          maxWidth: 360,
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ marginBottom: 12 }}>
+          {Icons.cancelled({ size: 36, color: G.danger })}
+        </div>
+        <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
+          This invite link is invalid or has already been used.
+        </div>
+        <div style={{ fontSize: 11, color: G.muted, marginBottom: 16 }}>
+          Contact your employer for a new link.
+        </div>
+        <Btn size="sm" onClick={() => navigate(PATHS.login)}>
+          Go to login
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+function SuperAdminRoute() {
+  const data = useAppData();
+  const { user, logout, themeMode, toggleTheme } = useSession();
+  const { tab: rawTab } = useParams();
+  const navigate = useNavigate();
+  const tab = isSuperAdminTab(rawTab) ? rawTab : 'companies';
+
+  useEffect(() => {
+    if (!isSuperAdminTab(rawTab)) {
+      navigate(adminTabPath('companies'), { replace: true });
+    }
+  }, [rawTab, navigate]);
+
+  useEffect(() => {
+    void data.refreshAll('all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  return (
+    <SuperAdminPanel
+      companies={data.companies}
+      setCompanies={data.setCompanies}
+      users={data.users}
+      setUsers={data.setUsers}
+      onLogout={() => {
+        logout();
+        navigate(PATHS.login, { replace: true });
+      }}
+      themeMode={themeMode}
+      onToggleTheme={toggleTheme}
+      apiEnabled={data.apiEnabled}
+      refreshAll={data.refreshAll}
+      activeTab={tab}
+      onTabChange={(id: string) => navigate(adminTabPath(id))}
+    />
+  );
+}
+
+function CompanyWorkspace() {
+  const data = useAppData();
+  const { user, logout, themeMode, toggleTheme } = useSession();
+  const { tab: rawTab } = useParams();
+  const navigate = useNavigate();
+  const tab = isCompanyAdminTab(rawTab) ? rawTab : 'dashboard';
+
+  useEffect(() => {
+    if (!isCompanyAdminTab(rawTab)) {
+      navigate(appTabPath('dashboard'), { replace: true });
+    }
+  }, [rawTab, navigate]);
+
+  useEffect(() => {
+    if (user?.companyId) void data.refreshAll(user.companyId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.companyId]);
+
+  if (!user) return null;
+
+  if (data.loading && data.companies.length === 0) {
+    return <BootSplash label="Loading company…" />;
+  }
+
+  const freshSession =
+    data.users.find((u) => u.id === user.id) || (user as AppUser);
+  const company = data.companies.find((c) => c.id === freshSession.companyId);
+
+  if (!company && data.loading) {
+    return <BootSplash label="Loading company…" />;
+  }
+
+  if (!company || !company.active) {
+    return (
+      <div style={{ ...pageCentered() }}>
+        <div
+          style={{
+            background: G.card,
+            border: `1px solid ${G.border}`,
+            borderRadius: 18,
+            padding: 40,
+            maxWidth: 340,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
+          <div style={{ color: G.muted, marginBottom: 20 }}>
+            Company inactive or not assigned. Contact your administrator.
+          </div>
+          <Btn
+            full
+            onClick={() => {
+              logout();
+              navigate(PATHS.login, { replace: true });
+            }}
+            style={{ padding: 15, fontSize: 14 }}
+          >
+            BACK TO LOGIN
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  if (freshSession.role === 'company_admin') {
+    return (
+      <CompanyAdminPanel
+        company={company}
+        adminUser={freshSession}
+        users={data.users}
+        setUsers={data.setUsers}
+        sheets={data.sheets}
+        loads={data.loads}
+        setLoads={data.setLoads}
+        assets={data.assets}
+        setAssets={data.setAssets}
+        manifests={data.manifests}
+        setManifests={data.setManifests}
+        carrierProfiles={data.carrierProfiles}
+        setCarrierProfiles={data.setCarrierProfiles}
+        driverDocs={data.driverDocs}
+        setDriverDocs={data.setDriverDocs}
+        invites={data.invites}
+        setInvites={data.setInvites}
+        onLogout={() => {
+          logout();
+          navigate(PATHS.login, { replace: true });
+        }}
+        themeMode={themeMode}
+        onToggleTheme={toggleTheme}
+        apiEnabled={data.apiEnabled}
+        refreshAll={() => data.refreshAll(company.id)}
+        activeTab={tab}
+        onTabChange={(id: string) => navigate(appTabPath(id))}
+      />
+    );
+  }
+
+  return <Navigate to={homePathForRole(freshSession.role)} replace />;
+}
+
+function DriverWorkspace() {
+  const data = useAppData();
+  const { user, logout, themeMode, toggleTheme } = useSession();
+  const { tab: rawTab } = useParams();
+  const navigate = useNavigate();
+  const tab = isDriverTab(rawTab) ? rawTab : 'sheets';
+
+  useEffect(() => {
+    if (!isDriverTab(rawTab)) {
+      navigate(driverTabPath('sheets'), { replace: true });
+    }
+  }, [rawTab, navigate]);
+
+  useEffect(() => {
+    if (user?.companyId) void data.refreshAll(user.companyId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.companyId]);
+
+  if (!user) return null;
+
+  if (data.loading && data.companies.length === 0) {
+    return <BootSplash label="Loading…" />;
+  }
+
+  const freshSession =
+    data.users.find((u) => u.id === user.id) || (user as AppUser);
+  const company = data.companies.find((c) => c.id === freshSession.companyId);
+
+  if (!company && data.loading) {
+    return <BootSplash label="Loading company…" />;
+  }
+
+  if (!company || !company.active) {
+    return (
+      <div style={{ ...pageCentered() }}>
+        <div
+          style={{
+            background: G.card,
+            border: `1px solid ${G.border}`,
+            borderRadius: 18,
+            padding: 40,
+            maxWidth: 340,
+            textAlign: 'center',
+          }}
+        >
+          <div style={{ marginBottom: 12 }}>
+            {Icons.alert({ size: 36, color: G.danger })}
+          </div>
+          <div style={{ color: G.muted, marginBottom: 20 }}>
+            Company inactive or not assigned. Contact your administrator.
+          </div>
+          <Btn
+            full
+            onClick={() => {
+              logout();
+              navigate(PATHS.login, { replace: true });
+            }}
+            style={{ padding: 15, fontSize: 14 }}
+          >
+            BACK TO LOGIN
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <DriverDashboard
+      user={freshSession}
+      company={company}
+      sheets={data.sheets}
+      setSheets={data.setSheets}
+      loads={data.loads}
+      driverDocs={data.driverDocs}
+      setDriverDocs={data.setDriverDocs}
+      onLogout={() => {
+        logout();
+        navigate(PATHS.login, { replace: true });
+      }}
+      themeMode={themeMode}
+      onToggleTheme={toggleTheme}
+      apiEnabled={data.apiEnabled}
+      refreshAll={() => data.refreshAll(company.id)}
+      activeTab={tab}
+      onTabChange={(id: string) => navigate(driverTabPath(id))}
+    />
+  );
+}
+
+/** Role-based routes with persisted session + URL tabs. */
+export function AppRoutes() {
+  const [search] = useSearchParams();
+  const inviteToken = search.get('invite');
+  const path = window.location.pathname;
 
   useEffect(() => {
     if (document.getElementById('ts-font-link')) return;
@@ -39,230 +517,48 @@ export function AppRoutes() {
     document.head.appendChild(link);
   }, []);
 
-  const inviteToken = new URLSearchParams(window.location.search).get('invite');
-
-  useEffect(() => {
-    if (!inviteToken) return;
-    if (!data.apiEnabled) {
-      setInviteState({ loading: false, invite: null, company: null, error: true });
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      setInviteState((s) => ({ ...s, loading: true }));
-      try {
-        const inv = await invitesApi.byToken(inviteToken);
-        const co = await companiesApi.get(inv.companyId);
-        if (!cancelled) {
-          setInviteState({ loading: false, invite: inv, company: co, error: false });
-        }
-      } catch {
-        if (!cancelled) {
-          setInviteState({ loading: false, invite: null, company: null, error: true });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [inviteToken, data.apiEnabled]);
-
-  useEffect(() => {
-    if (session?.companyId) {
-      void data.refreshAll(session.companyId);
-    } else if (session?.role === 'superadmin') {
-      void data.refreshAll('all');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id, session?.companyId, session?.role]);
-
-  const handleLogin = (user: AppUser) => {
-    setSession(user);
-  };
-
-  let screen: ReactNode;
-
-  if (inviteToken) {
-    if (data.loading || inviteState.loading) {
-      screen = (
-        <div style={{ ...pageCentered() }}>
-          <div style={{ color: G.muted }}>Loading invite…</div>
-        </div>
-      );
-    } else if (!data.apiEnabled) {
-      screen = (
-        <div style={{ ...pageCentered() }}>
-          <div
-            style={{
-              background: G.card,
-              border: `1px solid ${G.danger}44`,
-              borderRadius: 16,
-              padding: 40,
-              maxWidth: 400,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
-            <div style={{ fontSize: 14, color: G.muted, marginBottom: 12 }}>
-              {data.apiError || 'API is offline — invite onboarding requires the live gateway.'}
-            </div>
-            <Btn size="sm" onClick={() => void data.refreshAll()}>
-              Retry
-            </Btn>
-          </div>
-        </div>
-      );
-    } else if (inviteState.invite && inviteState.company) {
-      const invite = inviteState.invite;
-      const company = inviteState.company;
-      screen = (
-        <DriverOnboarding
-          invite={invite}
-          company={company}
-          onComplete={async (profile: any, docs: any, contract: any) => {
-            try {
-              await authApi.createUser({
-                email: profile.email,
-                password: profile.password,
-                name: profile.name,
-                role: 'driver',
-                companyId: invite.companyId,
-              });
-            } catch {
-              // user may already exist
-            }
-            await invitesApi.complete(inviteToken, { profile, docs, contract });
-            window.history.replaceState({}, '', window.location.pathname);
-            setSession(null);
-          }}
-        />
-      );
-    } else {
-      screen = (
-        <div style={{ ...pageCentered() }}>
-          <div
-            style={{
-              background: G.card,
-              border: `1px solid ${G.danger}44`,
-              borderRadius: 16,
-              padding: 40,
-              maxWidth: 360,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
-            <div style={{ fontSize: 14, color: G.muted, marginBottom: 8 }}>
-              This invite link is invalid or has already been used.
-            </div>
-            <div style={{ fontSize: 11, color: G.muted }}>
-              Contact your employer for a new link.
-            </div>
-          </div>
-        </div>
-      );
-    }
-  } else if (!session) {
-    screen = (
-      <LoginScreen
-        onLogin={handleLogin}
-        themeMode={themeMode}
-        onToggleTheme={toggleTheme}
-        apiEnabled={data.apiEnabled}
-        apiError={data.apiError}
-        onRetryApi={() => void data.refreshAll()}
+  // Any legacy link with ?invite= on a non-invite path
+  if (inviteToken && path !== PATHS.invite) {
+    return (
+      <Navigate
+        to={`${PATHS.invite}?invite=${encodeURIComponent(inviteToken)}`}
+        replace
       />
     );
-  } else if (session.role === 'superadmin') {
-    screen = (
-      <SuperAdminPanel
-        companies={data.companies}
-        setCompanies={data.setCompanies}
-        users={data.users}
-        setUsers={data.setUsers}
-        onLogout={logout}
-        themeMode={themeMode}
-        onToggleTheme={toggleTheme}
-        apiEnabled={data.apiEnabled}
-        refreshAll={data.refreshAll}
-      />
-    );
-  } else {
-    const freshSession = data.users.find((u) => u.id === session.id) || session;
-    const company = data.companies.find((c) => c.id === freshSession.companyId);
-
-    if (!company || !company.active) {
-      screen = (
-        <div style={{ ...pageCentered() }}>
-          <div
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: 18,
-              padding: 40,
-              maxWidth: 340,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⛔</div>
-            <div style={{ color: G.muted, marginBottom: 20 }}>
-              Company inactive or not assigned. Contact your administrator.
-            </div>
-            <Btn full onClick={logout} style={{ padding: 15, fontSize: 14 }}>
-              BACK TO LOGIN
-            </Btn>
-          </div>
-        </div>
-      );
-    } else if (freshSession.role === 'company_admin') {
-      screen = (
-        <CompanyAdminPanel
-          company={company}
-          adminUser={freshSession}
-          users={data.users}
-          setUsers={data.setUsers}
-          sheets={data.sheets}
-          loads={data.loads}
-          setLoads={data.setLoads}
-          assets={data.assets}
-          setAssets={data.setAssets}
-          manifests={data.manifests}
-          setManifests={data.setManifests}
-          carrierProfiles={data.carrierProfiles}
-          setCarrierProfiles={data.setCarrierProfiles}
-          driverDocs={data.driverDocs}
-          setDriverDocs={data.setDriverDocs}
-          invites={data.invites}
-          setInvites={data.setInvites}
-          onLogout={logout}
-          themeMode={themeMode}
-          onToggleTheme={toggleTheme}
-          apiEnabled={data.apiEnabled}
-          refreshAll={() => data.refreshAll(company.id)}
-        />
-      );
-    } else {
-      screen = (
-        <DriverDashboard
-          user={freshSession}
-          company={company}
-          sheets={data.sheets}
-          setSheets={data.setSheets}
-          loads={data.loads}
-          driverDocs={data.driverDocs}
-          setDriverDocs={data.setDriverDocs}
-          onLogout={logout}
-          themeMode={themeMode}
-          onToggleTheme={toggleTheme}
-          apiEnabled={data.apiEnabled}
-          refreshAll={() => data.refreshAll(company.id)}
-        />
-      );
-    }
   }
 
   return (
     <>
-      {screen}
+      <Routes>
+        <Route path={PATHS.login} element={<LoginRoute />} />
+        <Route path={PATHS.invite} element={<InviteRoute />} />
+        <Route
+          path={`${PATHS.admin}/:tab?`}
+          element={
+            <RequireAuth roles={['superadmin']}>
+              <SuperAdminRoute />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path={`${PATHS.app}/:tab?`}
+          element={
+            <RequireAuth roles={['company_admin']}>
+              <CompanyWorkspace />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path={`${PATHS.driver}/:tab?`}
+          element={
+            <RequireAuth roles={['driver']}>
+              <DriverWorkspace />
+            </RequireAuth>
+          }
+        />
+        <Route path="/" element={<RootRedirect />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
       <ToastHost />
     </>
   );

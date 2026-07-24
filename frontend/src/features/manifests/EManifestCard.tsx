@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
+
+const btnIconStyle = {
+  display: 'inline-flex' as const,
+  alignItems: 'center' as const,
+  gap: 6,
+};
 
 export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, error, onDismissError, onSubmit, onAccept, onReject, onCancel, onDelete, onEdit, onLeadSheet }: any) {
   const [expanded, setExpanded] = useState(false);
@@ -62,21 +68,24 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
       {/* Error banner from last failed gateway action */}
       {error && (
         <div style={{ margin:"0 16px 10px", background:G.dangerBg, border:`1px solid ${G.danger}44`, borderRadius:8, padding:"9px 12px", fontSize:11, color:G.danger, display:"flex", alignItems:"center", justifyContent:"space-between", gap:8 }}>
-          <span>⚠️ {error}</span>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+            {Icons.alert({ size: 16, color: G.danger })}
+            {error}
+          </span>
           <button onClick={e=>{e.stopPropagation();onDismissError();}} style={{ background:"none", border:"none", color:G.danger, cursor:"pointer", fontSize:14, lineHeight:1, padding:0 }}>✕</button>
         </div>
       )}
 
       {/* Action bar */}
       <div style={{ padding:"10px 16px", borderTop:`1px solid ${G.border}`, display:"flex", gap:8, flexWrap:"wrap", background:G.card2 }}>
-        {m.status==="draft"     && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onSubmit();}} style={{ padding:"7px 14px", fontSize:11, background:G.info, borderColor:G.info, opacity:pending?0.6:1 }}>{pending==="Submission"?"⏳ SUBMITTING…":"📤 SUBMIT"}</Btn>}
-        {m.status==="submitted" && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onAccept();}} style={{ padding:"7px 14px", fontSize:11, background:G.success, opacity:pending?0.6:1 }}>{pending==="Accept"?"⏳ PROCESSING…":"✓ MARK ACCEPTED"}</Btn>}
-        {m.status==="submitted" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onReject();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1 }}>{pending==="Reject"?"⏳ PROCESSING…":"✗ MARK REJECTED"}</Btn>}
-        {m.status==="rejected"  && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11 }}>✏️ EDIT & RESUBMIT</Btn>}
-        {["draft","submitted","rejected"].includes(m.status) && <Btn variant="outline" disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11 }}>✏️ EDIT</Btn>}
-        {!["delivered","cancelled"].includes(m.status) && m.status!=="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onCancel();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1 }}>{pending==="Cancellation"?"⏳ CANCELLING…":"CANCEL"}</Btn>}
-        <Btn variant="ghost" onClick={e=>{e.stopPropagation();onLeadSheet();}} style={{ padding:"7px 14px", fontSize:11 }}>🖨 LEAD SHEET</Btn>
-        {m.status==="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onDelete();}} style={{ padding:"7px 14px", fontSize:11 }}>🗑 DELETE</Btn>}
+        {m.status==="draft"     && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onSubmit();}} style={{ padding:"7px 14px", fontSize:11, background:G.info, borderColor:G.info, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Submission"?<>{Icons.pending({ size: 16, color: '#fff' })} SUBMITTING…</>:<>SUBMIT</>}</Btn>}
+        {m.status==="submitted" && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onAccept();}} style={{ padding:"7px 14px", fontSize:11, background:G.success, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Accept"?<>{Icons.pending({ size: 16, color: '#fff' })} PROCESSING…</>:<>MARK ACCEPTED</>}</Btn>}
+        {m.status==="submitted" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onReject();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Reject"?<>{Icons.pending({ size: 16, color: G.danger })} PROCESSING…</>:<>MARK REJECTED</>}</Btn>}
+        {m.status==="rejected"  && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.onGold })} EDIT & RESUBMIT</Btn>}
+        {["draft","submitted","rejected"].includes(m.status) && <Btn variant="outline" disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.muted })} EDIT</Btn>}
+        {!["delivered","cancelled"].includes(m.status) && m.status!=="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onCancel();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Cancellation"?<>{Icons.pending({ size: 16, color: G.danger })} CANCELLING…</>:<>CANCEL</>}</Btn>}
+        <Btn variant="ghost" onClick={e=>{e.stopPropagation();onLeadSheet();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.print({ size: 16, color: G.muted })} LEAD SHEET</Btn>
+        {m.status==="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onDelete();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.trash({ size: 16, color: G.danger })} DELETE</Btn>}
       </div>
 
       {/* Expanded detail */}

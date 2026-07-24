@@ -1,0 +1,144 @@
+# Blue/green application stack (unique container names per color).
+# Usage:
+#   COLOR=blue IMAGE_TAG=local IMAGE_REGISTRY=tripsheet \
+#   docker compose -p tripsheet-blue -f deploy/compose.app.yml --env-file /opt/tripsheet/secrets/app.env up -d
+
+services:
+  frontend:
+    image: ${IMAGE_REGISTRY}/frontend:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-frontend
+    restart: unless-stopped
+    networks:
+      - tripsheet-net
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1/healthz || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    image: ${IMAGE_REGISTRY}/gateway:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-gateway
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      DRIVER_SERVICE_URL: http://${COLOR}-driver-service:3003
+      FLEET_SERVICE_URL: http://${COLOR}-fleet-service:3004
+      MANIFEST_SERVICE_URL: http://${COLOR}-manifest-service:3005
+      TRIPSHEET_SERVICE_URL: http://${COLOR}-tripsheet-service:3006
+      ACCOUNTING_SERVICE_URL: http://${COLOR}-accounting-service:3007
+      NOTIFICATION_SERVICE_URL: http://${COLOR}-notification-service:3008
+    networks:
+      - tripsheet-net
+    depends_on:
+      - auth-service
+      - company-service
+      - driver-service
+      - fleet-service
+      - manifest-service
+      - tripsheet-service
+      - accounting-service
+      - notification-service
+
+  auth-service:
+    image: ${IMAGE_REGISTRY}/auth-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-auth-service
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/auth_db?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+    networks:
+      - tripsheet-net
+
+  company-service:
+    image: ${IMAGE_REGISTRY}/company-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-company-service
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/company_db?schema=public
+    networks:
+      - tripsheet-net
+
+  driver-service:
+    image: ${IMAGE_REGISTRY}/driver-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-driver-service
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/driver_db?schema=public
+      AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-tripsheet/documents}
+    networks:
+      - tripsheet-net
+
+  fleet-service:
+    image: ${IMAGE_REGISTRY}/fleet-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-fleet-service
+    restart: unless-stopped
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/fleet_db?schema=public
+    networks:
+      - tripsheet-net
+
+  manifest-service:
+    image: ${IMAGE_REGISTRY}/manifest-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-manifest-service
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/manifest_db?schema=public
+    networks:
+      - tripsheet-net
+
+  tripsheet-service:
+    image: ${IMAGE_REGISTRY}/tripsheet-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-tripsheet-service
+    restart: unless-stopped
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/tripsheet_db?schema=public
+    networks:
+      - tripsheet-net
+
+  accounting-service:
+    image: ${IMAGE_REGISTRY}/accounting-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-accounting-service
+    restart: unless-stopped
+    environment:
+      PORT: 3007
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/accounting_db?schema=public
+      FLEET_SERVICE_URL: http://${COLOR}-fleet-service:3004
+      TRIPSHEET_SERVICE_URL: http://${COLOR}-tripsheet-service:3006
+      DRIVER_SERVICE_URL: http://${COLOR}-driver-service:3003
+    networks:
+      - tripsheet-net
+
+  notification-service:
+    image: ${IMAGE_REGISTRY}/notification-service:${IMAGE_TAG:-latest}
+    container_name: ${COLOR}-notification-service
+    restart: unless-stopped
+    environment:
+      PORT: 3008
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db?schema=public
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+    networks:
+      - tripsheet-net
+
+networks:
+  tripsheet-net:
+    external: true

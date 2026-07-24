@@ -55,9 +55,26 @@ export class ContractsService {
     };
 
     if (dto.id) {
-      await this.ensureExists(dto.id);
-      return this.prisma.contract.update({
+      const existing = await this.prisma.contract.findUnique({
         where: { id: dto.id },
+      });
+      if (existing) {
+        return this.prisma.contract.update({
+          where: { id: dto.id },
+          data: fields,
+        });
+      }
+      // Stale / wrong id (e.g. DriverDocument stub) — create a real contract
+    }
+
+    // Prefer updating latest contract for this driver when no valid id
+    const latest = await this.prisma.contract.findFirst({
+      where: { driverId: dto.driverId },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (latest) {
+      return this.prisma.contract.update({
+        where: { id: latest.id },
         data: fields,
       });
     }

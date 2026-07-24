@@ -1,5 +1,5 @@
 import { G, pageCentered } from '@/lib/theme';
-import { Btn } from '@/components/ui';
+import { Btn, Icons } from '@/components/ui';
 
 /** Prefer Cloudinary URL; fall back to legacy inline fileData. */
 function docSrc(doc: { fileUrl?: string; fileData?: string }) {
@@ -63,7 +63,7 @@ export function DocViewer({ doc, onClose }: any) {
                 gap: 6,
               }}
             >
-              ⬇️ DOWNLOAD
+              DOWNLOAD
             </a>
           )}
           <button
@@ -119,7 +119,9 @@ export function DocViewer({ doc, onClose }: any) {
         )}
         {src && !isImage && !isPDF && (
           <div style={{ textAlign: 'center', color: G.muted }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>📄</div>
+            <div style={{ marginBottom: 16 }}>
+              {Icons.docs({ size: 64, color: G.muted })}
+            </div>
             <div style={{ fontSize: 14, marginBottom: 12 }}>{doc.fileName}</div>
             <a
               href={src}
@@ -137,7 +139,7 @@ export function DocViewer({ doc, onClose }: any) {
                 display: 'inline-block',
               }}
             >
-              ⬇️ Download to View
+              Download to View
             </a>
           </div>
         )}

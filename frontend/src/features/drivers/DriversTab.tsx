@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { invitesApi, authApi, driversApi } from '@/lib/api';
+import { invitesApi, authApi, driversApi, notificationsApi } from '@/lib/api';
 import { DriverProfile } from './DriverProfile';
+import { matchesDriverRef } from '@/lib/driverIds';
 
 export function DriversTab({
   company,
@@ -28,6 +29,7 @@ export function DriversTab({
   const [show, setShow] = useState(false);
   const [editDriver, setEditDriver] = useState<any>(null);
   const [generatedLink, setGeneratedLink] = useState<any>(null);
+  const [invitePhone, setInvitePhone] = useState('');
   const [busy, setBusy] = useState(false);
 
   const createInvite = async () => {
@@ -35,8 +37,9 @@ export function DriversTab({
       if (apiEnabled) {
         const invite = await invitesApi.create(company.id);
         const token = invite.token;
-        const base = window.location.href.split('?')[0];
-        setGeneratedLink(`${base}?invite=${token}`);
+        setGeneratedLink(
+          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
+        );
         await refreshAll?.();
       } else {
         const token = uid() + uid();
@@ -48,8 +51,9 @@ export function DriversTab({
           createdAt: new Date().toLocaleDateString('en-CA'),
         };
         setInvites((p: any[]) => [...p, invite]);
-        const base = window.location.href.split('?')[0];
-        setGeneratedLink(`${base}?invite=${token}`);
+        setGeneratedLink(
+          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
+        );
       }
     } catch (e: any) {
       notify(e?.message || 'Failed to create invite', 'error');
@@ -259,12 +263,49 @@ export function DriversTab({
           setView('list');
           setSD(null);
         }}
+        apiEnabled={apiEnabled}
+        refreshAll={refreshAll}
       />
     );
   }
 
   return (
     <div>
+      <StatsGrid>
+        <StatCard
+          label="Drivers"
+          value={drivers.length}
+          subtitle="Active roster"
+          accent={G.info}
+          icon={Icons.drivers({ size: 20, color: G.info })}
+        />
+        <StatCard
+          label="In Transit"
+          value={drivers.filter((d: any) =>
+            loads.some(
+              (l: any) =>
+                matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
+            ),
+          ).length}
+          subtitle="On duty now"
+          accent={G.warning}
+          icon={Icons.running({ size: 20, color: G.warning })}
+        />
+        <StatCard
+          label="Pending Invites"
+          value={pendingInvites.length}
+          subtitle="Awaiting signup"
+          accent={G.gold}
+          icon={Icons.pending({ size: 20, color: G.gold })}
+        />
+        <StatCard
+          label="Completed Invites"
+          value={completedInvites.length}
+          subtitle="Onboarded"
+          accent={G.success}
+          icon={Icons.completed({ size: 20, color: G.success })}
+        />
+      </StatsGrid>
       <div
         style={{
           display: 'flex',
@@ -275,16 +316,23 @@ export function DriversTab({
           gap: 8,
         }}
       >
-        <div style={{ fontSize: 10, letterSpacing: 3, color: G.muted }}>
-          DRIVERS ({drivers.length})
+        <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>
+          Driver roster
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn
             variant="ghost"
             onClick={createInvite}
-            style={{ fontSize: 11, padding: '8px 16px' }}
+            style={{
+              fontSize: 11,
+              padding: '8px 16px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
           >
-            🔗 SEND INVITE LINK
+            {Icons.link({ size: 16, color: G.muted })}
+            SEND INVITE LINK
           </Btn>
           <Btn
             onClick={() => {
@@ -354,17 +402,67 @@ export function DriversTab({
                 fontWeight: 800,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
               }}
             >
-              📋 COPY
+              {Icons.copy({ size: 16, color: G.onGold })}
+              COPY
             </button>
           </div>
+          {apiEnabled && (
+            <div
+              style={{
+                display: 'flex',
+                gap: 8,
+                marginBottom: 10,
+                flexWrap: 'wrap',
+                alignItems: 'flex-end',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 160 }}>
+                <Inp
+                  label="SMS invite to phone"
+                  value={invitePhone}
+                  onChange={(e) => setInvitePhone(e.target.value)}
+                  placeholder="+1..."
+                />
+              </div>
+              <Btn
+                size="sm"
+                variant="outline"
+                onClick={async () => {
+                  if (!invitePhone.trim()) {
+                    notify('Enter a phone number', 'error');
+                    return;
+                  }
+                  try {
+                    await notificationsApi.sendSms({
+                      to: invitePhone.trim(),
+                      body: `${company.name || 'TripSheet'}: complete onboarding ${generatedLink}`,
+                      companyId: company.id,
+                      meta: { type: 'invite' },
+                    });
+                    notify('Invite SMS queued');
+                  } catch (e: any) {
+                    notify(e?.message || 'SMS failed', 'error');
+                  }
+                }}
+              >
+                Send SMS
+              </Btn>
+            </div>
+          )}
           <div style={{ fontSize: 11, color: G.muted }}>
             Driver opens this link → fills profile → uploads documents → signs
             contract → you see completed profile here.
           </div>
           <button
-            onClick={() => setGeneratedLink(null)}
+            onClick={() => {
+              setGeneratedLink(null);
+              setInvitePhone('');
+            }}
             style={{
               background: 'transparent',
               border: 'none',
@@ -436,9 +534,13 @@ export function DriversTab({
               letterSpacing: 2,
               color: G.gold,
               marginBottom: 10,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
             }}
           >
-            ⏳ PENDING INVITES ({pendingInvites.length})
+            {Icons.pending({ size: 14, color: G.gold })}
+            PENDING INVITES ({pendingInvites.length})
           </div>
           {pendingInvites.map((inv: any) => {
             const link = `${window.location.href.split('?')[0]}?invite=${inv.token}`;
@@ -484,9 +586,13 @@ export function DriversTab({
                       padding: '5px 12px',
                       fontSize: 11,
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                   >
-                    📋 COPY
+                    {Icons.copy({ size: 16, color: G.gold })}
+                    COPY
                   </button>
                   <button
                     onClick={() =>
@@ -502,9 +608,12 @@ export function DriversTab({
                       padding: '5px 12px',
                       fontSize: 11,
                       cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
                     }}
                   >
-                    🗑
+                    {Icons.trash({ size: 16, color: G.danger })}
                   </button>
                 </div>
               </div>
@@ -685,17 +794,20 @@ export function DriversTab({
 
       {drivers.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
-          <div style={{ fontSize: 36 }}>👤</div>
+          <div>{Icons.driver({ size: 36, color: G.muted })}</div>
           <div style={{ color: G.muted, marginTop: 10 }}>No drivers yet.</div>
         </Card>
       ) : (
         drivers.map((d: any) => {
           const active = loads.find(
-            (l: any) => l.driverId === d.id && l.status === 'in_transit',
+            (l: any) =>
+              matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
           );
-          const sc = sheets.filter((s: any) => s.driverId === d.id).length;
-          const myDocs = (driverDocs || []).filter(
-            (doc: any) => doc.driverId === d.id,
+          const sc = sheets.filter((s: any) =>
+            matchesDriverRef(s.driverId, d),
+          ).length;
+          const myDocs = (driverDocs || []).filter((doc: any) =>
+            matchesDriverRef(doc.driverId, d),
           );
           const missing = DRIVER_DOC_TYPES.filter(
             (t) =>
@@ -709,7 +821,7 @@ export function DriversTab({
           ).length;
           return (
             <Card
-              key={d.id}
+              key={d.driverRecordId || d.id}
               style={{ cursor: 'pointer' }}
               onClick={() => {
                 setSD(d);
@@ -745,10 +857,9 @@ export function DriversTab({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 18,
                       }}
                     >
-                      👤
+                      {Icons.driver({ size: 20, color: G.gold })}
                     </div>
                     <div>
                       <div
@@ -780,13 +891,30 @@ export function DriversTab({
                       <Pill color={G.muted}>{d.citizenship}</Pill>
                     )}
                     {d.licenseNo && (
-                      <span style={{ fontSize: 11, color: G.muted }}>
-                        🪪 {d.licenseNo}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: G.muted,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {d.licenseNo}
                       </span>
                     )}
                     {d.phone && (
-                      <span style={{ fontSize: 11, color: G.muted }}>
-                        📞 {d.phone}
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: G.muted,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {Icons.phone({ size: 14, color: G.muted })}
+                        {d.phone}
                       </span>
                     )}
                   </div>
@@ -798,8 +926,17 @@ export function DriversTab({
                       flexWrap: 'wrap',
                     }}
                   >
-                    <span style={{ fontSize: 11, color: G.muted }}>
-                      📋 {sc} sheet{sc !== 1 ? 's' : ''}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: G.muted,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      {Icons.sheets({ size: 14, color: G.muted })}
+                      {sc} sheet{sc !== 1 ? 's' : ''}
                     </span>
                     {missing > 0 ? (
                       <span
@@ -807,19 +944,41 @@ export function DriversTab({
                           fontSize: 11,
                           color: G.danger,
                           fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
                         }}
                       >
-                        ⛔ {missing} required doc{missing !== 1 ? 's' : ''}{' '}
+                        {Icons.alert({ size: 14, color: G.danger })}
+                        {missing} required doc{missing !== 1 ? 's' : ''}{' '}
                         missing — cannot dispatch
                       </span>
                     ) : (
-                      <span style={{ fontSize: 11, color: G.success }}>
-                        ✅ Dispatch-ready
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: G.success,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {Icons.completed({ size: 14, color: G.success })}
+                        Dispatch-ready
                       </span>
                     )}
                     {expiring > 0 && (
-                      <span style={{ fontSize: 11, color: G.gold }}>
-                        ⏰ {expiring} expiring soon
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: G.gold,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        {Icons.pending({ size: 14, color: G.gold })}
+                        {expiring} expiring soon
                       </span>
                     )}
                   </div>
@@ -853,9 +1012,13 @@ export function DriversTab({
                         fontSize: 11,
                         cursor: 'pointer',
                         fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      ✏️ EDIT
+                      {Icons.edit({ size: 16, color: G.gold })}
+                      EDIT
                     </button>
                     <button
                       onClick={(e) => {
@@ -871,9 +1034,12 @@ export function DriversTab({
                         fontSize: 11,
                         cursor: 'pointer',
                         fontWeight: 700,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
                       }}
                     >
-                      🗑
+                      {Icons.trash({ size: 16, color: G.danger })}
                     </button>
                   </div>
                 </div>

@@ -21,6 +21,7 @@ class InviteDocDto {
   fileName!: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   fileSize?: number;
 

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
+import { Icons } from '@/components/ui';
 
 export function MapView({ load, users, loads, tick }: any) {
   const canvasRef = useRef<any>(null);
@@ -28,7 +29,7 @@ export function MapView({ load, users, loads, tick }: any) {
     ctx.setLineDash([]);
     ctx.beginPath();ctx.arc(x,y,13,0,Math.PI*2);ctx.fillStyle=G.gold;ctx.fill();
     ctx.fillStyle="#000";ctx.font="bold 13px Arial";ctx.textAlign="center";ctx.textBaseline="middle";
-    ctx.fillText("🚛",x,y);
+    ctx.fillText("T",x,y);
     ctx.fillStyle="#000c";ctx.fillRect(x+16,y-14,118,28);
     ctx.fillStyle=G.gold;ctx.font="bold 10px monospace";ctx.textAlign="left";ctx.textBaseline="middle";
     ctx.fillText(load.truckNo||load.id,x+20,y-5);
@@ -47,7 +48,10 @@ export function MapView({ load, users, loads, tick }: any) {
           <span style={{ fontSize:11,color:G.muted,marginLeft:10 }}>{driver?.name||"Unknown"}</span>
         </div>
         <div style={{ fontSize:11,color:G.muted,display:"flex",gap:10 }}>
-          <span>🚛 {load.truckNo||"—"}</span>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>
+            {Icons.truck({ size: 14, color: G.muted })}
+            {load.truckNo||"—"}
+          </span>
           {load.status==="in_transit"&&<span style={{ color:G.success }}>● LIVE</span>}
         </div>
       </div>

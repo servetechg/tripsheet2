@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { G } from '@/lib/theme';
-import { Card, Pill } from '@/components/ui';
+import { Card, Pill, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { loadsApi } from '@/lib/api';
 import { MapView } from './MapView';
@@ -86,17 +86,36 @@ export function TrackTab({
 
   return (
     <div>
-      <div
-        style={{
-          fontSize: 10,
-          letterSpacing: 3,
-          color: G.muted,
-          marginBottom: 14,
-        }}
-      >
-        LIVE TRACKING ·{' '}
-        {loads.filter((l: any) => l.status === 'in_transit').length} IN TRANSIT
-      </div>
+      <StatsGrid>
+        <StatCard
+          label="In Transit"
+          value={loads.filter((l: any) => l.status === 'in_transit').length}
+          subtitle="Live on route"
+          accent={G.warning}
+          icon={Icons.track({ size: 20, color: G.warning })}
+        />
+        <StatCard
+          label="Assigned"
+          value={loads.filter((l: any) => l.status === 'assigned').length}
+          subtitle="Waiting to depart"
+          accent={G.info}
+          icon={Icons.assigned({ size: 20, color: G.info })}
+        />
+        <StatCard
+          label="Delivered"
+          value={loads.filter((l: any) => l.status === 'delivered').length}
+          subtitle="Completed trips"
+          accent={G.success}
+          icon={Icons.completed({ size: 20, color: G.success })}
+        />
+        <StatCard
+          label="Total Loads"
+          value={loads.length}
+          subtitle="All statuses"
+          accent={G.gold}
+          icon={Icons.dispatch({ size: 20, color: G.gold })}
+        />
+      </StatsGrid>
       <div
         style={{
           display: 'grid',
@@ -107,7 +126,7 @@ export function TrackTab({
         <div>
           {loads.length === 0 && (
             <Card style={{ textAlign: 'center', padding: 50 }}>
-              <div style={{ fontSize: 36 }}>📍</div>
+              <div>{Icons.track({ size: 36, color: G.muted })}</div>
               <div style={{ color: G.muted, marginTop: 10 }}>
                 No loads yet. Assign loads from Dispatch.
               </div>
@@ -126,7 +145,7 @@ export function TrackTab({
                   color: G.gold,
                 }}
               >
-                ℹ️ No loads currently in transit. Start a load from Dispatch to
+                No loads currently in transit. Start a load from Dispatch to
                 track it live.
               </div>
             )}
@@ -188,8 +207,18 @@ export function TrackTab({
                     <div style={{ fontSize: 13, fontWeight: 600 }}>
                       {driver?.name || '—'}
                     </div>
-                    <div style={{ fontSize: 11, color: G.muted }}>
-                      🚛 {l.truckNo || '—'} · {l.origin} → {l.destination}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: G.muted,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      {Icons.truck({ size: 14, color: G.muted })}
+                      {l.truckNo || '—'} · {l.origin} → {l.destination}
                     </div>
                     {l.status === 'in_transit' && (
                       <div

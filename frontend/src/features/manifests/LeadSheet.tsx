@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
 
 export function LeadSheet({ manifest:m, company, carrier, onBack }: any) {
@@ -40,7 +40,10 @@ ${ref.current.innerHTML}
       <div style={{ background:G.card2, borderBottom:`2px solid ${isACI?G.info:G.purple}`, padding:"12px 16px", display:"flex", gap:12, alignItems:"center", position:"sticky", top:0, zIndex:100 }}>
         <Btn onClick={onBack} style={{ padding:"9px 16px" }}>← BACK</Btn>
         <span style={{ fontSize:11, fontWeight:700, color: isACI?G.info:G.purple, flex:1, letterSpacing:2 }}>{m.type} eMAANIFEST LEAD SHEET</span>
-        <Btn onClick={doPrint} style={{ padding:"9px 20px", background: isACI?G.info:G.purple }}>🖨 PRINT LEAD SHEET</Btn>
+        <Btn onClick={doPrint} style={{ padding:"9px 20px", background: isACI?G.info:G.purple, display:'inline-flex', alignItems:'center', gap:6 }}>
+          {Icons.print({ size: 16, color: '#fff' })}
+          PRINT LEAD SHEET
+        </Btn>
       </div>
 
       {/* A4 Lead Sheet */}

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Pill, SectionTitle, Skeleton } from '@/components/ui';
+import { Btn, Card, Pill, SectionTitle, Skeleton, Icons } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { uid } from '@/lib/uid';
 import { notify } from '@/components/feedback/Toast';
@@ -15,6 +15,10 @@ import {
   documentsApi,
   contractsApi,
 } from '@/lib/api';
+import {
+  driverRecordIdOf,
+  matchesDriverRef,
+} from '@/lib/driverIds';
 
 export function DriverDashboard({
   user,
@@ -29,26 +33,34 @@ export function DriverDashboard({
   onToggleTheme,
   apiEnabled,
   refreshAll,
+  activeTab,
+  onTabChange,
 }: any) {
-  const [tab, setTab] = useState('sheets');
+  const tab = activeTab || 'sheets';
+  const setTab = onTabChange || (() => {});
   const [formOpen, setForm] = useState(false);
   const [editSheet, setEditSheet] = useState<any>(null);
   const [previewS, setPreview] = useState<any>(null);
   const sn = company.shortName;
+  const recordId = driverRecordIdOf(user);
   const mySheets = sheets.filter(
-    (s: any) => s.companyId === company.id && s.driverId === user.id,
+    (s: any) =>
+      s.companyId === company.id && matchesDriverRef(s.driverId, user),
   );
   const sortedSheets = [...mySheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
   const myLoad = loads.find(
-    (l: any) => l.driverId === user.id && l.status === 'in_transit',
+    (l: any) =>
+      matchesDriverRef(l.driverId, user) && l.status === 'in_transit',
   );
   const myDocs = (driverDocs || []).filter(
-    (d: any) => d.driverId === user.id && d.type !== '__contract__',
+    (d: any) =>
+      matchesDriverRef(d.driverId, user) && d.type !== '__contract__',
   );
   const localContract = (driverDocs || []).find(
-    (d: any) => d.driverId === user.id && d.type === '__contract__',
+    (d: any) =>
+      matchesDriverRef(d.driverId, user) && d.type === '__contract__',
   );
   const [apiContract, setApiContract] = useState<any>(null);
   const myContract = apiEnabled ? apiContract || localContract : localContract;
@@ -61,13 +73,13 @@ export function DriverDashboard({
     let cancelled = false;
     (async () => {
       try {
-        const list = await contractsApi.list(user.id);
+        const list = await contractsApi.list(recordId);
         if (!cancelled && Array.isArray(list) && list.length) {
           const c = list[0];
           setApiContract({
             ...c,
             type: '__contract__',
-            driverId: user.id,
+            driverId: recordId,
             companyId: company.id,
             signedByDriver: !!c.signedByDriver || !!c.driverSignedAt,
             driverSignedAt: c.driverSignedAt,
@@ -81,12 +93,12 @@ export function DriverDashboard({
     return () => {
       cancelled = true;
     };
-  }, [apiEnabled, tab, user.id, company.id]);
+  }, [apiEnabled, tab, recordId, company.id]);
 
   const saveDoc = async (typeId: string, fileData: any) => {
     const nd = {
       id: uid(),
-      driverId: user.id,
+      driverId: recordId,
       companyId: company.id,
       type: typeId,
       fileName: fileData.name,
@@ -101,7 +113,7 @@ export function DriverDashboard({
     try {
       if (apiEnabled) {
         await documentsApi.upsert({
-          driverId: user.id,
+          driverId: recordId,
           companyId: company.id,
           type: typeId,
           fileName: fileData.name,
@@ -117,7 +129,7 @@ export function DriverDashboard({
       } else {
         setDriverDocs((p: any[]) => {
           const ex = p.findIndex(
-            (d) => d.driverId === user.id && d.type === typeId,
+            (d) => matchesDriverRef(d.driverId, user) && d.type === typeId,
           );
           if (ex >= 0) {
             const n = [...p];
@@ -179,13 +191,13 @@ export function DriverDashboard({
       if (apiEnabled && myContract?.id) {
         await contractsApi.sign(myContract.id, { role: 'driver' });
         await refreshAll?.();
-        const list = await contractsApi.list(user.id);
+        const list = await contractsApi.list(recordId);
         if (Array.isArray(list) && list.length) {
           const c = list[0];
           setApiContract({
             ...c,
             type: '__contract__',
-            driverId: user.id,
+            driverId: recordId,
             companyId: company.id,
             signedByDriver: true,
             driverSignedAt:
@@ -196,7 +208,7 @@ export function DriverDashboard({
       } else {
         setDriverDocs((p: any[]) =>
           p.map((d) =>
-            d.driverId === user.id && d.type === '__contract__'
+            matchesDriverRef(d.driverId, user) && d.type === '__contract__'
               ? {
                   ...d,
                   signedByDriver: true,
@@ -251,10 +263,10 @@ export function DriverDashboard({
     );
 
   const TABS = [
-    { id: 'sheets', icon: '📋', label: 'Sheets' },
-    { id: 'docs', icon: '📁', label: 'My Docs' },
-    { id: 'contract', icon: '📄', label: 'Contract' },
-    { id: 'status', icon: '🚛', label: 'My Load' },
+    { id: 'sheets', icon: 'sheets', label: 'Sheets' },
+    { id: 'docs', icon: 'docs', label: 'My Docs' },
+    { id: 'contract', icon: 'contract', label: 'Contract' },
+    { id: 'status', icon: 'status', label: 'My Load' },
   ];
 
   return (
@@ -264,20 +276,11 @@ export function DriverDashboard({
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
+      userName={user?.name}
+      userEmail={user?.email}
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
-      topRight={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, color: G.muted }}>{user.name}</span>
-          <Btn
-            variant="outline"
-            onClick={onLogout}
-            style={{ fontSize: 11, padding: '8px 14px' }}
-          >
-            LOGOUT
-          </Btn>
-        </div>
-      }
+      onLogout={onLogout}
     >
       {tabLoading ? (
         <Skeleton rows={3} />
@@ -308,9 +311,22 @@ export function DriverDashboard({
                   <div style={{ fontWeight: 700, fontSize: 13 }}>
                     {myLoad.id} · {myLoad.origin} → {myLoad.destination}
                   </div>
-                  <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                    🚛 Truck {myLoad.truckNo || '—'} · 📦 Trailer{' '}
-                    {myLoad.trailerNo || '—'}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: G.muted,
+                      marginTop: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {Icons.truck({ size: 14, color: G.muted })}
+                    Truck {myLoad.truckNo || '—'}
+                    <span>·</span>
+                    {Icons.trailer({ size: 14, color: G.muted })}
+                    Trailer {myLoad.trailerNo || '—'}
                   </div>
                   {myLoad.eta && (
                     <div style={{ fontSize: 11, color: G.gold, marginTop: 2 }}>
@@ -336,7 +352,7 @@ export function DriverDashboard({
               </div>
               {mySheets.length === 0 ? (
                 <Card style={{ textAlign: 'center', padding: 60 }}>
-                  <div style={{ fontSize: 40 }}>🚛</div>
+                  <div>{Icons.sheets({ size: 40, color: G.muted })}</div>
                   <div
                     style={{ color: G.muted, marginTop: 12, marginBottom: 20 }}
                   >
@@ -403,9 +419,13 @@ export function DriverDashboard({
                               cursor: 'pointer',
                               fontWeight: 700,
                               fontFamily: 'monospace',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
                             }}
                           >
-                            ✏️ EDIT
+                            {Icons.edit({ size: 16, color: G.gold })}
+                            EDIT
                           </button>
                           <button
                             onClick={(e) => openPDF(s, e)}
@@ -419,9 +439,13 @@ export function DriverDashboard({
                               cursor: 'pointer',
                               fontWeight: 700,
                               fontFamily: FONT_MONO,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
                             }}
                           >
-                            👁 PDF
+                            {Icons.eye({ size: 16, color: G.onGold })}
+                            PDF
                           </button>
                         </div>
                       </div>
@@ -455,7 +479,7 @@ export function DriverDashboard({
                   color: G.muted,
                 }}
               >
-                📎 Upload your documents. Your employer can view these in your
+                Upload your documents. Your employer can view these in your
                 driver profile.
               </div>
               {DRIVER_DOC_TYPES.map((dt) => {
@@ -494,7 +518,7 @@ export function DriverDashboard({
                           flex: 1,
                         }}
                       >
-                        <span style={{ fontSize: 20 }}>{dt.icon}</span>
+                        {Icons.docs({ size: 20, color: G.muted })}
                         <div>
                           <div
                             style={{
@@ -549,9 +573,13 @@ export function DriverDashboard({
                               fontSize: 11,
                               cursor: 'pointer',
                               fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
                             }}
                           >
-                            👁 VIEW
+                            {Icons.eye({ size: 16, color: G.gold })}
+                            VIEW
                           </button>
                         )}
                         <button
@@ -565,9 +593,16 @@ export function DriverDashboard({
                             fontSize: 11,
                             fontWeight: 800,
                             cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
                           }}
                         >
-                          {doc ? '↑ REPLACE' : '↑ UPLOAD'}
+                          {Icons.upload({
+                            size: 16,
+                            color: doc ? G.muted : G.onGold,
+                          })}
+                          {doc ? 'REPLACE' : 'UPLOAD'}
                         </button>
                       </div>
                     </div>
@@ -760,7 +795,7 @@ export function DriverDashboard({
                   >
                     {myContract.signedByDriver ? (
                       <>
-                        <div style={{ fontSize: 28 }}>✅</div>
+                        <div>{Icons.completed({ size: 28, color: G.success })}</div>
                         <div
                           style={{
                             fontSize: 14,
@@ -783,7 +818,7 @@ export function DriverDashboard({
                       </>
                     ) : (
                       <>
-                        <div style={{ fontSize: 28 }}>✍️</div>
+                        <div>{Icons.contract({ size: 28, color: G.muted })}</div>
                         <div
                           style={{
                             fontSize: 14,
@@ -818,7 +853,7 @@ export function DriverDashboard({
                       padding: '12px 16px',
                     }}
                   >
-                    <span style={{ fontSize: 20 }}>🏢</span>
+                    {Icons.companies({ size: 20, color: G.muted })}
                     <div>
                       <div
                         style={{
@@ -845,7 +880,9 @@ export function DriverDashboard({
                     textAlign: 'center',
                   }}
                 >
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>📄</div>
+                  <div style={{ marginBottom: 12 }}>
+                    {Icons.contract({ size: 40, color: G.muted })}
+                  </div>
                   <div style={{ color: G.muted, fontSize: 13 }}>
                     No contract set yet.
                   </div>
@@ -918,7 +955,7 @@ export function DriverDashboard({
                 </Card>
               ) : (
                 <Card style={{ textAlign: 'center', padding: 60 }}>
-                  <div style={{ fontSize: 40 }}>🚛</div>
+                  <div>{Icons.dispatch({ size: 40, color: G.muted })}</div>
                   <div style={{ color: G.muted, marginTop: 12 }}>
                     No active load assigned to you right now.
                   </div>

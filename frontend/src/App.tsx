@@ -1,11 +1,17 @@
+import { BrowserRouter } from 'react-router-dom';
 import { AppDataProvider } from '@/context/AppDataContext';
+import { SessionProvider } from '@/context/SessionContext';
 import { AppRoutes } from '@/routes/AppRoutes';
 
-/** Shell only — providers + session routing. */
+/** Shell — providers + router. */
 export default function App() {
   return (
-    <AppDataProvider>
-      <AppRoutes />
-    </AppDataProvider>
+    <BrowserRouter>
+      <AppDataProvider>
+        <SessionProvider>
+          <AppRoutes />
+        </SessionProvider>
+      </AppDataProvider>
+    </BrowserRouter>
   );
 }

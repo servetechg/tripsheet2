@@ -1,19 +1,20 @@
 import { DRIVER_DOC_TYPES as SHARED, DISPATCH_REQUIRED_DOCS, PAY_TYPES as SHARED_PAY } from '@tripsheet/shared';
 import type { DriverDocTypeId, PayTypeId } from '@tripsheet/shared';
 
+/** Monochrome icon keys mapped to `Icons` (no emoji). */
 const DOC_ICONS: Record<DriverDocTypeId, string> = {
-  contract: '📄',
-  license: '🪪',
-  abstract: '📋',
-  medical: '🏥',
-  fast_card: '🛂',
-  twic: '🔐',
-  hazmat: '☢️',
-  cvor: '🚛',
-  criminal: '✅',
-  sin_ssn: '🔒',
-  void_cheque: '🏦',
-  other: '📎',
+  contract: 'contract',
+  license: 'docs',
+  abstract: 'sheets',
+  medical: 'docs',
+  fast_card: 'assigned',
+  twic: 'docs',
+  hazmat: 'alert',
+  cvor: 'truck',
+  criminal: 'completed',
+  sin_ssn: 'docs',
+  void_cheque: 'expenses',
+  other: 'docs',
 };
 
 export const DRIVER_DOC_TYPES = SHARED.map((d) => ({
@@ -24,11 +25,11 @@ export const DRIVER_DOC_TYPES = SHARED.map((d) => ({
 export { DISPATCH_REQUIRED_DOCS };
 
 const PAY_ICONS: Record<PayTypeId, string> = {
-  per_mile: '🛣️',
-  hourly: '⏱️',
-  per_load: '📦',
-  percentage: '📊',
-  salary: '💰',
+  per_mile: 'track',
+  hourly: 'pending',
+  per_load: 'box',
+  percentage: 'chart',
+  salary: 'revenue',
 };
 
 export const PAY_TYPES = SHARED_PAY.map((p) => ({
