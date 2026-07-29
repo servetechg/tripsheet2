@@ -12,10 +12,13 @@ read -r -p "ACME email for HTTPS: " ACME_EMAIL
 read -r -p "GitHub org/repo for GHCR (e.g. myorg/tripsheet) or 'tripsheet' for local: " IMAGE_REGISTRY_INPUT
 
 DOMAIN="tripsheet.${VPS_IP}.sslip.io"
+STAGING_DOMAIN="staging.tripsheet.${VPS_IP}.sslip.io"
 POSTGRES_PASSWORD="$(openssl rand -hex 32)"
 REDIS_PASSWORD="$(openssl rand -hex 32)"
 JWT_SECRET="$(openssl rand -base64 48)"
+JWT_SECRET_STAGING="$(openssl rand -base64 48)"
 INTERNAL_API_KEY="$(openssl rand -hex 32)"
+INTERNAL_API_KEY_STAGING="$(openssl rand -hex 32)"
 IMAGE_REGISTRY="${IMAGE_REGISTRY_INPUT:-tripsheet}"
 
 cat > "${SECRETS_DIR}/infra.env" <<EOF
@@ -44,13 +47,34 @@ IMAGE_TAG=local
 COLOR=blue
 EOF
 
+cat > "${SECRETS_DIR}/staging.app.env" <<EOF
+POSTGRES_USER=tripsheet
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+REDIS_PASSWORD=${REDIS_PASSWORD}
+JWT_SECRET=${JWT_SECRET_STAGING}
+JWT_EXPIRES_IN=7d
+INTERNAL_API_KEY=${INTERNAL_API_KEY_STAGING}
+CORS_ORIGIN=https://${STAGING_DOMAIN}
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+CLOUDINARY_FOLDER=tripsheet/staging/documents
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM_NUMBER=
+IMAGE_REGISTRY=${IMAGE_REGISTRY}
+IMAGE_TAG=local
+EOF
+
 cat > "${SECRETS_DIR}/edge.env" <<EOF
 DOMAIN=${DOMAIN}
+STAGING_DOMAIN=${STAGING_DOMAIN}
 ACTIVE_COLOR=blue
 CADDY_ACME_EMAIL=${ACME_EMAIL}
 EOF
 
 chmod 600 "${SECRETS_DIR}/"*.env
 echo "Wrote secrets to ${SECRETS_DIR}"
-echo "Domain: https://${DOMAIN}"
-echo "Verify DNS: dig +short ${DOMAIN}"
+echo "Production: https://${DOMAIN}"
+echo "Staging:    https://${STAGING_DOMAIN}"
+echo "Verify DNS: dig +short ${DOMAIN} && dig +short ${STAGING_DOMAIN}"

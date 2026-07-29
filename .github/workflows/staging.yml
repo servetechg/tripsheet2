@@ -1,17 +1,12 @@
-name: production
+name: staging
 
 on:
   push:
-    branches: [main, master]
+    branches: [develop]
   workflow_dispatch:
-    inputs:
-      color:
-        description: 'Target color (blue/green). Leave empty to auto-pick inactive.'
-        required: false
-        default: ''
 
 concurrency:
-  group: production-deploy
+  group: staging-deploy
   cancel-in-progress: false
 
 jobs:
@@ -45,7 +40,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ github.repository }}/gateway:${{ steps.meta.outputs.sha }}
-            ghcr.io/${{ github.repository }}/gateway:latest
+            ghcr.io/${{ github.repository }}/gateway:staging
 
       - name: Build & push frontend
         uses: docker/build-push-action@v6
@@ -56,7 +51,7 @@ jobs:
           build-args: VITE_API_URL=/api
           tags: |
             ghcr.io/${{ github.repository }}/frontend:${{ steps.meta.outputs.sha }}
-            ghcr.io/${{ github.repository }}/frontend:latest
+            ghcr.io/${{ github.repository }}/frontend:staging
 
       - name: Build & push backend services
         run: |
@@ -64,45 +59,39 @@ jobs:
           TAG="${{ steps.meta.outputs.sha }}"
           for svc in auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service; do
             docker build -t "ghcr.io/${{ github.repository }}/${svc}:${TAG}" \
-              -t "ghcr.io/${{ github.repository }}/${svc}:latest" \
+              -t "ghcr.io/${{ github.repository }}/${svc}:staging" \
               -f "backend/services/${svc}/Dockerfile" \
               "backend/services/${svc}"
             docker push "ghcr.io/${{ github.repository }}/${svc}:${TAG}"
-            docker push "ghcr.io/${{ github.repository }}/${svc}:latest"
+            docker push "ghcr.io/${{ github.repository }}/${svc}:staging"
           done
 
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    environment: production
+    environment: staging
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy over SSH
+      - name: Deploy staging over SSH
         env:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          REQUESTED_COLOR: ${{ github.event.inputs.color }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           install -m 600 /dev/null key
           printf '%s\n' "$SSH_KEY" > key
-          COLOR="${REQUESTED_COLOR:-}"
-          if [[ -z "${COLOR}" ]]; then
-            COLOR=$(ssh -i key -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
-              'grep -E "^ACTIVE_COLOR=" /opt/tripsheet/secrets/edge.env | cut -d= -f2 || echo blue')
-            if [[ "${COLOR}" == "blue" ]]; then COLOR=green; else COLOR=blue; fi
-          fi
           ssh -i key -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
           set -euo pipefail
           cd /opt/tripsheet/repo
           git fetch --all
           git checkout ${GITHUB_SHA}
-          sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=ghcr.io/${{ github.repository }}|' /opt/tripsheet/secrets/app.env
-          sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/app.env
+          sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=ghcr.io/${{ github.repository }}|' /opt/tripsheet/secrets/staging.app.env
+          sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/staging.app.env
           echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
-          ./deploy/scripts/deploy.sh ${COLOR} ${IMAGE_TAG}
+          chmod +x deploy/scripts/*.sh
+          ./deploy/scripts/deploy-staging.sh ${IMAGE_TAG}
           EOF
