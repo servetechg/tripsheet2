@@ -38,6 +38,16 @@ export TWILIO_ACCOUNT_SID TWILIO_AUTH_TOKEN TWILIO_FROM_NUMBER
 export DOMAIN STAGING_DOMAIN ACTIVE_COLOR CADDY_ACME_EMAIL
 
 echo "==> Pulling/starting ${PROJECT} with tag ${IMAGE_TAG}"
+echo "    registry: ${IMAGE_REGISTRY}"
+if ! docker pull "${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}" >/dev/null 2>&1; then
+  echo "ERROR: cannot pull ${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}"
+  echo "  - Production CI publishes tags: <12-char-sha> and 'latest'"
+  echo "  - Do not use git short sha (7 chars) or 'local' with GHCR"
+  echo "  - Run GitHub Actions (production) first, then: docker login ghcr.io"
+  echo "  - Example: ./deploy/scripts/deploy.sh green latest"
+  exit 1
+fi
+
 COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" \
   --env-file "${APP_ENV}" \

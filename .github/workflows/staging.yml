@@ -9,20 +9,66 @@ concurrency:
   group: staging-deploy
   cancel-in-progress: false
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.sha }}
+      image_registry: ${{ steps.meta.outputs.registry }}
+    steps:
+      - name: Image meta
+        id: meta
+        run: |
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "registry=${{ env.REGISTRY }}/${REPO_LC}" >> "$GITHUB_OUTPUT"
+
   build-and-push:
+    needs: meta
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      image_tag: ${{ steps.meta.outputs.sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gateway
+            context: backend/gateway
+            file: backend/gateway/Dockerfile
+          - name: frontend
+            context: .
+            file: frontend/Dockerfile
+            build_args: VITE_API_URL=/api
+          - name: auth-service
+            context: backend/services/auth-service
+            file: backend/services/auth-service/Dockerfile
+          - name: company-service
+            context: backend/services/company-service
+            file: backend/services/company-service/Dockerfile
+          - name: driver-service
+            context: backend/services/driver-service
+            file: backend/services/driver-service/Dockerfile
+          - name: fleet-service
+            context: backend/services/fleet-service
+            file: backend/services/fleet-service/Dockerfile
+          - name: manifest-service
+            context: backend/services/manifest-service
+            file: backend/services/manifest-service/Dockerfile
+          - name: tripsheet-service
+            context: backend/services/tripsheet-service
+            file: backend/services/tripsheet-service/Dockerfile
+          - name: accounting-service
+            context: backend/services/accounting-service
+            file: backend/services/accounting-service/Dockerfile
+          - name: notification-service
+            context: backend/services/notification-service
+            file: backend/services/notification-service/Dockerfile
     steps:
       - uses: actions/checkout@v4
-
-      - name: Image tag
-        id: meta
-        run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -32,44 +78,26 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push gateway
+      - name: Build & push ${{ matrix.name }}
         uses: docker/build-push-action@v6
         with:
-          context: backend/gateway
-          file: backend/gateway/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
+          build-args: ${{ matrix.build_args || '' }}
           tags: |
-            ghcr.io/${{ github.repository }}/gateway:${{ steps.meta.outputs.sha }}
-            ghcr.io/${{ github.repository }}/gateway:staging
-
-      - name: Build & push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: frontend/Dockerfile
-          push: true
-          build-args: VITE_API_URL=/api
-          tags: |
-            ghcr.io/${{ github.repository }}/frontend:${{ steps.meta.outputs.sha }}
-            ghcr.io/${{ github.repository }}/frontend:staging
-
-      - name: Build & push backend services
-        run: |
-          set -euo pipefail
-          TAG="${{ steps.meta.outputs.sha }}"
-          for svc in auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service; do
-            docker build -t "ghcr.io/${{ github.repository }}/${svc}:${TAG}" \
-              -t "ghcr.io/${{ github.repository }}/${svc}:staging" \
-              -f "backend/services/${svc}/Dockerfile" \
-              "backend/services/${svc}"
-            docker push "ghcr.io/${{ github.repository }}/${svc}:${TAG}"
-            docker push "ghcr.io/${{ github.repository }}/${svc}:staging"
-          done
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:${{ needs.meta.outputs.image_tag }}
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:staging
+          cache-from: type=gha,scope=staging-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=staging-${{ matrix.name }}
 
   deploy:
-    needs: build-and-push
+    needs: [meta, build-and-push]
     runs-on: ubuntu-latest
     environment: staging
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -78,20 +106,27 @@ jobs:
           SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+          IMAGE_REGISTRY: ${{ needs.meta.outputs.image_registry }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ secrets.GHCR_USERNAME || github.actor }}
         run: |
           set -euo pipefail
           install -m 600 /dev/null key
           printf '%s\n' "$SSH_KEY" > key
-          ssh -i key -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
+          ssh -i key -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
           set -euo pipefail
           cd /opt/tripsheet/repo
           git fetch --all
-          git checkout ${GITHUB_SHA}
-          sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=ghcr.io/${{ github.repository }}|' /opt/tripsheet/secrets/staging.app.env
-          sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/staging.app.env
-          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+          git checkout --force ${GITHUB_SHA}
           chmod +x deploy/scripts/*.sh
+          touch /opt/tripsheet/secrets/staging.app.env
+          grep -q '^IMAGE_REGISTRY=' /opt/tripsheet/secrets/staging.app.env \
+            && sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${IMAGE_REGISTRY}|' /opt/tripsheet/secrets/staging.app.env \
+            || echo "IMAGE_REGISTRY=${IMAGE_REGISTRY}" >> /opt/tripsheet/secrets/staging.app.env
+          grep -q '^IMAGE_TAG=' /opt/tripsheet/secrets/staging.app.env \
+            && sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/staging.app.env \
+            || echo "IMAGE_TAG=${IMAGE_TAG}" >> /opt/tripsheet/secrets/staging.app.env
+          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
           ./deploy/scripts/deploy-staging.sh ${IMAGE_TAG}
           EOF
