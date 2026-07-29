@@ -34,7 +34,18 @@ if [[ -z "${STAGING_DOMAIN:-}" ]]; then
   exit 1
 fi
 
-echo "==> Starting ${PROJECT} with tag ${IMAGE_TAG}"
+echo "==> Pulling/starting ${PROJECT} with tag ${IMAGE_TAG}"
+echo "    registry: ${IMAGE_REGISTRY}"
+if ! docker pull "${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}" >/dev/null 2>&1; then
+  echo "ERROR: cannot pull ${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}"
+  echo "  - Staging CI publishes tags: <12-char-sha> and 'staging'"
+  echo "  - Production CI publishes tags: <12-char-sha> and 'latest'"
+  echo "  - Do not use git short sha (7 chars) or 'local' with GHCR"
+  echo "  - Run GitHub Actions first, then: docker login ghcr.io"
+  echo "  - Example: ./deploy/scripts/deploy-staging.sh staging"
+  exit 1
+fi
+
 IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" \
   --env-file "${APP_ENV}" \

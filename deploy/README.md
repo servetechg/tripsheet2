@@ -57,6 +57,33 @@ Create two GitHub Environments:
 - `production` — secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 - `staging` — same three secrets (can reuse values)
 
+Optional (recommended for reliable VPS pulls of private packages):
+
+- Repository secret `GHCR_TOKEN` — classic PAT with `read:packages` (+ `write:packages` if needed)
+- Repository secret `GHCR_USERNAME` — your GitHub username
+
+Also: **Settings → Actions → General → Workflow permissions → Read and write**.
+
+### Image tags (important)
+
+| Env | Movable tag | Immutable tag |
+|-----|-------------|---------------|
+| Staging | `staging` | 12-char commit sha |
+| Production | `latest` | 12-char commit sha |
+
+Do **not** manually deploy with:
+
+- `local` (only for `build-local.sh` + `IMAGE_REGISTRY=tripsheet`)
+- 7-char git short sha (e.g. `5d756a5`) — CI uses **12** chars
+
+After a green staging workflow:
+
+```bash
+# on VPS (logged into ghcr.io)
+./deploy/scripts/deploy-staging.sh staging
+# or the 12-char sha printed in Actions
+```
+
 ### Workflows
 - `.github/workflows/staging.yml` → push to `develop`
 - `.github/workflows/production.yml` → push to `main` / `master` only
@@ -65,6 +92,19 @@ Create two GitHub Environments:
 1. Feature branch → PR → `develop` → **staging URL**
 2. Test on staging
 3. PR `develop` → `main` → **production** (blue/green)
+
+### First-time: publish packages then deploy
+1. Push these workflow fixes to `develop` (and merge to `main` when ready)
+2. GitHub → Actions → **staging** → Run workflow (or push to develop)
+3. Wait until build+deploy are green (images appear under Packages)
+4. If deploy SSH fails but build succeeded, on VPS:
+
+```bash
+echo YOUR_PAT | docker login ghcr.io -u YOUR_GITHUB_USER --password-stdin
+cd /opt/tripsheet/repo
+# ensure IMAGE_REGISTRY=ghcr.io/servetechg/tripsheet2
+./deploy/scripts/deploy-staging.sh staging
+```
 
 ## RAM tip (KVM 2)
 
