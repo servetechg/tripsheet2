@@ -1,88 +1,95 @@
-# Production deployment (Hostinger KVM 2)
+# Production + Staging deployment (Hostinger KVM 2)
 
-## Architecture
+## Environments
 
-- Docker Compose: shared Postgres + Redis
-- Blue/green app stacks (`blue-*` / `green-*` containers)
-- Caddy on ports 80/443 with automatic HTTPS
-- Temporary domain: `tripsheet.<YOUR_REAL_VPS_IP>.sslip.io`
-- Images built in GitHub Actions → GHCR (or `build-local.sh` for first bring-up)
+| Env | Branch trigger | URL | Strategy |
+|-----|----------------|-----|----------|
+| **Production** | `main` / `master` | `https://tripsheet.<IP>.sslip.io` | Blue/green |
+| **Staging** | `develop` | `https://staging.tripsheet.<IP>.sslip.io` | Single stack |
 
-## Important
-
-`203.0.113.10` in earlier docs is an **example IP**. Use your real VPS IPv4:
+Use your **real** VPS IPv4 (not the example `203.0.113.10`).
 
 ```bash
 curl -4 ifconfig.me
 dig +short tripsheet.YOUR_REAL_IP.sslip.io
+dig +short staging.tripsheet.YOUR_REAL_IP.sslip.io
 ```
 
-## On the VPS (after Docker + deploy user are ready)
+## Architecture
+
+- Shared Postgres + Redis (`compose.infra.yml`)
+- Production app: `blue-*` / `green-*` (`compose.app.yml` + `deploy.sh`)
+- Staging app: `staging-*` (`compose.staging.yml` + `deploy-staging.sh`)
+- Caddy edge for both hostnames (`compose.edge.yml`)
+- Images: GitHub Actions → GHCR (or `build-local.sh`)
+
+## First-time / existing VPS — enable staging
 
 ```bash
-# 1) Clone repo
-sudo mkdir -p /opt/tripsheet
-sudo chown -R deploy:deploy /opt/tripsheet
-cd /opt/tripsheet
-git clone YOUR_REPO_URL repo
-cd repo
-
-# 2) Create secrets (never commit these)
-mkdir -p /opt/tripsheet/secrets
-chmod 700 /opt/tripsheet/secrets
-cp deploy/secrets.example.env /opt/tripsheet/secrets/README.txt
-
-# Create three files from the example sections:
-#   /opt/tripsheet/secrets/infra.env
-#   /opt/tripsheet/secrets/app.env
-#   /opt/tripsheet/secrets/edge.env
-
-openssl rand -hex 32   # POSTGRES_PASSWORD
-openssl rand -hex 32   # REDIS_PASSWORD
-openssl rand -base64 48 # JWT_SECRET
-openssl rand -hex 32   # INTERNAL_API_KEY
-
-# In edge.env / app.env set:
-#   DOMAIN=tripsheet.YOUR_REAL_IP.sslip.io
-#   CORS_ORIGIN=https://tripsheet.YOUR_REAL_IP.sslip.io
-#   IMAGE_REGISTRY=tripsheet   # local first deploy
-#   CADDY_ACME_EMAIL=you@example.com
-
-chmod 600 /opt/tripsheet/secrets/*.env
-
-# 3) Bootstrap infra
+cd /opt/tripsheet/repo
+git pull
 chmod +x deploy/scripts/*.sh
-./deploy/scripts/bootstrap.sh
 
-# 4) First deploy (build on VPS — slower; OK once)
+# Add staging.app.env + STAGING_DOMAIN to edge.env (keeps prod secrets)
+./deploy/scripts/init-staging-env.sh
+
+# Create *_staging databases
+./deploy/scripts/init-staging-dbs.sh
+
+# Reload Caddy with both hostnames
+docker compose -f deploy/compose.edge.yml --env-file /opt/tripsheet/secrets/edge.env up -d
+
+# First staging deploy (use a tag you already built, or build local)
 ./deploy/scripts/build-local.sh local
-# ensure app.env has IMAGE_REGISTRY=tripsheet
-./deploy/scripts/deploy.sh blue local
-
-# 5) Open the site
-# https://tripsheet.YOUR_REAL_IP.sslip.io
+# ensure staging.app.env has IMAGE_REGISTRY=tripsheet (or ghcr.io/ORG/REPO)
+./deploy/scripts/deploy-staging.sh local
 ```
 
-## Blue/green release
+Open: `https://staging.tripsheet.YOUR_IP.sslip.io`
+
+Seed staging DBs separately (use `*_staging` database names in DATABASE_URL).
+
+## GitHub Actions
+
+### Environments
+Create two GitHub Environments:
+
+- `production` — secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+- `staging` — same three secrets (can reuse values)
+
+### Workflows
+- `.github/workflows/staging.yml` → push to `develop`
+- `.github/workflows/production.yml` → push to `main` / `master` only
+
+### Branch flow
+1. Feature branch → PR → `develop` → **staging URL**
+2. Test on staging
+3. PR `develop` → `main` → **production** (blue/green)
+
+## RAM tip (KVM 2)
+
+Do not run staging + blue + green all day. After a stable prod release, stop the inactive color:
 
 ```bash
-./deploy/scripts/deploy.sh green local   # or a GHCR tag
-./deploy/scripts/rollback.sh             # switch back if needed
+docker compose -p tripsheet-green -f deploy/compose.app.yml --env-file /opt/tripsheet/secrets/app.env down
+# or tripsheet-blue, whichever is inactive
 ```
 
-## GitHub Actions secrets
+Stop staging when idle:
 
-- `VPS_HOST` — VPS IP
-- `VPS_USER` — `deploy`
-- `VPS_SSH_KEY` — private key for deploy user
-- Create GitHub Environment named `production`
-
-Never put Hostinger panel passwords in GitHub or `.env`.
+```bash
+docker compose -p tripsheet-staging -f deploy/compose.staging.yml --env-file /opt/tripsheet/secrets/staging.app.env down
+```
 
 ## Backups
 
 ```bash
 ./deploy/scripts/backup.sh
-# cron example (daily 02:15 UTC):
-# 15 2 * * * /opt/tripsheet/repo/deploy/scripts/backup.sh >> /opt/tripsheet/backups/cron.log 2>&1
+# cron: 15 2 * * * /opt/tripsheet/repo/deploy/scripts/backup.sh >> /opt/tripsheet/backups/cron.log 2>&1
+```
+
+## Rollback (production only)
+
+```bash
+./deploy/scripts/rollback.sh
 ```

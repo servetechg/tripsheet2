@@ -2,10 +2,10 @@
 	email {$CADDY_ACME_EMAIL}
 }
 
+# Production (blue/green via ACTIVE_COLOR)
 {$DOMAIN} {
 	encode gzip
 
-	# Liveness for the edge itself (used by deploy health checks)
 	handle /healthz {
 		respond "ok" 200
 	}
@@ -20,5 +20,26 @@
 
 	handle {
 		reverse_proxy {$ACTIVE_COLOR}-frontend:80
+	}
+}
+
+# Staging (single stack)
+{$STAGING_DOMAIN} {
+	encode gzip
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle /api* {
+		reverse_proxy staging-gateway:3000
+	}
+
+	handle /health {
+		reverse_proxy staging-gateway:3000
+	}
+
+	handle {
+		reverse_proxy staging-frontend:80
 	}
 }
