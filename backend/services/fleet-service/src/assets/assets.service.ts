@@ -36,6 +36,10 @@ export class AssetsService {
           vin: dto.vin,
           plate: dto.plate,
           status: dto.status ?? 'active',
+          insuranceExpiry: dto.insuranceExpiry,
+          plateExpiry: dto.plateExpiry,
+          permitExpiry: dto.permitExpiry,
+          notes: dto.notes,
         },
       });
     } catch (err) {
@@ -65,6 +69,10 @@ export class AssetsService {
           vin: dto.vin,
           plate: dto.plate,
           status: dto.status,
+          insuranceExpiry: dto.insuranceExpiry,
+          plateExpiry: dto.plateExpiry,
+          permitExpiry: dto.permitExpiry,
+          notes: dto.notes,
         },
       });
     } catch (err) {

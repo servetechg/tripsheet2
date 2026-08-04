@@ -269,6 +269,100 @@ export const settlementsApi = {
 export const reportsApi = {
   summary: (companyId: string) =>
     api<any>(`/reports/summary?companyId=${encodeURIComponent(companyId)}`),
+  analytics: (companyId: string) =>
+    api<any>(`/reports/analytics?companyId=${encodeURIComponent(companyId)}`),
+};
+
+export const maintenanceApi = {
+  list: (companyId: string, assetId?: string) => {
+    const q = new URLSearchParams({ companyId });
+    if (assetId) q.set('assetId', assetId);
+    return api<any[]>(`/maintenance?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/maintenance', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: unknown) =>
+    api(`/maintenance/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  remove: (id: string) => api(`/maintenance/${id}`, { method: 'DELETE' }),
+};
+
+export const dvirApi = {
+  list: (companyId: string, assetId?: string) => {
+    const q = new URLSearchParams({ companyId });
+    if (assetId) q.set('assetId', assetId);
+    return api<any[]>(`/dvir?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/dvir', { method: 'POST', body: JSON.stringify(body) }),
+  remove: (id: string) => api(`/dvir/${id}`, { method: 'DELETE' }),
+};
+
+export const invoicesApi = {
+  list: (companyId: string, status?: string) => {
+    const q = new URLSearchParams({ companyId });
+    if (status) q.set('status', status);
+    return api<any[]>(`/invoices?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/invoices', { method: 'POST', body: JSON.stringify(body) }),
+  update: (id: string, body: unknown) =>
+    api(`/invoices/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  remove: (id: string) => api(`/invoices/${id}`, { method: 'DELETE' }),
+};
+
+export const billsApi = {
+  list: (companyId: string) =>
+    api<any[]>(`/bills?companyId=${encodeURIComponent(companyId)}`),
+  create: (body: unknown) =>
+    api('/bills', { method: 'POST', body: JSON.stringify(body) }),
+  remove: (id: string) => api(`/bills/${id}`, { method: 'DELETE' }),
+};
+
+export const paymentsApi = {
+  list: (companyId: string) =>
+    api<any[]>(`/payments?companyId=${encodeURIComponent(companyId)}`),
+  create: (body: unknown) =>
+    api('/payments', { method: 'POST', body: JSON.stringify(body) }),
+};
+
+export const accountsApi = {
+  list: (companyId: string) =>
+    api<any[]>(`/accounts?companyId=${encodeURIComponent(companyId)}`),
+  seedDefaults: (companyId: string) =>
+    api('/accounts/seed-defaults', {
+      method: 'POST',
+      body: JSON.stringify({ companyId }),
+    }),
+};
+
+export const messagesApi = {
+  list: (companyId: string, toUserId?: string) => {
+    const q = new URLSearchParams({ companyId });
+    if (toUserId) q.set('toUserId', toUserId);
+    return api<any[]>(`/messages?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/messages', { method: 'POST', body: JSON.stringify(body) }),
+  markRead: (id: string) =>
+    api(`/messages/${id}/read`, { method: 'PATCH' }),
+};
+
+export const commentsApi = {
+  list: (companyId: string, entityType: string, entityId: string) => {
+    const q = new URLSearchParams({ companyId, entityType, entityId });
+    return api<any[]>(`/comments?${q}`);
+  },
+  create: (body: unknown) =>
+    api('/comments', { method: 'POST', body: JSON.stringify(body) }),
+};
+
+export const auditApi = {
+  list: (companyId: string, limit = 100) =>
+    api<any[]>(
+      `/audit?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    ),
+  create: (body: unknown) =>
+    api('/audit', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const notificationsApi = {

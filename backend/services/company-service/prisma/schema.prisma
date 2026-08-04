@@ -17,3 +17,19 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  companyId  String?
+  actorId    String?
+  actorName  String   @default("")
+  action     String
+  entityType String   @default("")
+  entityId   String   @default("")
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}

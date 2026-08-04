@@ -1,7 +1,10 @@
 export { Btn } from './Btn';
 export { Card } from './Card';
 export { Inp } from './Inp';
+export { FieldInp } from './FieldInp';
 export { Sel } from './Sel';
+export { SearchSelect } from './SearchSelect';
+export type { SearchSelectOption, SearchSelectProps } from './SearchSelect';
 export { Pill } from './Pill';
 export { Divider } from './Divider';
 export { SectionTitle } from './SectionTitle';

@@ -16,6 +16,17 @@ import { CarrierProfilesProxyController } from './carrier-profiles.proxy.control
 import { SettlementsProxyController } from './settlements.proxy.controller';
 import { ReportsProxyController } from './reports.proxy.controller';
 import { NotificationsProxyController } from './notifications.proxy.controller';
+import {
+  AccountsProxyController,
+  AuditProxyController,
+  BillsProxyController,
+  CommentsProxyController,
+  DvirProxyController,
+  InvoicesProxyController,
+  MaintenanceProxyController,
+  MessagesProxyController,
+  PaymentsProxyController,
+} from './extended.proxy.controllers';
 
 @Module({
   imports: [
@@ -42,6 +53,15 @@ import { NotificationsProxyController } from './notifications.proxy.controller';
     SettlementsProxyController,
     ReportsProxyController,
     NotificationsProxyController,
+    MaintenanceProxyController,
+    DvirProxyController,
+    InvoicesProxyController,
+    BillsProxyController,
+    PaymentsProxyController,
+    AccountsProxyController,
+    MessagesProxyController,
+    CommentsProxyController,
+    AuditProxyController,
   ],
   providers: [ProxyService],
 })

@@ -2,8 +2,8 @@ import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateAssetDto {
   @IsOptional()
-  @IsIn(['truck', 'trailer'])
-  type?: 'truck' | 'trailer';
+  @IsIn(['truck', 'trailer', 'equipment'])
+  type?: 'truck' | 'trailer' | 'equipment';
 
   @IsOptional()
   @IsString()
@@ -33,4 +33,20 @@ export class UpdateAssetDto {
   @IsOptional()
   @IsIn(['active', 'inactive'])
   status?: 'active' | 'inactive';
+
+  @IsOptional()
+  @IsString()
+  insuranceExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  plateExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  permitExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }
