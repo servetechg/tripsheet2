@@ -5,6 +5,7 @@ import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { settlementsApi } from '@/lib/api';
 import { blank } from '@/lib/format';
+import { BillingPanel } from './BillingPanel';
 
 function statusColor(status: string) {
   if (status === 'paid') return G.success;
@@ -16,11 +17,15 @@ export function AccountingTab({
   company,
   drivers,
   sheets,
+  loads = [],
+  adminUser,
   apiEnabled,
 }: {
   company: { id: string };
   drivers: any[];
   sheets: any[];
+  loads?: any[];
+  adminUser?: any;
   apiEnabled?: boolean;
 }) {
   const [list, setList] = useState<any[]>([]);
@@ -328,6 +333,13 @@ export function AccountingTab({
           ))}
         </div>
       )}
+
+      <BillingPanel
+        company={company}
+        loads={loads}
+        adminUser={adminUser}
+        apiEnabled={apiEnabled}
+      />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsIn,
   IsNumber,
   IsOptional,
@@ -45,6 +46,10 @@ export class CreateLoadDto {
 
   @IsOptional()
   @IsString()
+  actualDelivery?: string;
+
+  @IsOptional()
+  @IsString()
   tripNo?: string;
 
   @IsOptional()
@@ -58,6 +63,38 @@ export class CreateLoadDto {
   @IsOptional()
   @IsString()
   trailerNo?: string;
+
+  @IsOptional()
+  @IsNumber()
+  customerRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  carrierCost?: number;
+
+  @IsOptional()
+  @IsNumber()
+  fuelSurcharge?: number;
+
+  @IsOptional()
+  @IsNumber()
+  accessorials?: number;
+
+  @IsOptional()
+  @IsNumber()
+  detentionHours?: number;
+
+  @IsOptional()
+  @IsNumber()
+  detentionRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  miles?: number;
+
+  @IsOptional()
+  @IsArray()
+  stops?: unknown[];
 
   @IsOptional()
   @IsNumber()

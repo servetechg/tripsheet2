@@ -7,6 +7,20 @@ import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { assetsApi } from '@/lib/api';
 
+const emptyAsset = {
+  type: 'truck',
+  unitNo: '',
+  year: '',
+  make: '',
+  model: '',
+  vin: '',
+  plate: '',
+  notes: '',
+  insuranceExpiry: '',
+  plateExpiry: '',
+  permitExpiry: '',
+};
+
 export function AssetsTab({
   company,
   assets,
@@ -15,18 +29,11 @@ export function AssetsTab({
   apiEnabled,
   refreshAll,
 }: any) {
-  const [assetTab, setAssetTab] = useState('trucks');
+  const [assetTab, setAssetTab] = useState<'trucks' | 'trailers' | 'equipment'>(
+    'trucks',
+  );
   const [show, setShow] = useState(false);
-  const [f, setF] = useState({
-    type: 'truck',
-    unitNo: '',
-    year: '',
-    make: '',
-    model: '',
-    vin: '',
-    plate: '',
-    notes: '',
-  });
+  const [f, setF] = useState(emptyAsset);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -36,9 +43,22 @@ export function AssetsTab({
   const myTrailers = assets.filter(
     (a: any) => a.companyId === company.id && a.type === 'trailer',
   );
-  const list = assetTab === 'trucks' ? myTrucks : myTrailers;
+  const myEquipment = assets.filter(
+    (a: any) => a.companyId === company.id && a.type === 'equipment',
+  );
+  const list =
+    assetTab === 'trucks'
+      ? myTrucks
+      : assetTab === 'trailers'
+        ? myTrailers
+        : myEquipment;
   const activeCount = list.filter((a: any) => a.status === 'active').length;
-  const inactiveCount = list.length - activeCount;
+  const typeLabel =
+    assetTab === 'trucks'
+      ? 'TRUCK'
+      : assetTab === 'trailers'
+        ? 'TRAILER'
+        : 'EQUIPMENT';
 
   const add = async () => {
     if (blank(f.unitNo)) {
@@ -54,7 +74,12 @@ export function AssetsTab({
       setErr('Unit No. already exists.');
       return;
     }
-    const type = assetTab === 'trucks' ? 'truck' : 'trailer';
+    const type =
+      assetTab === 'trucks'
+        ? 'truck'
+        : assetTab === 'trailers'
+          ? 'trailer'
+          : 'equipment';
     const body = {
       ...f,
       type,
@@ -70,16 +95,7 @@ export function AssetsTab({
       } else {
         setAssets((p: any[]) => [...p, { ...body, id: uid() }]);
       }
-      setF({
-        type: 'truck',
-        unitNo: '',
-        year: '',
-        make: '',
-        model: '',
-        vin: '',
-        plate: '',
-        notes: '',
-      });
+      setF(emptyAsset);
       setShow(false);
       setErr('');
     } catch (e: any) {
@@ -124,6 +140,9 @@ export function AssetsTab({
     }
   };
 
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpired = (dt?: string) => !!dt && dt <= today;
+
   return (
     <div>
       <StatsGrid>
@@ -137,9 +156,16 @@ export function AssetsTab({
         <StatCard
           label="Trailers"
           value={myTrailers.length}
-          subtitle="Equipment"
+          subtitle="Trailers"
           accent={G.purple}
           icon={Icons.assets({ size: 20, color: G.purple })}
+        />
+        <StatCard
+          label="Equipment"
+          value={myEquipment.length}
+          subtitle="General"
+          accent={G.gold}
+          icon={Icons.status({ size: 20, color: G.gold })}
         />
         <StatCard
           label="Active"
@@ -148,19 +174,13 @@ export function AssetsTab({
           accent={G.success}
           icon={Icons.completed({ size: 20, color: G.success })}
         />
-        <StatCard
-          label="Inactive"
-          value={inactiveCount}
-          subtitle={`Current ${assetTab}`}
-          accent={G.muted}
-          icon={Icons.pending({ size: 20, color: G.muted })}
-        />
       </StatsGrid>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {(
           [
             ['trucks', 'TRUCKS', Icons.truck],
             ['trailers', 'TRAILERS', Icons.trailer],
+            ['equipment', 'EQUIPMENT', Icons.status],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -198,15 +218,13 @@ export function AssetsTab({
             setErr('');
           }}
         >
-          + ADD {assetTab === 'trucks' ? 'TRUCK' : 'TRAILER'}
+          + ADD {typeLabel}
         </Btn>
       </div>
 
       {show && (
         <Card>
-          <SectionTitle>
-            ADD {assetTab === 'trucks' ? 'TRUCK' : 'TRAILER'}
-          </SectionTitle>
+          <SectionTitle>ADD {typeLabel}</SectionTitle>
           <Err msg={err} />
           <G2 cols={2}>
             <Inp
@@ -233,18 +251,12 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, make: e.target.value }))
               }
-              placeholder={
-                assetTab === 'trucks' ? 'e.g. Kenworth' : 'e.g. Stoughton'
-              }
             />
             <Inp
               label="Model"
               value={f.model}
               onChange={(e: any) =>
                 setF((x) => ({ ...x, model: e.target.value }))
-              }
-              placeholder={
-                assetTab === 'trucks' ? 'e.g. T680' : 'e.g. 53ft Dry Van'
               }
             />
           </G2>
@@ -255,7 +267,6 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, vin: e.target.value }))
               }
-              placeholder="Vehicle ID number"
             />
             <Inp
               label="Plate No."
@@ -263,9 +274,34 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, plate: e.target.value }))
               }
-              placeholder="e.g. AB-32054"
             />
           </G2>
+          <G2 cols={2}>
+            <Inp
+              label="Insurance expiry"
+              value={f.insuranceExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, insuranceExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
+            />
+            <Inp
+              label="Plate expiry"
+              value={f.plateExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, plateExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
+            />
+          </G2>
+          <Inp
+            label="Permit expiry"
+            value={f.permitExpiry}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, permitExpiry: e.target.value }))
+            }
+            placeholder="YYYY-MM-DD"
+          />
           <Inp
             label="Notes"
             value={f.notes}
@@ -294,7 +330,11 @@ export function AssetsTab({
       {list.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
           <div>
-            {(assetTab === 'trucks' ? Icons.truck : Icons.trailer)({
+            {(assetTab === 'trucks'
+              ? Icons.truck
+              : assetTab === 'trailers'
+                ? Icons.trailer
+                : Icons.status)({
               size: 36,
               color: G.muted,
             })}
@@ -343,6 +383,11 @@ export function AssetsTab({
                       ['assigned', 'in_transit'].includes(l.status) &&
                       (l.truckId === a.id || l.trailerId === a.id),
                   ) && <Pill color={G.gold}>IN USE</Pill>}
+                  {(isExpired(a.insuranceExpiry) ||
+                    isExpired(a.plateExpiry) ||
+                    isExpired(a.permitExpiry)) && (
+                    <Pill color={G.danger}>EXPIRED</Pill>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
                   {a.year} {a.make} {a.model}
@@ -353,9 +398,10 @@ export function AssetsTab({
                     <span style={{ fontFamily: FONT_MONO }}>{a.plate}</span>
                   </div>
                 )}
-                {a.vin && (
-                  <div style={{ fontSize: 10, color: G.muted }}>
-                    VIN: <span style={{ fontFamily: FONT_MONO }}>{a.vin}</span>
+                {(a.insuranceExpiry || a.plateExpiry || a.permitExpiry) && (
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
+                    Ins {a.insuranceExpiry || '—'} · Plate {a.plateExpiry || '—'}{' '}
+                    · Permit {a.permitExpiry || '—'}
                   </div>
                 )}
                 {a.notes && (

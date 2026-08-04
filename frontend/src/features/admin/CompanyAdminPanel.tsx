@@ -13,6 +13,9 @@ import { PrintPreview } from '@/features/trip-sheets/PrintPreview';
 import { ReportsTab } from '@/features/reports/ReportsTab';
 import { AccountingTab } from '@/features/accounting/AccountingTab';
 import { DashboardTab } from '@/features/dashboard/DashboardTab';
+import { FleetOpsTab } from '@/features/fleet/FleetOpsTab';
+import { MessagesTab } from '@/features/comms/MessagesTab';
+import { ComplianceTab } from '@/features/compliance/ComplianceTab';
 
 export function CompanyAdminPanel({
   company,
@@ -74,7 +77,10 @@ export function CompanyAdminPanel({
     { id: 'emanifest', icon: 'emanifest', label: 'eManifest' },
     { id: 'drivers', icon: 'drivers', label: 'Drivers' },
     { id: 'assets', icon: 'assets', label: 'Assets' },
+    { id: 'fleet', icon: 'status', label: 'Fleet Ops' },
     { id: 'sheets', icon: 'sheets', label: 'Sheets' },
+    { id: 'messages', icon: 'bell', label: 'Messages' },
+    { id: 'compliance', icon: 'docs', label: 'Compliance' },
     { id: 'reports', icon: 'reports', label: 'Reports' },
     { id: 'accounting', icon: 'accounting', label: 'Accounting' },
   ];
@@ -196,12 +202,41 @@ export function CompanyAdminPanel({
               {...apiProps}
             />
           )}
+          {tab === 'fleet' && (
+            <FleetOpsTab
+              company={company}
+              assets={assets.filter((a: any) => a.companyId === company.id)}
+              drivers={myDrivers}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+            />
+          )}
           {tab === 'sheets' && (
             <AdminSheetsTab
               sheets={mySheets}
               users={users}
               company={company}
               onViewPdf={setAdminPreview}
+            />
+          )}
+          {tab === 'messages' && (
+            <MessagesTab
+              company={company}
+              drivers={myDrivers}
+              loads={myLoads}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+            />
+          )}
+          {tab === 'compliance' && (
+            <ComplianceTab
+              company={company}
+              drivers={myDrivers}
+              driverDocs={driverDocs}
+              assets={assets.filter((a: any) => a.companyId === company.id)}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+              onGoDrivers={() => setTab('drivers')}
             />
           )}
           {tab === 'reports' && (
@@ -212,6 +247,8 @@ export function CompanyAdminPanel({
               company={company}
               drivers={myDrivers}
               sheets={mySheets}
+              loads={myLoads}
+              adminUser={adminUser}
               apiEnabled={apiEnabled}
             />
           )}

@@ -1,13 +1,60 @@
 import { useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
+import {
+  Btn,
+  Card,
+  FieldInp,
+  Sel,
+  Pill,
+  SectionTitle,
+  G2,
+  StatCard,
+  StatsGrid,
+  Icons,
+  SearchSelect,
+} from '@/components/ui';
 import { blank } from '@/lib/format';
+import {
+  datetimeLocalToIso,
+  formatDisplayDateTime,
+  isValidTripNo,
+  parseNonNegNumber,
+  sanitizeDecimal,
+  sanitizeInteger,
+  toDatetimeLocal,
+} from '@/lib/formFields';
+import { FREIGHT_LOCATIONS } from '@/lib/locations';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { loadsApi, driversApi, notificationsApi } from '@/lib/api';
 import { matchesDriverRef } from '@/lib/driverIds';
+
+type FormErrors = Partial<
+  Record<
+    | 'driverId'
+    | 'truckId'
+    | 'origin'
+    | 'destination'
+    | 'pickupTime'
+    | 'eta'
+    | 'tripNo'
+    | 'customerRate'
+    | 'carrierCost'
+    | 'fuelSurcharge'
+    | 'accessorials'
+    | 'detentionHours'
+    | 'detentionRate'
+    | 'miles'
+    | 'stop1'
+    | 'stop2'
+    | 'notes',
+    string
+  >
+>;
+
+const LOCATION_OPTIONS = [...FREIGHT_LOCATIONS];
 
 export function DispatchTab({
   company,
@@ -27,8 +74,9 @@ export function DispatchTab({
   const [show, setShow] = useState(false);
   const [editLoad, setEditLoad] = useState<any>(null);
   const [docErr, setDocErr] = useState('');
+  const [fieldErr, setFieldErr] = useState<FormErrors>({});
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({
+  const emptyForm = {
     driverId: '',
     truckId: '',
     trailerId: '',
@@ -38,36 +86,56 @@ export function DispatchTab({
     eta: '',
     tripNo: '',
     notes: '',
-  });
-  const upd = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
-  const resetForm = () => {
-    setF({
-      driverId: '',
-      truckId: '',
-      trailerId: '',
-      origin: '',
-      destination: '',
-      pickupTime: '',
-      eta: '',
-      tripNo: '',
-      notes: '',
+    customerRate: '',
+    carrierCost: '',
+    fuelSurcharge: '',
+    accessorials: '',
+    detentionHours: '',
+    detentionRate: '',
+    miles: '',
+    stop1: '',
+    stop2: '',
+  };
+  const [f, setF] = useState(emptyForm);
+  const upd = (k: string, v: string) => {
+    setF((x) => ({ ...x, [k]: v }));
+    setFieldErr((e) => {
+      if (!(k in e)) return e;
+      const next = { ...e };
+      delete next[k as keyof FormErrors];
+      return next;
     });
+  };
+  const resetForm = () => {
+    setF(emptyForm);
     setEditLoad(null);
     setShow(false);
     setDocErr('');
+    setFieldErr({});
   };
   const openEdit = (l: any) => {
+    const stops = Array.isArray(l.stops) ? l.stops : [];
     setF({
       driverId: l.driverId || '',
       truckId: l.truckId || '',
       trailerId: l.trailerId || '',
       origin: l.origin || '',
       destination: l.destination || '',
-      pickupTime: l.pickupTime || '',
-      eta: l.eta || '',
+      pickupTime: toDatetimeLocal(l.pickupTime || ''),
+      eta: toDatetimeLocal(l.eta || ''),
       tripNo: l.tripNo || '',
       notes: l.notes || '',
+      customerRate: l.customerRate != null ? String(l.customerRate) : '',
+      carrierCost: l.carrierCost != null ? String(l.carrierCost) : '',
+      fuelSurcharge: l.fuelSurcharge != null ? String(l.fuelSurcharge) : '',
+      accessorials: l.accessorials != null ? String(l.accessorials) : '',
+      detentionHours: l.detentionHours != null ? String(l.detentionHours) : '',
+      detentionRate: l.detentionRate != null ? String(l.detentionRate) : '',
+      miles: l.miles != null ? String(l.miles) : '',
+      stop1: stops[0]?.location || stops[0] || '',
+      stop2: stops[1]?.location || stops[1] || '',
     });
+    setFieldErr({});
     setEditLoad(l);
     setShow(true);
   };
@@ -102,18 +170,130 @@ export function DispatchTab({
     );
   };
 
+  const num = (v: string) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const validateForm = (): FormErrors => {
+    const errs: FormErrors = {};
+    if (blank(f.driverId)) errs.driverId = 'Select a driver';
+    if (blank(f.truckId)) errs.truckId = 'Select a truck';
+    if (blank(f.origin)) errs.origin = 'Origin is required';
+    if (blank(f.destination)) errs.destination = 'Destination is required';
+    if (
+      !blank(f.origin) &&
+      !blank(f.destination) &&
+      f.origin.trim().toLowerCase() === f.destination.trim().toLowerCase()
+    ) {
+      errs.destination = 'Destination must differ from origin';
+    }
+    if (blank(f.pickupTime)) errs.pickupTime = 'Pickup date & time is required';
+
+    const pickupMs = f.pickupTime ? new Date(f.pickupTime).getTime() : NaN;
+    const etaMs = f.eta ? new Date(f.eta).getTime() : NaN;
+    if (f.pickupTime && Number.isNaN(pickupMs)) {
+      errs.pickupTime = 'Invalid pickup date/time';
+    }
+    if (f.eta && Number.isNaN(etaMs)) {
+      errs.eta = 'Invalid ETA';
+    }
+    if (
+      Number.isFinite(pickupMs) &&
+      Number.isFinite(etaMs) &&
+      etaMs < pickupMs
+    ) {
+      errs.eta = 'ETA must be on or after pickup';
+    }
+
+    if (!isValidTripNo(f.tripNo)) {
+      errs.tripNo = 'Use letters, numbers, - _ / (max 32)';
+    }
+
+    const moneyFields: (keyof FormErrors)[] = [
+      'customerRate',
+      'carrierCost',
+      'fuelSurcharge',
+      'accessorials',
+      'detentionRate',
+    ];
+    for (const key of moneyFields) {
+      const raw = String(f[key as keyof typeof f] ?? '');
+      if (parseNonNegNumber(raw) === null) {
+        errs[key] = 'Enter a valid amount ≥ 0';
+      }
+    }
+    if (parseNonNegNumber(f.detentionHours) === null) {
+      errs.detentionHours = 'Enter hours ≥ 0';
+    }
+    if (parseNonNegNumber(f.miles) === null) {
+      errs.miles = 'Enter miles ≥ 0';
+    }
+    if (f.notes.length > 500) {
+      errs.notes = 'Notes max 500 characters';
+    }
+    if (
+      !blank(f.stop1) &&
+      f.stop1.trim().toLowerCase() === f.origin.trim().toLowerCase()
+    ) {
+      errs.stop1 = 'Stop should differ from origin';
+    }
+    if (
+      !blank(f.stop2) &&
+      !blank(f.stop1) &&
+      f.stop2.trim().toLowerCase() === f.stop1.trim().toLowerCase()
+    ) {
+      errs.stop2 = 'Stops must be different';
+    }
+    return errs;
+  };
+
   const payloadFromForm = () => {
     const truck = trucks.find((t: any) => t.id === f.truckId);
     const trailer = trailers.find((t: any) => t.id === f.trailerId);
+    const stops = [f.stop1, f.stop2]
+      .filter((s) => !blank(s))
+      .map((location, i) => ({ seq: i + 1, location }));
     return {
-      ...f,
+      driverId: f.driverId,
+      truckId: f.truckId,
+      trailerId: f.trailerId,
+      origin: f.origin.trim(),
+      destination: f.destination.trim(),
+      pickupTime: datetimeLocalToIso(f.pickupTime),
+      eta: datetimeLocalToIso(f.eta),
+      tripNo: f.tripNo.trim(),
+      notes: f.notes.trim(),
       truckNo: truck?.unitNo || '',
       trailerNo: trailer?.unitNo || '',
+      customerRate: num(f.customerRate),
+      carrierCost: num(f.carrierCost),
+      fuelSurcharge: num(f.fuelSurcharge),
+      accessorials: num(f.accessorials),
+      detentionHours: num(f.detentionHours),
+      detentionRate: num(f.detentionRate),
+      miles: num(f.miles),
+      stops,
     };
   };
 
+  const loadMargin = (l: any) => {
+    const rev =
+      Number(l.customerRate || 0) +
+      Number(l.fuelSurcharge || 0) +
+      Number(l.accessorials || 0) +
+      Number(l.detentionHours || 0) * Number(l.detentionRate || 0);
+    const cost = Number(l.carrierCost || 0);
+    return { rev, cost, margin: rev - cost };
+  };
+
   const save = async () => {
-    if (blank(f.driverId) || blank(f.origin) || blank(f.destination)) return;
+    const errs = validateForm();
+    setFieldErr(errs);
+    if (Object.keys(errs).length > 0) {
+      setDocErr('Fix the highlighted fields before saving.');
+      return;
+    }
     if (!editLoad) {
       const missing = await assertDispatchReady(f.driverId);
       if (missing.length > 0) {
@@ -195,10 +375,29 @@ export function DispatchTab({
     try {
       if (apiEnabled) {
         await loadsApi.setStatus(id, s);
+        if (s === 'delivered') {
+          try {
+            await loadsApi.update(id, {
+              actualDelivery: new Date().toISOString(),
+            });
+          } catch {
+            /* optional */
+          }
+        }
         await refreshAll?.();
       } else {
         setLoads((p: any[]) =>
-          p.map((l) => (l.id === id ? { ...l, status: s } : l)),
+          p.map((l) =>
+            l.id === id
+              ? {
+                  ...l,
+                  status: s,
+                  ...(s === 'delivered'
+                    ? { actualDelivery: new Date().toISOString() }
+                    : {}),
+                }
+              : l,
+          ),
         );
       }
     } catch (e: any) {
@@ -332,6 +531,11 @@ export function DispatchTab({
             >
               Driver *
             </label>
+            {fieldErr.driverId && (
+              <div style={{ fontSize: 11, color: G.danger, marginBottom: 8 }}>
+                {fieldErr.driverId}
+              </div>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {drivers.length === 0 && (
                 <div style={{ fontSize: 11, color: G.muted, padding: 10 }}>
@@ -437,29 +641,51 @@ export function DispatchTab({
           </div>
 
           <G2 cols={2}>
-            <Inp
+            <FieldInp
               label="Trip No."
               value={f.tripNo}
-              onChange={(e: any) => upd('tripNo', e.target.value)}
+              onChange={(e: any) =>
+                upd(
+                  'tripNo',
+                  e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
+                )
+              }
               placeholder="e.g. 34320"
+              maxLength={32}
+              error={fieldErr.tripNo}
+              hint="Letters, numbers, - _ /"
             />
             <div />
           </G2>
           <G2 cols={2}>
-            <Sel
-              label="Truck"
-              value={f.truckId}
-              onChange={(e: any) => upd('truckId', e.target.value)}
-            >
-              <option value="">— Select truck —</option>
-              {trucks
-                .filter((t: any) => t.status === 'active')
-                .map((t: any) => (
-                  <option key={t.id} value={t.id}>
-                    #{t.unitNo} · {t.year} {t.make} {t.model}
-                  </option>
-                ))}
-            </Sel>
+            <div>
+              <Sel
+                label="Truck *"
+                value={f.truckId}
+                onChange={(e: any) => upd('truckId', e.target.value)}
+              >
+                <option value="">— Select truck —</option>
+                {trucks
+                  .filter((t: any) => t.status === 'active')
+                  .map((t: any) => (
+                    <option key={t.id} value={t.id}>
+                      #{t.unitNo} · {t.year} {t.make} {t.model}
+                    </option>
+                  ))}
+              </Sel>
+              {fieldErr.truckId && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: G.danger,
+                    marginTop: -8,
+                    marginBottom: 12,
+                  }}
+                >
+                  {fieldErr.truckId}
+                </div>
+              )}
+            </div>
             <Sel
               label="Trailer"
               value={f.trailerId}
@@ -476,38 +702,152 @@ export function DispatchTab({
             </Sel>
           </G2>
           <G2 cols={2}>
-            <Inp
-              label="Origin *"
+            <SearchSelect
+              label="Origin"
+              required
               value={f.origin}
-              onChange={(e: any) => upd('origin', e.target.value)}
-              placeholder="e.g. Calgary, AB"
+              onChange={(v) => upd('origin', v)}
+              options={LOCATION_OPTIONS}
+              placeholder="Search city… e.g. Calgary"
+              allowCustom
+              error={fieldErr.origin}
             />
-            <Inp
-              label="Destination *"
+            <SearchSelect
+              label="Destination"
+              required
               value={f.destination}
-              onChange={(e: any) => upd('destination', e.target.value)}
-              placeholder="e.g. Toronto, ON"
+              onChange={(v) => upd('destination', v)}
+              options={LOCATION_OPTIONS}
+              placeholder="Search city… e.g. Toronto"
+              allowCustom
+              error={fieldErr.destination}
             />
           </G2>
           <G2 cols={2}>
-            <Inp
-              label="Pickup Date / Time"
+            <FieldInp
+              label="Pickup date & time *"
+              type="datetime-local"
               value={f.pickupTime}
               onChange={(e: any) => upd('pickupTime', e.target.value)}
-              placeholder="e.g. Jun 15 08:00"
+              error={fieldErr.pickupTime}
+              inputStyle={{ colorScheme: G.mode === 'light' ? 'light' : 'dark' }}
             />
-            <Inp
+            <FieldInp
               label="ETA"
+              type="datetime-local"
               value={f.eta}
+              min={f.pickupTime || undefined}
               onChange={(e: any) => upd('eta', e.target.value)}
-              placeholder="e.g. Jun 17 18:00"
+              error={fieldErr.eta}
+              hint="Must be on or after pickup"
+              inputStyle={{ colorScheme: G.mode === 'light' ? 'light' : 'dark' }}
             />
           </G2>
-          <Inp
+          <SectionTitle>Economics & stops</SectionTitle>
+          <G2 cols={2}>
+            <FieldInp
+              label="Customer rate ($)"
+              inputMode="decimal"
+              value={f.customerRate}
+              onChange={(e: any) =>
+                upd('customerRate', sanitizeDecimal(e.target.value, 2))
+              }
+              placeholder="0.00"
+              error={fieldErr.customerRate}
+            />
+            <FieldInp
+              label="Carrier cost ($)"
+              inputMode="decimal"
+              value={f.carrierCost}
+              onChange={(e: any) =>
+                upd('carrierCost', sanitizeDecimal(e.target.value, 2))
+              }
+              placeholder="0.00"
+              error={fieldErr.carrierCost}
+            />
+          </G2>
+          <G2 cols={2}>
+            <FieldInp
+              label="Fuel surcharge ($)"
+              inputMode="decimal"
+              value={f.fuelSurcharge}
+              onChange={(e: any) =>
+                upd('fuelSurcharge', sanitizeDecimal(e.target.value, 2))
+              }
+              placeholder="0.00"
+              error={fieldErr.fuelSurcharge}
+            />
+            <FieldInp
+              label="Accessorials ($)"
+              inputMode="decimal"
+              value={f.accessorials}
+              onChange={(e: any) =>
+                upd('accessorials', sanitizeDecimal(e.target.value, 2))
+              }
+              placeholder="0.00"
+              error={fieldErr.accessorials}
+            />
+          </G2>
+          <G2 cols={2}>
+            <FieldInp
+              label="Detention hours"
+              inputMode="decimal"
+              value={f.detentionHours}
+              onChange={(e: any) =>
+                upd('detentionHours', sanitizeDecimal(e.target.value, 1))
+              }
+              placeholder="0"
+              error={fieldErr.detentionHours}
+            />
+            <FieldInp
+              label="Detention rate ($/hr)"
+              inputMode="decimal"
+              value={f.detentionRate}
+              onChange={(e: any) =>
+                upd('detentionRate', sanitizeDecimal(e.target.value, 2))
+              }
+              placeholder="0.00"
+              error={fieldErr.detentionRate}
+            />
+          </G2>
+          <G2 cols={2}>
+            <FieldInp
+              label="Miles"
+              inputMode="numeric"
+              value={f.miles}
+              onChange={(e: any) =>
+                upd('miles', sanitizeInteger(e.target.value).slice(0, 6))
+              }
+              placeholder="e.g. 1200"
+              error={fieldErr.miles}
+            />
+            <SearchSelect
+              label="Stop 1 (optional)"
+              value={f.stop1}
+              onChange={(v) => upd('stop1', v)}
+              options={LOCATION_OPTIONS}
+              placeholder="Search intermediate stop…"
+              allowCustom
+              error={fieldErr.stop1}
+            />
+          </G2>
+          <SearchSelect
+            label="Stop 2 (optional)"
+            value={f.stop2}
+            onChange={(v) => upd('stop2', v)}
+            options={LOCATION_OPTIONS}
+            placeholder="Search intermediate stop…"
+            allowCustom
+            error={fieldErr.stop2}
+          />
+          <FieldInp
             label="Notes"
             value={f.notes}
-            onChange={(e: any) => upd('notes', e.target.value)}
-            placeholder="Any special instructions..."
+            onChange={(e: any) => upd('notes', e.target.value.slice(0, 500))}
+            placeholder="Any special instructions…"
+            maxLength={500}
+            error={fieldErr.notes}
+            hint={`${f.notes.length}/500`}
           />
           <div style={{ display: 'flex', gap: 10 }}>
             <Btn onClick={save} style={{ opacity: busy ? 0.6 : 1 }}>
@@ -634,12 +974,12 @@ export function DispatchTab({
                   </div>
                   {l.pickupTime && (
                     <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                      Pickup: {l.pickupTime}
+                      Pickup: {formatDisplayDateTime(l.pickupTime)}
                     </div>
                   )}
                   {l.eta && (
                     <div style={{ fontSize: 11, color: G.gold, marginTop: 2 }}>
-                      ETA: {l.eta}
+                      ETA: {formatDisplayDateTime(l.eta)}
                     </div>
                   )}
                   {l.notes && (
@@ -654,6 +994,29 @@ export function DispatchTab({
                       {l.notes}
                     </div>
                   )}
+                  {(() => {
+                    const { rev, cost, margin } = loadMargin(l);
+                    if (rev === 0 && cost === 0) return null;
+                    const stops = Array.isArray(l.stops) ? l.stops : [];
+                    return (
+                      <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
+                        Rev ${rev.toFixed(0)} · Cost ${cost.toFixed(0)} · Margin{' '}
+                        <span
+                          style={{
+                            color: margin >= 0 ? G.success : G.danger,
+                            fontWeight: 700,
+                          }}
+                        >
+                          ${margin.toFixed(0)}
+                        </span>
+                        {l.miles ? ` · ${l.miles} mi` : ''}
+                        {stops.length > 0 &&
+                          ` · stops: ${stops
+                            .map((s: any) => s.location || s)
+                            .join(' → ')}`}
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div
                   style={{

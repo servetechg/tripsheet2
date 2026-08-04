@@ -5,8 +5,8 @@ export class CreateAssetDto {
   @MinLength(1)
   companyId!: string;
 
-  @IsIn(['truck', 'trailer'])
-  type!: 'truck' | 'trailer';
+  @IsIn(['truck', 'trailer', 'equipment'])
+  type!: 'truck' | 'trailer' | 'equipment';
 
   @IsString()
   @MinLength(1)
@@ -35,4 +35,20 @@ export class CreateAssetDto {
   @IsOptional()
   @IsIn(['active', 'inactive'])
   status?: 'active' | 'inactive';
+
+  @IsOptional()
+  @IsString()
+  insuranceExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  plateExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  permitExpiry?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
 }

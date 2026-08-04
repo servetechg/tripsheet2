@@ -51,6 +51,20 @@ export interface Asset {
   vin: string;
   plate: string;
   status: AssetStatus;
+  insuranceExpiry?: string;
+  plateExpiry?: string;
+  permitExpiry?: string;
+  notes?: string;
+}
+
+export interface LoadStop {
+  seq: number;
+  location: string;
+  stopType: 'pickup' | 'delivery' | 'stop';
+  scheduledAt?: string;
+  arrivedAt?: string;
+  departedAt?: string;
+  notes?: string;
 }
 
 export interface Load {
@@ -64,6 +78,7 @@ export interface Load {
   destination: string;
   pickupTime?: string;
   eta?: string;
+  actualDelivery?: string;
   lat?: number;
   lng?: number;
   tripNo?: string;
@@ -73,6 +88,14 @@ export interface Load {
   truckNo?: string;
   trailerNo?: string;
   notes?: string;
+  customerRate?: number;
+  carrierCost?: number;
+  fuelSurcharge?: number;
+  accessorials?: number;
+  detentionHours?: number;
+  detentionRate?: number;
+  miles?: number;
+  stops?: LoadStop[];
 }
 
 export interface CarrierProfile {
