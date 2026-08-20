@@ -5,6 +5,22 @@ import { AxiosRequestConfig, Method } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { Request } from 'express';
 
+const FORWARD_HEADERS = [
+  'authorization',
+  'content-type',
+  'x-user-id',
+  'x-user-role',
+  'x-user-email',
+  'x-user-permissions',
+  'x-driver-id',
+  'x-company-id',
+  'x-tenant-key',
+  'x-tenant-status',
+  'x-tenant-routing',
+  'x-tenant-db-name',
+  'x-internal-api-key',
+] as const;
+
 @Injectable()
 export class ProxyService {
   private readonly logger = new Logger(ProxyService.name);
@@ -32,19 +48,27 @@ export class ProxyService {
     const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
 
     const headers: Record<string, string> = {};
-    if (req.headers.authorization) {
-      headers.authorization = String(req.headers.authorization);
+    for (const name of FORWARD_HEADERS) {
+      const v = req.headers[name];
+      if (v) headers[name] = Array.isArray(v) ? v[0] : String(v);
     }
-    if (req.headers['content-type']) {
-      headers['content-type'] = String(req.headers['content-type']);
+
+    // Non-superadmin: never let client override companyId via query
+    const role = headers['x-user-role'];
+    const companyId = headers['x-company-id'];
+    const params = { ...(req.query as Record<string, unknown>) };
+    if (role && role !== 'superadmin' && companyId) {
+      params.companyId = companyId;
     }
 
     const config: AxiosRequestConfig = {
       method,
       url,
       headers,
-      params: req.query,
-      data: ['GET', 'HEAD'].includes(method.toUpperCase()) ? undefined : req.body,
+      params,
+      data: ['GET', 'HEAD'].includes(method.toUpperCase())
+        ? undefined
+        : req.body,
       validateStatus: () => true,
     };
 

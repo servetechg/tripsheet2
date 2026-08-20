@@ -5,9 +5,11 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { InternalAuthController } from '../internal/internal-auth.controller';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [
+    RbacModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

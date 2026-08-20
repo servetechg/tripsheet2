@@ -143,6 +143,12 @@ npm test
 # or per service:
 cd services/driver-service && npm test
 cd services/fleet-service && npm test
+
+# Chapter 2 RBAC (in-process, no stack)
+npm run test:rbac
+
+# Live persona suite (gateway + auth + company + driver + fleet)
+cd gateway && npm run test:rbac:live
 ```
 
 ### Health checks
@@ -158,7 +164,7 @@ curl http://localhost:3002/health
 | Email | Password | Role |
 |-------|----------|------|
 | admin@tripsheet.io | admin123 | superadmin |
-| admin@mkx.ca | mkx123 | company_admin (companyId: c1) |
+| admin@mkx.ca | mkx123 | company_owner (companyId: c1) |
 | divyam@mkx.ca | driver123 | driver (companyId: c1) |
 
 Login via gateway:

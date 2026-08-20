@@ -40,6 +40,7 @@ export class AssetsService {
           plateExpiry: dto.plateExpiry,
           permitExpiry: dto.permitExpiry,
           notes: dto.notes,
+          branchId: (dto as { branchId?: string }).branchId,
         },
       });
     } catch (err) {

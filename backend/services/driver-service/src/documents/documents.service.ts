@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
 import { UpsertDocumentDto } from './dto/upsert-document.dto';
+import { getTenantStore } from '@tripsheet/tenant-runtime';
 
 @Injectable()
 export class DocumentsService {
@@ -10,11 +11,12 @@ export class DocumentsService {
     private readonly files: FilesService,
   ) {}
 
-  findAll(params: { driverId?: string; companyId?: string }) {
+  async findAll(params: { driverId?: string; companyId?: string }) {
     const { driverId, companyId } = params;
+    const own = await this.ownDriverId();
     return this.prisma.driverDocument.findMany({
       where: {
-        ...(driverId ? { driverId } : {}),
+        ...(own ? { driverId: own } : driverId ? { driverId } : {}),
         ...(companyId ? { companyId } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -22,6 +24,10 @@ export class DocumentsService {
   }
 
   async upsert(dto: UpsertDocumentDto) {
+    const own = await this.ownDriverId();
+    if (own && dto.driverId !== own) {
+      throw new ForbiddenException('Drivers may only manage their own documents');
+    }
     const existing = await this.prisma.driverDocument.findFirst({
       where: { driverId: dto.driverId, type: dto.type },
     });
@@ -93,10 +99,27 @@ export class DocumentsService {
     if (!doc) {
       throw new NotFoundException(`Document ${id} not found`);
     }
+    const own = await this.ownDriverId();
+    if (own && doc.driverId !== own) {
+      throw new ForbiddenException('Drivers may only manage their own documents');
+    }
     if (doc.cloudinaryPublicId) {
       await this.files.destroy(doc.cloudinaryPublicId);
     }
     await this.prisma.driverDocument.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  private async ownDriverId(): Promise<string | undefined> {
+    const store = getTenantStore();
+    if (store?.role !== 'driver' || !store.userId) return undefined;
+    const d = await this.prisma.driver.findFirst({
+      where: {
+        userId: store.userId,
+        ...(store.companyId ? { companyId: store.companyId } : {}),
+      },
+      select: { id: true },
+    });
+    return d?.id;
   }
 }

@@ -63,4 +63,8 @@ export class UpdateDriverDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

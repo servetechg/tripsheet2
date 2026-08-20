@@ -22,11 +22,14 @@ model Asset {
   plateExpiry     String?
   permitExpiry    String?
   notes           String?
+  /// Phase 5: branch assignment
+  branchId        String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@unique([companyId, unitNo])
   @@index([companyId])
+  @@index([branchId])
 }
 
 model Load {
@@ -60,12 +63,15 @@ model Load {
   speed            Float?
   heading          String?
   lastUpdate       String?
+  /// Phase 5: branch assignment
+  branchId         String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([companyId])
   @@index([driverId])
   @@index([status])
+  @@index([branchId])
 }
 
 model MaintenanceRecord {

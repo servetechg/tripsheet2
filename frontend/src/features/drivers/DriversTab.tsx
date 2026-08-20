@@ -9,6 +9,7 @@ import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { invitesApi, authApi, driversApi, notificationsApi } from '@/lib/api';
 import { DriverProfile } from './DriverProfile';
 import { matchesDriverRef } from '@/lib/driverIds';
+import { useCan } from '@/lib/permissions';
 
 export function DriversTab({
   company,
@@ -24,6 +25,7 @@ export function DriversTab({
   apiEnabled,
   refreshAll,
 }: any) {
+  const { can } = useCan();
   const [view, setView] = useState('list');
   const [selectedDriver, setSD] = useState<any>(null);
   const [show, setShow] = useState(false);
@@ -320,6 +322,7 @@ export function DriversTab({
           Driver roster
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {can('drivers.invite') && (
           <Btn
             variant="ghost"
             onClick={createInvite}
@@ -334,6 +337,8 @@ export function DriversTab({
             {Icons.link({ size: 16, color: G.muted })}
             SEND INVITE LINK
           </Btn>
+          )}
+          {can('drivers.create') && (
           <Btn
             onClick={() => {
               resetForm();
@@ -342,6 +347,7 @@ export function DriversTab({
           >
             + ADD MANUALLY
           </Btn>
+          )}
         </div>
       </div>
 

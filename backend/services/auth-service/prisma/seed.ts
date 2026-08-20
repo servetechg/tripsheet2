@@ -1,9 +1,13 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { syncRbacCatalog } from '../src/rbac/rbac.sync';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  await syncRbacCatalog(prisma);
+  console.log('RBAC catalog synced');
+
   const users: Array<{
     id: string;
     email: string;
@@ -25,7 +29,7 @@ async function main() {
       email: 'admin@mkx.ca',
       password: 'mkx123',
       name: 'MKX Admin',
-      role: 'company_admin',
+      role: 'company_owner',
       companyId: 'c1',
     },
     {

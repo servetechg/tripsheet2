@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { CompleteInviteDto } from './dto/complete-invite.dto';
+import { assertPermission } from '@tripsheet/tenant-runtime';
 
 const MAX_INLINE_FILE_CHARS = 1_500_000; // ~1MB raw ≈ base64 data URL ceiling without Cloudinary
 
@@ -32,17 +33,40 @@ export class InvitesService {
     });
   }
 
-  create(dto: CreateInviteDto) {
+  async create(dto: CreateInviteDto) {
+    const kind = dto.kind === 'staff' ? 'staff' : 'driver';
+    if (kind === 'staff') {
+      assertPermission('users.create');
+      assertPermission('users.assign_role');
+      if (!dto.role || dto.role === 'driver' || dto.role === 'superadmin') {
+        throw new BadRequestException('Staff invite requires a company role');
+      }
+      if (!dto.email?.trim()) {
+        throw new BadRequestException('Staff invite requires an email');
+      }
+    } else {
+      assertPermission('drivers.invite');
+    }
+
     const token = randomBytes(16).toString('hex');
     const createdAt = new Date().toISOString();
-    return this.prisma.invite.create({
+    const invite = await this.prisma.invite.create({
       data: {
         token,
         companyId: dto.companyId,
         status: 'pending',
+        kind,
+        role: kind === 'staff' ? dto.role! : 'driver',
+        email: dto.email?.trim().toLowerCase() || null,
+        name: dto.name?.trim() || null,
         createdAt,
       },
     });
+
+    if (kind === 'staff' && invite.email) {
+      void this.queueInviteEmail(invite);
+    }
+    return invite;
   }
 
   async findByToken(token: string) {
@@ -50,7 +74,8 @@ export class InvitesService {
     if (!invite || invite.status !== 'pending') {
       throw new NotFoundException('Invite not found or no longer pending');
     }
-    return invite;
+    const passwordPolicy = await this.fetchPasswordPolicy(invite.companyId);
+    return { ...invite, passwordPolicy };
   }
 
   async complete(token: string, dto: CompleteInviteDto) {
@@ -62,6 +87,10 @@ export class InvitesService {
       throw new BadRequestException(
         `This invite is already ${invite.status}. Ask your admin for a new link.`,
       );
+    }
+
+    if (invite.kind === 'staff') {
+      return this.completeStaff(invite, dto);
     }
 
     if (!dto.profile?.name?.trim() || !dto.profile?.email?.trim()) {
@@ -80,6 +109,7 @@ export class InvitesService {
         password: dto.profile.password,
         name: dto.profile.name.trim(),
         companyId: invite.companyId,
+        role: 'driver',
       });
       if (!userId) {
         throw new BadRequestException(
@@ -339,11 +369,120 @@ export class InvitesService {
     return out;
   }
 
+  private async completeStaff(
+    invite: {
+      id: string;
+      token: string;
+      companyId: string;
+      role: string;
+      email: string | null;
+      name: string | null;
+    },
+    dto: CompleteInviteDto,
+  ) {
+    if (!dto.profile?.name?.trim() || !dto.profile?.email?.trim()) {
+      throw new BadRequestException('Name and email are required');
+    }
+    if (!dto.profile.password?.trim()) {
+      throw new BadRequestException('Password is required to create login');
+    }
+    const email = dto.profile.email.toLowerCase().trim();
+    if (invite.email && invite.email !== email) {
+      throw new BadRequestException('Use the email this invite was sent to');
+    }
+    const userId = await this.tryCreateAuthUser({
+      email,
+      password: dto.profile.password,
+      name: dto.profile.name.trim(),
+      companyId: invite.companyId,
+      role: invite.role || 'dispatcher',
+    });
+    if (!userId) {
+      throw new BadRequestException(
+        'Could not create login account. Check auth-service is running.',
+      );
+    }
+    await this.prisma.invite.update({
+      where: { id: invite.id },
+      data: {
+        status: 'completed',
+        completedAt: new Date().toISOString(),
+        email,
+        name: dto.profile.name.trim(),
+      },
+    });
+    return { ok: true, userId, role: invite.role, kind: 'staff' };
+  }
+
+  private async queueInviteEmail(invite: {
+    token: string;
+    companyId: string;
+    email: string | null;
+    name: string | null;
+    role: string;
+  }) {
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    const origin =
+      this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
+      'http://localhost:5173';
+    if (!notifyUrl || !invite.email) return;
+    const link = `${origin.replace(/\/$/, '')}/invite?invite=${encodeURIComponent(invite.token)}`;
+    try {
+      await fetch(`${notifyUrl.replace(/\/$/, '')}/notifications/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: invite.companyId,
+          channel: 'email',
+          to: invite.email,
+          body: `You are invited as ${invite.role}. Set your password: ${link}`,
+          status: 'queued',
+          meta: { type: 'staff_invite', role: invite.role, token: invite.token },
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(`invite email log failed: ${String(e)}`);
+    }
+  }
+
+  private async fetchPasswordPolicy(companyId: string) {
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/internal/tenants/${encodeURIComponent(companyId)}/security-policy`,
+        { headers: { 'x-internal-api-key': key } },
+      );
+      if (!res.ok) return null;
+      const row = (await res.json()) as {
+        passwordMinLength?: number;
+        passwordComplexity?: boolean;
+      };
+      const complexity = Boolean(row.passwordComplexity);
+      const minRaw = Number(row.passwordMinLength) || 8;
+      const minLength = complexity ? Math.max(minRaw, 12) : Math.max(minRaw, 4);
+      return {
+        minLength,
+        complexity,
+        hint: complexity
+          ? `At least ${minLength} characters, with upper, lower, and a number`
+          : `At least ${minLength} characters`,
+      };
+    } catch (e) {
+      this.logger.warn(`password policy for invite failed: ${String(e)}`);
+      return null;
+    }
+  }
+
   private async tryCreateAuthUser(input: {
     email: string;
     password: string;
     name: string;
     companyId: string;
+    role?: string;
   }): Promise<string | undefined> {
     const baseUrl = this.config.get<string>('AUTH_SERVICE_URL');
     if (!baseUrl) {
@@ -365,14 +504,26 @@ export class InvitesService {
           email: input.email,
           password: input.password,
           name: input.name,
-          role: 'driver',
+          role: input.role || 'driver',
           companyId: input.companyId,
         }),
       });
       if (!res.ok) {
+        const text = await res.text();
+        let message = 'Could not create login account';
+        try {
+          const parsed = JSON.parse(text) as { message?: string | string[] };
+          const m = parsed.message;
+          message = Array.isArray(m) ? m.join(', ') : m || message;
+        } catch {
+          /* keep default */
+        }
         this.logger.warn(
-          `auth-service internal create user failed: ${res.status} ${await res.text()}`,
+          `auth-service internal create user failed: ${res.status} ${text}`,
         );
+        if (res.status === 400) {
+          throw new BadRequestException(message);
+        }
         return undefined;
       }
       const body = (await res.json()) as { id?: string };

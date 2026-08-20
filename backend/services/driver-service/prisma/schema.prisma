@@ -24,6 +24,8 @@ model Driver {
   notes          String?
   sin            String?
   active         Boolean          @default(true)
+  /// Phase 5: branch assignment
+  branchId       String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   documents      DriverDocument[]
@@ -31,6 +33,7 @@ model Driver {
 
   @@unique([companyId, email])
   @@index([companyId])
+  @@index([branchId])
 }
 
 model DriverDocument {
@@ -94,6 +97,10 @@ model Invite {
   token       String   @unique
   companyId   String
   status      String   @default("pending") // pending|completed|expired
+  kind        String   @default("driver") // driver | staff
+  role        String   @default("driver")
+  email       String?
+  name        String?
   driverId    String?
   createdAt   String
   completedAt String?

@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsEnum,
   IsOptional,
@@ -6,6 +7,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Role } from '@prisma/client';
+import { normalizeRoleCode } from '../../rbac/rbac.catalog';
 
 export class UpdateUserDto {
   @IsOptional()
@@ -19,6 +21,9 @@ export class UpdateUserDto {
   companyId?: string | null;
 
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? normalizeRoleCode(value) : value,
+  )
   @IsEnum(Role)
   role?: Role;
 
@@ -26,4 +31,11 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(4)
   password?: string;
+
+  /** Tenant custom role id; null/empty clears and uses the system role. */
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? null : value))
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  customRoleId?: string | null;
 }

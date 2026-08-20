@@ -41,12 +41,21 @@ export function LoginScreen({
     try {
       const res = await authApi.login(email.trim(), pass.trim());
       setToken(res.accessToken);
+      if (res.session) {
+        const mins = res.session.idleTimeoutMinutes || 0;
+        if (mins > 0) sessionStorage.setItem('ts_idle_minutes', String(mins));
+        else sessionStorage.removeItem('ts_idle_minutes');
+      }
       onLogin({
         id: res.user.id,
         name: res.user.name,
         email: res.user.email,
         role: res.user.role,
         companyId: res.user.companyId,
+        tenantKey: res.user.tenantKey ?? null,
+        permissions: res.user.permissions ?? [],
+        customRoleId: res.user.customRoleId ?? null,
+        customRoleName: res.user.customRoleName ?? null,
       });
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Invalid email or password.');

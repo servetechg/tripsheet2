@@ -28,6 +28,140 @@ import {
   appTabPath,
   driverTabPath,
 } from '@/lib/paths';
+import { useCan } from '@/lib/permissions';
+import { normalizeRole, ROLE_LABELS, COMPANY_APP_ROLES } from '@tripsheet/shared';
+import type { Role } from '@tripsheet/shared';
+
+function StaffWorkspacePending() {
+  const { user, logout } = useSession();
+  const navigate = useNavigate();
+  const code = user ? normalizeRole(user.role) : '';
+  const label =
+    code && code in ROLE_LABELS ? ROLE_LABELS[code as Role] : 'this role';
+
+  return (
+    <div style={{ ...pageCentered() }}>
+      <div style={{ maxWidth: 440, textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
+          Workspace coming next
+        </div>
+        <div style={{ color: G.muted, marginBottom: 20, lineHeight: 1.5 }}>
+          You are signed in as {label}. Permission-based screens for this role
+          ship in the next RBAC phase. Company owners keep the full app today.
+        </div>
+        <Btn
+          full
+          onClick={() => {
+            logout();
+            navigate(PATHS.login, { replace: true });
+          }}
+          style={{ padding: 15, fontSize: 14 }}
+        >
+          SIGN OUT
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
+function StaffOnboarding({
+  invite,
+  company,
+  onComplete,
+}: {
+  invite: {
+    role?: string;
+    email?: string;
+    name?: string;
+    passwordPolicy?: { minLength?: number; hint?: string };
+  };
+  company: { name?: string; shortName?: string };
+  onComplete: (p: { name: string; email: string; password: string }) => Promise<void>;
+}) {
+  const [name, setName] = useState(invite.name || '');
+  const [email, setEmail] = useState(invite.email || '');
+  const [password, setPassword] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const minLen = invite.passwordPolicy?.minLength || 8;
+  const roleLabel =
+    invite.role && invite.role in ROLE_LABELS
+      ? ROLE_LABELS[invite.role as keyof typeof ROLE_LABELS]
+      : invite.role || 'staff';
+
+  return (
+    <div style={{ ...pageCentered() }}>
+      <div
+        style={{
+          background: G.card,
+          border: `1px solid ${G.border}`,
+          borderRadius: 16,
+          padding: 32,
+          maxWidth: 420,
+          width: '100%',
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
+          Join {company.shortName || company.name}
+        </div>
+        <div style={{ color: G.muted, marginBottom: 20, fontSize: 13 }}>
+          You were invited as {roleLabel}. Set a password to activate your account.
+          {invite.passwordPolicy?.hint ? (
+            <div style={{ marginTop: 6 }}>{invite.passwordPolicy.hint}</div>
+          ) : null}
+        </div>
+        {err ? (
+          <div style={{ color: G.danger, fontSize: 13, marginBottom: 12 }}>{err}</div>
+        ) : null}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Full name"
+            style={{ padding: 10, borderRadius: 8 }}
+          />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            style={{ padding: 10, borderRadius: 8 }}
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            style={{ padding: 10, borderRadius: 8 }}
+          />
+          <Btn
+            full
+            disabled={busy}
+            onClick={() => {
+              setErr('');
+              if (!name.trim() || !email.trim() || password.length < minLen) {
+                setErr(
+                  `Name, email, and password (min ${minLen}) are required.`,
+                );
+                return;
+              }
+              setBusy(true);
+              void onComplete({
+                name: name.trim(),
+                email: email.trim(),
+                password,
+              }).catch((e: { message?: string }) => {
+                setErr(e?.message || 'Could not complete invite');
+                setBusy(false);
+              });
+            }}
+          >
+            {busy ? 'Saving…' : 'Activate account'}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function BootSplash({ label = 'Loading…' }: { label?: string }) {
   return (
@@ -47,7 +181,8 @@ function RequireAuth({
   const { user, bootstrapping } = useSession();
   if (bootstrapping) return <BootSplash label="Restoring session…" />;
   if (!user) return <Navigate to={PATHS.login} replace />;
-  if (!roles.includes(user.role)) {
+  const allowed = roles.map(normalizeRole);
+  if (!allowed.includes(normalizeRole(user.role))) {
     return <Navigate to={homePathForRole(user.role)} replace />;
   }
   return <>{children}</>;
@@ -191,6 +326,21 @@ function InviteRoute() {
   if (inviteState.invite && inviteState.company) {
     const invite = inviteState.invite;
     const company = inviteState.company;
+    if (invite.kind === 'staff') {
+      return (
+        <StaffOnboarding
+          invite={invite}
+          company={company}
+          onComplete={async (profile: { name: string; email: string; password: string }) => {
+            await invitesApi.complete(inviteToken!, {
+              profile,
+            });
+            setToken(null);
+            navigate(PATHS.login, { replace: true });
+          }}
+        />
+      );
+    }
     return (
       <DriverOnboarding
         invite={invite}
@@ -314,13 +464,14 @@ function CompanyWorkspace() {
   const { user, logout, themeMode, toggleTheme } = useSession();
   const { tab: rawTab } = useParams();
   const navigate = useNavigate();
-  const tab = isCompanyAdminTab(rawTab) ? rawTab : 'dashboard';
+  const { canTab } = useCan();
+  const tab = isCompanyAdminTab(rawTab) && canTab(rawTab || '') ? rawTab : 'dashboard';
 
   useEffect(() => {
-    if (!isCompanyAdminTab(rawTab)) {
+    if (!isCompanyAdminTab(rawTab) || !canTab(rawTab || '')) {
       navigate(appTabPath('dashboard'), { replace: true });
     }
-  }, [rawTab, navigate]);
+  }, [rawTab, navigate, canTab]);
 
   useEffect(() => {
     if (user?.companyId) void data.refreshAll(user.companyId);
@@ -375,7 +526,11 @@ function CompanyWorkspace() {
     );
   }
 
-  if (freshSession.role === 'company_admin') {
+  const staffRole = normalizeRole(freshSession.role);
+  if (
+    (COMPANY_APP_ROLES as readonly string[]).includes(staffRole) ||
+    staffRole === 'company_admin'
+  ) {
     return (
       <CompanyAdminPanel
         company={company}
@@ -533,6 +688,25 @@ export function AppRoutes() {
         <Route path={PATHS.login} element={<LoginRoute />} />
         <Route path={PATHS.invite} element={<InviteRoute />} />
         <Route
+          path={PATHS.workspace}
+          element={
+            <RequireAuth
+              roles={[
+                'general_manager',
+                'dispatcher',
+                'dispatcher_supervisor',
+                'fleet_manager',
+                'safety_manager',
+                'accountant',
+                'hr_manager',
+                'maintenance_coordinator',
+              ]}
+            >
+              <StaffWorkspacePending />
+            </RequireAuth>
+          }
+        />
+        <Route
           path={`${PATHS.admin}/:tab?`}
           element={
             <RequireAuth roles={['superadmin']}>
@@ -543,7 +717,7 @@ export function AppRoutes() {
         <Route
           path={`${PATHS.app}/:tab?`}
           element={
-            <RequireAuth roles={['company_admin']}>
+            <RequireAuth roles={[...COMPANY_APP_ROLES, 'company_admin']}>
               <CompanyWorkspace />
             </RequireAuth>
           }

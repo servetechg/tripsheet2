@@ -30,6 +30,7 @@ import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { loadsApi, driversApi, notificationsApi } from '@/lib/api';
 import { matchesDriverRef } from '@/lib/driverIds';
+import { useCan } from '@/lib/permissions';
 
 type FormErrors = Partial<
   Record<
@@ -71,6 +72,7 @@ export function DispatchTab({
   apiEnabled,
   refreshAll,
 }: any) {
+  const { can } = useCan();
   const [show, setShow] = useState(false);
   const [editLoad, setEditLoad] = useState<any>(null);
   const [docErr, setDocErr] = useState('');
@@ -500,6 +502,7 @@ export function DispatchTab({
               eManifest
             </Btn>
           )}
+          {can('dispatch.create') && (
           <Btn
             size="sm"
             onClick={() => {
@@ -509,10 +512,11 @@ export function DispatchTab({
           >
             + Assign Load
           </Btn>
+          )}
         </div>
       </div>
 
-      {show && (
+      {show && (can('dispatch.create') || can('dispatch.edit')) && (
         <Card style={{ border: `1px solid ${G.gold}33` }}>
           <SectionTitle>{editLoad ? 'Edit Load' : 'Assign New Load'}</SectionTitle>
           <Err msg={docErr} />
@@ -1027,7 +1031,7 @@ export function DispatchTab({
                   }}
                 >
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {l.status === 'assigned' && (
+                    {l.status === 'assigned' && can('dispatch.edit') && (
                       <Btn
                         size="sm"
                         onClick={() => setStatus(l.id, 'in_transit')}
@@ -1035,7 +1039,7 @@ export function DispatchTab({
                         ▶ Start
                       </Btn>
                     )}
-                    {l.status === 'in_transit' && (
+                    {l.status === 'in_transit' && can('dispatch.close') && (
                       <Btn
                         variant="success"
                         size="sm"
@@ -1044,7 +1048,8 @@ export function DispatchTab({
                         ✓ Deliver
                       </Btn>
                     )}
-                    {!['delivered', 'cancelled'].includes(l.status) && (
+                    {!['delivered', 'cancelled'].includes(l.status) &&
+                      can('dispatch.cancel') && (
                       <Btn
                         variant="danger"
                         size="sm"
@@ -1068,7 +1073,7 @@ export function DispatchTab({
                     </Btn>
                   </div>
                   <div style={{ display: 'flex', gap: 6 }}>
-                    {!['delivered'].includes(l.status) && (
+                    {!['delivered'].includes(l.status) && can('dispatch.edit') && (
                       <Btn
                         variant="ghost"
                         size="sm"
@@ -1083,18 +1088,20 @@ export function DispatchTab({
                         Edit
                       </Btn>
                     )}
-                    <Btn
-                      variant="danger"
-                      size="sm"
-                      onClick={() => deleteLoad(l.id)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      {Icons.trash({ size: 16, color: G.danger })}
-                    </Btn>
+                    {can('dispatch.delete') && (
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        onClick={() => deleteLoad(l.id)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        {Icons.trash({ size: 16, color: G.danger })}
+                      </Btn>
+                    )}
                   </div>
                 </div>
               </div>

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { HttpModule } from '@nestjs/axios';
 import { HealthController } from './health/health.controller';
 import { ProxyModule } from './proxy/proxy.module';
+import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { ProxyModule } from './proxy/proxy.module';
       maxBodyLength: 30 * 1024 * 1024,
       maxContentLength: 30 * 1024 * 1024,
     }),
+    TenantModule,
     ProxyModule,
   ],
   controllers: [HealthController],
