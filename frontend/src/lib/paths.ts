@@ -1,14 +1,17 @@
 /** Canonical app paths and tab allow-lists */
 
+import { isDriverRole, isSuperAdminRole } from '@tripsheet/shared';
+
 export const PATHS = {
   login: '/login',
   invite: '/invite',
   admin: '/admin',
   app: '/app',
   driver: '/driver',
+  workspace: '/workspace',
 } as const;
 
-export const SUPER_ADMIN_TABS = ['companies'] as const;
+export const SUPER_ADMIN_TABS = ['companies', 'ops'] as const;
 export const COMPANY_ADMIN_TABS = [
   'dashboard',
   'dispatch',
@@ -16,9 +19,14 @@ export const COMPANY_ADMIN_TABS = [
   'emanifest',
   'drivers',
   'assets',
+  'fleet',
   'sheets',
+  'messages',
+  'compliance',
   'reports',
   'accounting',
+  'company',
+  'users',
 ] as const;
 export const DRIVER_TABS = ['sheets', 'docs', 'contract', 'status'] as const;
 
@@ -27,9 +35,9 @@ export type CompanyAdminTab = (typeof COMPANY_ADMIN_TABS)[number];
 export type DriverTab = (typeof DRIVER_TABS)[number];
 
 export function homePathForRole(role: string): string {
-  if (role === 'superadmin') return `${PATHS.admin}/companies`;
-  if (role === 'company_admin') return `${PATHS.app}/dashboard`;
-  if (role === 'driver') return `${PATHS.driver}/sheets`;
+  if (isSuperAdminRole(role)) return `${PATHS.admin}/companies`;
+  if (isDriverRole(role)) return `${PATHS.driver}/sheets`;
+  if (role) return `${PATHS.app}/dashboard`;
   return PATHS.login;
 }
 

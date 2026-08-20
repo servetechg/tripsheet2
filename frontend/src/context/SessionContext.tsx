@@ -19,6 +19,13 @@ import type { AppUser } from '@/context/AppDataContext';
 
 const THEME_KEY = 'ts_theme';
 export const AUTH_EXPIRED_EVENT = 'ts:auth-expired';
+const IDLE_KEY = 'ts_idle_minutes';
+
+function rememberIdle(minutes?: number) {
+  const n = Number(minutes || 0);
+  if (n > 0) sessionStorage.setItem(IDLE_KEY, String(n));
+  else sessionStorage.removeItem(IDLE_KEY);
+}
 
 type SessionContextValue = {
   user: AppUser | null;
@@ -47,6 +54,10 @@ function toAppUser(u: {
   name: string;
   role: string;
   companyId: string | null;
+  tenantKey?: string | null;
+  permissions?: string[];
+  customRoleId?: string | null;
+  customRoleName?: string | null;
 }): AppUser {
   return {
     id: u.id,
@@ -54,6 +65,10 @@ function toAppUser(u: {
     name: u.name,
     role: u.role,
     companyId: u.companyId,
+    tenantKey: u.tenantKey ?? null,
+    permissions: u.permissions ?? [],
+    customRoleId: u.customRoleId ?? null,
+    customRoleName: u.customRoleName ?? null,
   };
 }
 
@@ -66,13 +81,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return mode;
   });
 
+  const login = useCallback((next: AppUser) => {
+    setUser(toAppUser(next));
+  }, []);
+
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-  }, []);
-
-  const login = useCallback((next: AppUser) => {
-    setUser(toAppUser(next));
+    sessionStorage.removeItem(IDLE_KEY);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -95,7 +111,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await authApi.me();
-        if (!cancelled) setUser(toAppUser(me));
+        if (!cancelled) {
+          setUser(toAppUser(me));
+          rememberIdle(me.session?.idleTimeoutMinutes);
+        }
       } catch (e) {
         setToken(null);
         if (!cancelled) setUser(null);
@@ -117,6 +136,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, [logout]);
+
+  // Optional idle timeout from tenant SecurityPolicy (client-side).
+  useEffect(() => {
+    if (!user) return;
+    const mins = Number(sessionStorage.getItem(IDLE_KEY) || 0);
+    if (mins <= 0) return;
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+    };
+    const evts: Array<keyof WindowEventMap> = [
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart',
+    ];
+    for (const e of evts) window.addEventListener(e, bump, { passive: true });
+    const timer = window.setInterval(() => {
+      if (Date.now() - last > mins * 60_000) logout();
+    }, 15_000);
+    return () => {
+      window.clearInterval(timer);
+      for (const e of evts) window.removeEventListener(e, bump);
+    };
+  }, [user, logout]);
 
   const value = useMemo(
     () => ({

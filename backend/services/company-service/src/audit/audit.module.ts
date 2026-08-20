@@ -6,8 +6,10 @@ import {
   Module,
   Post,
   Query,
+  Req,
   BadRequestException,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -22,18 +24,35 @@ export class AuditService {
     });
   }
 
-  async create(body: Record<string, unknown>) {
+  async create(body: Record<string, unknown>, req?: Request) {
     const action = String(body.action || '');
     if (!action) throw new BadRequestException('action is required');
+    const ip =
+      String(body.ip || '') ||
+      String(req?.headers['x-forwarded-for'] || '').split(',')[0].trim() ||
+      req?.socket?.remoteAddress ||
+      '';
+    const userAgent =
+      String(body.userAgent || '') || String(req?.headers['user-agent'] || '');
     return this.prisma.auditEvent.create({
       data: {
         companyId: body.companyId ? String(body.companyId) : null,
-        actorId: body.actorId ? String(body.actorId) : null,
-        actorName: String(body.actorName || ''),
+        actorId: body.actorId
+          ? String(body.actorId)
+          : req?.headers['x-user-id']
+            ? String(req.headers['x-user-id'])
+            : null,
+        actorName:
+          String(body.actorName || '') ||
+          String(req?.headers['x-user-email'] || ''),
         action,
         entityType: String(body.entityType || ''),
         entityId: String(body.entityId || ''),
         meta: (body.meta as object) ?? undefined,
+        ip,
+        userAgent: userAgent.slice(0, 500),
+        before: (body.before as object) ?? undefined,
+        after: (body.after as object) ?? undefined,
       },
     });
   }
@@ -52,8 +71,8 @@ export class AuditController {
   }
 
   @Post()
-  create(@Body() body: Record<string, unknown>) {
-    return this.audit.create(body);
+  create(@Body() body: Record<string, unknown>, @Req() req: Request) {
+    return this.audit.create(body, req);
   }
 }
 

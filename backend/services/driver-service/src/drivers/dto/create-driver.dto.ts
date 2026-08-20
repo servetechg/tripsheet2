@@ -70,4 +70,8 @@ export class CreateDriverDto {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

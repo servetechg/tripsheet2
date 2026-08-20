@@ -2,10 +2,11 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 
-export function PrintPreview({ company, header, trips, expenses, notes, onBack }: any) {
+export function PrintPreview({ company, header, trips, expenses, notes, onBack, branding }: any) {
   const ref = useRef<any>(null);
   const sn = company.shortName || "CO";
   const accent = sn.slice(-1), base = sn.slice(0,-1);
+  const brandAccent = branding?.accentColor || '#D4A017';
   const cad = expenses.filter(e=>e.currency==="CAD").reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
   const usd = expenses.filter(e=>e.currency==="USD").reduce((a,e)=>a+(parseFloat(e.amount)||0),0);
 
@@ -25,19 +26,19 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
     .hdr{display:flex;justify-content:space-between;align-items:flex-start;
          padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid #000}
     .logo{font-size:28pt;font-weight:900;letter-spacing:-1px;line-height:1;font-family:Arial,Helvetica,sans-serif}
-    .logo-x{color:#D4A017}
+    .logo-x{color:${brandAccent}}
     .logo-tag{font-size:7pt;letter-spacing:3px;color:#777;margin-top:2px;text-transform:uppercase}
     .logo-addr{font-size:8pt;color:#555;margin-top:6px;line-height:1.6}
     /* TRUCK BOX */
     .truck-box{border:2px solid #000;min-width:195px;text-align:center}
-    .truck-box-hdr{background:#000;color:#D4A017;font-size:7pt;letter-spacing:2px;
+    .truck-box-hdr{background:#000;color:${brandAccent};font-size:7pt;letter-spacing:2px;
                    padding:4px 8px;font-weight:700;text-transform:uppercase}
     .truck-no{font-size:26pt;font-weight:900;padding:4px 12px 5px;border-bottom:1px solid #000;
               font-family:Arial,Helvetica,sans-serif;text-align:center}
     .truck-dates{display:flex}
     .truck-date{flex:1;border-right:1px solid #000}
     .truck-date:last-child{border-right:none}
-    .truck-date-lbl{background:#000;color:#D4A017;font-size:6.5pt;letter-spacing:1.5px;
+    .truck-date-lbl{background:#000;color:${brandAccent};font-size:6.5pt;letter-spacing:1.5px;
                     padding:3px 6px;text-align:center;font-weight:700;text-transform:uppercase}
     .truck-date-val{font-size:10pt;font-weight:700;padding:4px 6px;text-align:center}
     /* DRIVERS */
@@ -88,8 +89,11 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
         {/* Logo + address */}
         <div>
           <div style={{ fontSize:30, fontWeight:900, letterSpacing:-1, lineHeight:1, fontFamily:"Arial,Helvetica,sans-serif" }}>
-            {base}<span style={{ color:"#D4A017" }}>{accent}</span>
+            {base}<span style={{ color: brandAccent }}>{accent}</span>
           </div>
+          {branding?.invoiceHeader ? (
+            <div style={{ fontSize: 8, color: '#555', marginTop: 4 }}>{branding.invoiceHeader}</div>
+          ) : null}
           {company.tagline && <div style={{ fontSize:7.5, letterSpacing:3, color:"#777", marginTop:3, textTransform:"uppercase" }}>{company.tagline}</div>}
           {company.address && (
             <div style={{ fontSize:8.5, color:"#555", marginTop:6, lineHeight:1.65 }}>
@@ -100,7 +104,7 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
 
         {/* Truck box — exact layout from your screenshots */}
         <div style={{ border:"2px solid #000", minWidth:195, textAlign:"center" }}>
-          <div style={{ background:"#000", color:"#D4A017", fontSize:7.5, letterSpacing:2, padding:"4px 8px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>
+          <div style={{ background:"#000", color: brandAccent, fontSize:7.5, letterSpacing:2, padding:"4px 8px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>
             TRUCK UNIT NO.
           </div>
           <div style={{ fontSize:28, fontWeight:900, padding:"4px 10px 5px", borderBottom:"1px solid #000", textAlign:"center", fontFamily:"Arial,Helvetica,sans-serif" }}>
@@ -108,11 +112,11 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack }
           </div>
           <div style={{ display:"flex" }}>
             <div style={{ flex:1, borderRight:"1px solid #000" }}>
-              <div style={{ background:"#000", color:"#D4A017", fontSize:6.5, letterSpacing:1.5, padding:"3px 6px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>START DATE</div>
+              <div style={{ background:"#000", color: brandAccent, fontSize:6.5, letterSpacing:1.5, padding:"3px 6px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>START DATE</div>
               <div style={{ fontSize:10, fontWeight:700, padding:"4px 6px", textAlign:"center" }}>{header.startDate || "—"}</div>
             </div>
             <div style={{ flex:1 }}>
-              <div style={{ background:"#000", color:"#D4A017", fontSize:6.5, letterSpacing:1.5, padding:"3px 6px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>END DATE</div>
+              <div style={{ background:"#000", color: brandAccent, fontSize:6.5, letterSpacing:1.5, padding:"3px 6px", fontWeight:700, textTransform:"uppercase", textAlign:"center" }}>END DATE</div>
               <div style={{ fontSize:10, fontWeight:700, padding:"4px 6px", textAlign:"center" }}>{header.endDate || "—"}</div>
             </div>
           </div>

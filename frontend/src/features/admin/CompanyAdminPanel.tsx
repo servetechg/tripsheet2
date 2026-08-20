@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Skeleton } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
@@ -16,6 +16,11 @@ import { DashboardTab } from '@/features/dashboard/DashboardTab';
 import { FleetOpsTab } from '@/features/fleet/FleetOpsTab';
 import { MessagesTab } from '@/features/comms/MessagesTab';
 import { ComplianceTab } from '@/features/compliance/ComplianceTab';
+import { CompanySettingsTab } from '@/features/companies/CompanySettingsTab';
+import { companiesApi } from '@/lib/api';
+import { useCan } from '@/lib/permissions';
+import { ROLE_LABELS } from '@tripsheet/shared';
+import type { Role } from '@tripsheet/shared';
 
 export function CompanyAdminPanel({
   company,
@@ -43,9 +48,11 @@ export function CompanyAdminPanel({
   activeTab,
   onTabChange,
 }: any) {
+  const { canTab, can, role } = useCan();
   const tab = activeTab || 'dashboard';
   const setTab = onTabChange || (() => {});
   const [adminPreview, setAdminPreview] = useState<any>(null);
+  const [entitlements, setEntitlements] = useState<any>(null);
   const sn = company.shortName;
 
   const myDrivers = users.filter(
@@ -82,8 +89,23 @@ export function CompanyAdminPanel({
     { id: 'messages', icon: 'bell', label: 'Messages' },
     { id: 'compliance', icon: 'docs', label: 'Compliance' },
     { id: 'reports', icon: 'reports', label: 'Reports' },
-    { id: 'accounting', icon: 'accounting', label: 'Accounting' },
-  ];
+    ...(entitlements?.features?.accounting !== false
+      ? [{ id: 'accounting', icon: 'accounting', label: 'Accounting' }]
+      : []),
+    { id: 'users', icon: 'companies', label: 'Users' },
+    { id: 'company', icon: 'companies', label: 'Company' },
+  ].filter((t) => {
+    if (t.id === 'accounting' && !can('accounting.view')) return false;
+    return canTab(t.id);
+  });
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) return;
+    void companiesApi
+      .entitlements(company.id)
+      .then(setEntitlements)
+      .catch(() => setEntitlements(null));
+  }, [apiEnabled, company?.id]);
 
   const STATUS_COLOR = {
     assigned: G.info,
@@ -112,7 +134,9 @@ export function CompanyAdminPanel({
   return (
     <AppShell
       logo={sn}
-      subtitle="Admin"
+      subtitle={
+        ROLE_LABELS[role as Role] || 'Staff'
+      }
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
@@ -242,7 +266,7 @@ export function CompanyAdminPanel({
           {tab === 'reports' && (
             <ReportsTab company={company} apiEnabled={apiEnabled} />
           )}
-          {tab === 'accounting' && (
+          {tab === 'accounting' && entitlements?.features?.accounting !== false && (
             <AccountingTab
               company={company}
               drivers={myDrivers}
@@ -250,6 +274,23 @@ export function CompanyAdminPanel({
               loads={myLoads}
               adminUser={adminUser}
               apiEnabled={apiEnabled}
+            />
+          )}
+          {tab === 'users' && (
+            <CompanySettingsTab
+              company={company}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+              refreshAll={refreshAll}
+              initialSub="users"
+            />
+          )}
+          {tab === 'company' && (
+            <CompanySettingsTab
+              company={company}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+              refreshAll={refreshAll}
             />
           )}
         </>

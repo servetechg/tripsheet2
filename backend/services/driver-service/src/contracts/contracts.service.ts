@@ -1,16 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertContractDto } from './dto/upsert-contract.dto';
 import { SignContractDto } from './dto/sign-contract.dto';
+import { assertPermission, getTenantStore } from '@tripsheet/tenant-runtime';
 
 @Injectable()
 export class ContractsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(driverId?: string) {
+  async findAll(driverId?: string) {
+    const own = await this.ownDriverId();
     return this.prisma.contract.findMany({
-      where: driverId ? { driverId } : undefined,
+      where: {
+        driverId: own || driverId,
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -24,6 +28,11 @@ export class ContractsService {
   }
 
   async upsert(dto: UpsertContractDto) {
+    const store = getTenantStore();
+    if (store?.role === 'driver') {
+      throw new ForbiddenException('Drivers cannot edit wage or contract terms');
+    }
+    assertPermission('drivers.wage.edit');
     const payload =
       dto.payload === undefined
         ? undefined
@@ -87,7 +96,11 @@ export class ContractsService {
   }
 
   async sign(id: string, dto: SignContractDto) {
-    await this.ensureExists(id);
+    const contract = await this.ensureExists(id);
+    const own = await this.ownDriverId();
+    if (own && contract.driverId !== own) {
+      throw new ForbiddenException('Drivers may only sign their own contract');
+    }
     const signedAt = new Date().toISOString();
 
     if (dto.role === 'driver') {
@@ -117,5 +130,18 @@ export class ContractsService {
       throw new NotFoundException(`Contract ${id} not found`);
     }
     return contract;
+  }
+
+  private async ownDriverId(): Promise<string | undefined> {
+    const store = getTenantStore();
+    if (store?.role !== 'driver' || !store.userId) return undefined;
+    const d = await this.prisma.driver.findFirst({
+      where: {
+        userId: store.userId,
+        ...(store.companyId ? { companyId: store.companyId } : {}),
+      },
+      select: { id: true },
+    });
+    return d?.id;
   }
 }

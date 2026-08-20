@@ -1,20 +1,42 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDriverDto } from './dto/create-driver.dto';
 import { UpdateDriverDto } from './dto/update-driver.dto';
+import {
+  actorHasPermission,
+  getTenantStore,
+} from '@tripsheet/tenant-runtime';
 
 const DISPATCH_REQUIRED_DOCS = ['license', 'abstract', 'medical'] as const;
 
 @Injectable()
 export class DriversService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
-  findAll(companyId?: string) {
-    return this.prisma.driver.findMany({
-      where: companyId ? { companyId } : undefined,
+  async findAll(companyId?: string, userId?: string) {
+    const store = getTenantStore();
+    const asDriver = store?.role === 'driver';
+    const uid = asDriver ? store?.userId : userId;
+    const rows = await this.prisma.driver.findMany({
+      where: {
+        ...(companyId ? { companyId } : {}),
+        ...(uid ? { userId: uid } : {}),
+      },
       orderBy: { name: 'asc' },
       include: { documents: true, contracts: true },
     });
+    const canWage =
+      actorHasPermission('drivers.wage.view') || asDriver;
+    if (canWage) return rows;
+    return rows.map((d) => this.redactWage(d));
   }
 
   async findOne(id: string) {
@@ -28,7 +50,8 @@ export class DriversService {
     return driver;
   }
 
-  create(dto: CreateDriverDto) {
+  async create(dto: CreateDriverDto) {
+    await this.assertDriverQuota(dto.companyId);
     const { password: _password, ...data } = dto;
     return this.prisma.driver.create({
       data: {
@@ -47,6 +70,7 @@ export class DriversService {
         notes: data.notes,
         sin: data.sin,
         active: data.active ?? true,
+        branchId: data.branchId,
       },
       include: { documents: true, contracts: true },
     });
@@ -71,9 +95,34 @@ export class DriversService {
         notes: dto.notes,
         sin: dto.sin,
         active: dto.active,
+        branchId: dto.branchId,
       },
       include: { documents: true, contracts: true },
     });
+  }
+
+  private async assertDriverQuota(companyId: string) {
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/companies/${encodeURIComponent(companyId)}/entitlements`,
+      );
+      if (!res.ok) return;
+      const ent = (await res.json()) as { maxDrivers?: number };
+      const max = ent.maxDrivers ?? -1;
+      if (max < 0) return;
+      const count = await this.prisma.driver.count({ where: { companyId } });
+      if (count >= max) {
+        throw new ForbiddenException(
+          `Driver limit reached for plan (max ${max})`,
+        );
+      }
+    } catch (e) {
+      if (e instanceof ForbiddenException) throw e;
+      /* entitlements unavailable — allow create */
+    }
   }
 
   async remove(id: string) {
@@ -106,6 +155,25 @@ export class DriversService {
     }
 
     return { ready: missing.length === 0, missing };
+  }
+
+  private redactWage<T extends { contracts?: Array<Record<string, unknown>> }>(
+    driver: T,
+  ): T {
+    return {
+      ...driver,
+      contracts: (driver.contracts || []).map((c) => ({
+        ...c,
+        payType: null,
+        payRate: null,
+        payUnit: null,
+        teamRate: null,
+        detentionRate: null,
+        waitRate: null,
+        fuelSurcharge: null,
+        vacationPct: null,
+      })),
+    };
   }
 
   private async ensureExists(id: string) {

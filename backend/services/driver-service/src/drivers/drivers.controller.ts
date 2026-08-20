@@ -17,8 +17,11 @@ export class DriversController {
   constructor(private readonly driversService: DriversService) {}
 
   @Get()
-  findAll(@Query('companyId') companyId?: string) {
-    return this.driversService.findAll(companyId);
+  findAll(
+    @Query('companyId') companyId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.driversService.findAll(companyId, userId);
   }
 
   @Get(':id/dispatch-ready')

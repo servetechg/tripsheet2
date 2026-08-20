@@ -1,4 +1,5 @@
 export * from './roles';
+export * from './permissions';
 export * from './load-status';
 export * from './manifest-status';
 export * from './driver-doc-types';

@@ -10,7 +10,9 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts",
+    "seed": "ts-node --transpile-only prisma/seed.ts",
+    "test:rbac": "ts-node --transpile-only src/rbac/check-catalog.ts && ts-node --transpile-only src/auth/check-password-policy.ts",
+    "test:auth": "npm run test:rbac",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {

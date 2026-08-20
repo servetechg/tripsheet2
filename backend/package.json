@@ -4,6 +4,10 @@
   "private": true,
   "description": "TripSheet backend orchestrator — start all Nest services with one command",
   "scripts": {
+    "test:tenancy": "npm run test:tenancy --prefix gateway",
+    "test:rbac": "npm run test:rbac --prefix gateway && npm run test:rbac --prefix services/auth-service && npm run test:rbac --prefix services/company-service",
+    "test:rbac:live": "npm run test:rbac:live --prefix gateway",
+    "test:rbac:all": "npm run test:rbac && npm run test:rbac:live",
     "test": "npm run test --prefix services/driver-service && npm run test --prefix services/fleet-service && npm run test --prefix services/accounting-service && npm run test --prefix services/notification-service",
     "env:copy": "powershell -NoProfile -File scripts/copy-env.ps1",
     "infra:up": "docker compose up -d postgres redis",

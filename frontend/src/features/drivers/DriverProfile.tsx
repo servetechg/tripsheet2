@@ -11,6 +11,7 @@ import {
   driverRecordIdOf,
   matchesDriverRef,
 } from '@/lib/driverIds';
+import { useCan } from '@/lib/permissions';
 
 export function DriverProfile({
   driver,
@@ -24,6 +25,7 @@ export function DriverProfile({
   apiEnabled,
   refreshAll,
 }: any) {
+  const { can } = useCan();
   const [docTab, setDocTab] = useState('documents');
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
@@ -268,6 +270,7 @@ export function DriverProfile({
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {can('drivers.wage.edit') && (
           <button
             type="button"
             onClick={() => setShowWage(true)}
@@ -288,6 +291,7 @@ export function DriverProfile({
             {Icons.contract({ size: 16, color: G.gold })}
             {myContract?.payRate ? 'EDIT WAGE' : 'SET WAGE'}
           </button>
+          )}
           <button
             type="button"
             onClick={onEdit}
@@ -539,7 +543,7 @@ export function DriverProfile({
                   <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>
                     Employment Contract (wage)
                   </div>
-                  {myContract?.payRate ? (
+                  {can('drivers.wage.view') && myContract?.payRate ? (
                     <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
                       Pay: {myContract.payUnit || 'CAD'} {myContract.payRate} ·{' '}
                       {PAY_TYPES.find((p) => p.id === myContract.payType)
@@ -561,6 +565,7 @@ export function DriverProfile({
                   )}
                 </div>
               </div>
+              {can('drivers.wage.edit') && (
               <button
                 type="button"
                 onClick={() => setShowWage(true)}
@@ -581,6 +586,7 @@ export function DriverProfile({
                 {Icons.contract({ size: 16, color: G.onGold })}
                 {myContract?.payRate ? 'EDIT WAGE' : 'SET WAGE'}
               </button>
+              )}
             </div>
 
             {DRIVER_DOC_TYPES.map((docType) => {

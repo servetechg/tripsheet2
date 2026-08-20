@@ -11,6 +11,7 @@ import {
 } from 'react';
 import type { Company, Asset, Load, CarrierProfile, TripSheet, Invite } from '@tripsheet/shared';
 import type { Role } from '@tripsheet/shared';
+import { isCompanyOwnerRole } from '@tripsheet/shared';
 import {
   pingApi,
   companiesApi,
@@ -172,7 +173,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         setUsers((prev) => {
           const supers = prev.filter((u) => u.role === 'superadmin');
           const admins = prev.filter(
-            (u) => u.role === 'company_admin' && u.companyId === companyId,
+            (u) => isCompanyOwnerRole(u.role) && u.companyId === companyId,
           );
           return [...supers, ...admins, ...driverUsers];
         });

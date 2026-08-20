@@ -27,6 +27,10 @@ import {
   MessagesProxyController,
   PaymentsProxyController,
 } from './extended.proxy.controllers';
+import {
+  PlansProxyController,
+  TenantsProxyController,
+} from './platform.proxy.controllers';
 
 @Module({
   imports: [
@@ -41,6 +45,8 @@ import {
   controllers: [
     AuthProxyController,
     CompaniesProxyController,
+    PlansProxyController,
+    TenantsProxyController,
     DriversProxyController,
     LoadsProxyController,
     AssetsProxyController,

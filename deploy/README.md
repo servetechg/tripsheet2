@@ -121,12 +121,30 @@ Stop staging when idle:
 docker compose -p tripsheet-staging -f deploy/compose.staging.yml --env-file /opt/tripsheet/secrets/staging.app.env down
 ```
 
-## Backups
+## Backups (Phase 6)
+
+Nightly dump of shared DBs **and** every `fq_tenant_*` database:
 
 ```bash
 ./deploy/scripts/backup.sh
 # cron: 15 2 * * * /opt/tripsheet/repo/deploy/scripts/backup.sh >> /opt/tripsheet/backups/cron.log 2>&1
 ```
+
+Restore one tenant / quarterly drill:
+
+```bash
+./deploy/scripts/restore-tenant.sh fq_tenant_SLUG /opt/tripsheet/backups/STAMP/tenants/fq_tenant_SLUG.sql.gz --force
+./deploy/scripts/restore-drill.sh
+```
+
+Schema migrate-all (also runs automatically after staging/production deploy):
+
+```bash
+COMPANY_URL=http://127.0.0.1:3002 ./deploy/scripts/migrate-all-tenants.sh
+# or Actions → tenant-migrate workflow
+```
+
+Runbooks: `docs/runbooks/suspend-tenant.md`, `restore-tenant.md`, `offboard-tenant.md`.
 
 ## Rollback (production only)
 

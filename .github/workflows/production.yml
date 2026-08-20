@@ -141,4 +141,7 @@ jobs:
             || echo "IMAGE_TAG=${IMAGE_TAG}" >> /opt/tripsheet/secrets/app.env
           echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
           ./deploy/scripts/deploy.sh ${COLOR} ${IMAGE_TAG}
+          # Phase 6: migrate-all-tenants on the color just deployed
+          sleep 10
+          docker exec ${COLOR}-company-service node -e "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{console.log(await r.text()); if(!r.ok) process.exit(1)})"
           EOF
