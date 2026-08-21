@@ -4,6 +4,8 @@ import { isDriverRole, isSuperAdminRole } from '@tripsheet/shared';
 
 export const PATHS = {
   login: '/login',
+  forgotPassword: '/forgot-password',
+  resetPassword: '/reset-password',
   invite: '/invite',
   admin: '/admin',
   app: '/app',

@@ -96,15 +96,18 @@ model Invite {
   id          String   @id @default(cuid())
   token       String   @unique
   companyId   String
-  status      String   @default("pending") // pending|completed|expired
+  status      String   @default("pending") // pending|completed|expired|revoked
   kind        String   @default("driver") // driver | staff
   role        String   @default("driver")
   email       String?
   name        String?
   driverId    String?
+  /// ISO expiry; null = treat as expired only via status
+  expiresAt   String?
   createdAt   String
   completedAt String?
   updatedAt   DateTime @updatedAt
 
   @@index([companyId])
+  @@index([status])
 }

@@ -4,7 +4,8 @@ import { Btn, Inp } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { BrandLogo } from '@/components/brand/BrandLogo';
-import { authApi, setToken, ApiError } from '@/lib/api';
+import { authApi, setTokens, ApiError, type AuthTokens } from '@/lib/api';
+import { PATHS } from '@/lib/paths';
 import type { ThemeMode } from '@/lib/theme';
 import type { AppUser } from '@/context/AppDataContext';
 
@@ -17,6 +18,40 @@ interface LoginScreenProps {
   onRetryApi?: () => void;
 }
 
+type Step =
+  | { kind: 'password' }
+  | { kind: 'mfa'; mfaToken: string }
+  | {
+      kind: 'enroll';
+      mfaToken: string;
+      secret?: string;
+      qr?: string;
+      recovery?: string[];
+    };
+
+function finishSession(
+  res: AuthTokens,
+  onLogin: (user: AppUser) => void,
+) {
+  setTokens(res.accessToken, res.refreshToken || null);
+  if (res.session) {
+    const mins = res.session.idleTimeoutMinutes || 0;
+    if (mins > 0) sessionStorage.setItem('ts_idle_minutes', String(mins));
+    else sessionStorage.removeItem('ts_idle_minutes');
+  }
+  onLogin({
+    id: res.user.id,
+    name: res.user.name,
+    email: res.user.email,
+    role: res.user.role,
+    companyId: res.user.companyId,
+    tenantKey: res.user.tenantKey ?? null,
+    permissions: res.user.permissions ?? [],
+    customRoleId: res.user.customRoleId ?? null,
+    customRoleName: res.user.customRoleName ?? null,
+  });
+}
+
 export function LoginScreen({
   onLogin,
   themeMode,
@@ -27,11 +62,13 @@ export function LoginScreen({
 }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<Step>({ kind: 'password' });
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
   const isDark = themeMode !== 'light';
 
-  const go = async () => {
+  const goPassword = async () => {
     setErr('');
     if (!apiEnabled) {
       setErr(apiError || 'API is offline. Start the backend and try again.');
@@ -40,25 +77,66 @@ export function LoginScreen({
     setLoading(true);
     try {
       const res = await authApi.login(email.trim(), pass.trim());
-      setToken(res.accessToken);
-      if (res.session) {
-        const mins = res.session.idleTimeoutMinutes || 0;
-        if (mins > 0) sessionStorage.setItem('ts_idle_minutes', String(mins));
-        else sessionStorage.removeItem('ts_idle_minutes');
+      if ('mfaRequired' in res && res.mfaRequired) {
+        setStep({ kind: 'mfa', mfaToken: res.mfaToken });
+        setCode('');
+        return;
       }
-      onLogin({
-        id: res.user.id,
-        name: res.user.name,
-        email: res.user.email,
-        role: res.user.role,
-        companyId: res.user.companyId,
-        tenantKey: res.user.tenantKey ?? null,
-        permissions: res.user.permissions ?? [],
-        customRoleId: res.user.customRoleId ?? null,
-        customRoleName: res.user.customRoleName ?? null,
-      });
+      if ('mfaEnrollmentRequired' in res && res.mfaEnrollmentRequired) {
+        const started = await authApi.mfaEnrollLoginStart(res.mfaToken);
+        setStep({
+          kind: 'enroll',
+          mfaToken: started.mfaToken,
+          secret: started.secret,
+          qr: started.qrCodeDataUrl,
+        });
+        setCode('');
+        return;
+      }
+      if ('accessToken' in res) {
+        finishSession(res, onLogin);
+      }
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Invalid email or password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goMfa = async () => {
+    if (step.kind !== 'mfa') return;
+    setErr('');
+    setLoading(true);
+    try {
+      const res = await authApi.mfaChallenge(step.mfaToken, code.trim());
+      finishSession(res, onLogin);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Invalid code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const goEnrollConfirm = async () => {
+    if (step.kind !== 'enroll') return;
+    setErr('');
+    setLoading(true);
+    try {
+      const res = await authApi.mfaEnrollLoginConfirm(
+        step.mfaToken,
+        code.trim(),
+      );
+      if (res.recoveryCodes?.length) {
+        setStep({
+          ...step,
+          recovery: res.recoveryCodes,
+        });
+        setTokens(res.accessToken, res.refreshToken || null);
+        return;
+      }
+      finishSession(res, onLogin);
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Could not enable MFA');
     } finally {
       setLoading(false);
     }
@@ -77,145 +155,195 @@ export function LoginScreen({
         padding: '32px 20px',
         overflow: 'hidden',
         background: isDark
-          ? `radial-gradient(ellipse 80% 60% at 50% -10%, ${G.goldBg} 0%, transparent 55%),
-             radial-gradient(ellipse 50% 40% at 100% 100%, rgba(30,64,175,0.18) 0%, transparent 50%),
-             ${G.bg}`
-          : `radial-gradient(ellipse 80% 55% at 50% -5%, ${G.goldBg} 0%, transparent 50%),
-             linear-gradient(180deg, ${G.card2} 0%, ${G.bg} 100%)`,
+          ? `radial-gradient(1200px 600px at 10% -10%, ${G.gold}22, transparent), ${G.bg}`
+          : G.bg,
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage: isDark
-            ? `linear-gradient(${G.border} 1px, transparent 1px), linear-gradient(90deg, ${G.border} 1px, transparent 1px)`
-            : `linear-gradient(${G.border} 1px, transparent 1px), linear-gradient(90deg, ${G.border} 1px, transparent 1px)`,
-          backgroundSize: '48px 48px',
-          opacity: isDark ? 0.22 : 0.45,
-          pointerEvents: 'none',
-          maskImage: 'radial-gradient(ellipse 70% 65% at 50% 40%, black 20%, transparent 75%)',
-          WebkitMaskImage:
-            'radial-gradient(ellipse 70% 65% at 50% 40%, black 20%, transparent 75%)',
-        }}
-      />
-
-      <div style={{ position: 'absolute', top: SPACE.xl, right: SPACE.xl, zIndex: 2 }}>
+      <div style={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggle mode={themeMode} onToggle={onToggleTheme} />
       </div>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 420,
+          background: G.card,
+          border: `1px solid ${G.border}`,
+          borderRadius: RADIUS.lg,
+          padding: SPACE.xl,
+          boxShadow: G.shadow,
+        }}
+      >
+        <BrandLogo />
+        <h1 style={{ ...TYPE.h2, margin: '20px 0 8px' }}>
+          {step.kind === 'password'
+            ? 'Sign in'
+            : step.kind === 'mfa'
+              ? 'Authenticator code'
+              : step.recovery
+                ? 'Save recovery codes'
+                : 'Set up MFA'}
+        </h1>
+        <p style={{ color: G.muted, fontSize: 13, marginBottom: 20 }}>
+          {step.kind === 'password'
+            ? 'Email and password to continue.'
+            : step.kind === 'mfa'
+              ? 'Enter the 6-digit code from your authenticator app, or a recovery code.'
+              : step.recovery
+                ? 'Store these codes safely. You will need them if you lose your authenticator.'
+                : 'Your company requires MFA. Scan the QR code, then enter a code to finish.'}
+        </p>
+        {err ? <Err msg={err} /> : null}
 
-      <div style={{ width: '100%', maxWidth: 420, position: 'relative', zIndex: 1 }}>
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-            <BrandLogo variant="full" height={44} style={{ maxWidth: 240 }} />
-          </div>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 600,
-              letterSpacing: -0.3,
-              color: G.text,
-              lineHeight: 1.3,
-            }}
-          >
-            Welcome back
-          </h1>
-          <p
-            style={{
-              margin: '8px auto 0',
-              maxWidth: 320,
-              fontSize: 14,
-              lineHeight: 1.55,
-              color: G.muted,
-              fontWeight: 400,
-            }}
-          >
-            Sign in to manage dispatch, tracking, manifests, and trip sheets for your fleet.
-          </p>
-        </div>
-
-        {!apiEnabled && (
-          <div
-            style={{
-              background: G.dangerBg,
-              border: `1px solid ${G.danger}44`,
-              borderRadius: RADIUS.lg,
-              padding: 14,
-              marginBottom: 16,
-              fontSize: 13,
-              color: G.danger,
-              lineHeight: 1.45,
-            }}
-          >
-            {apiError || 'Cannot reach the API gateway.'}
-            {onRetryApi && (
-              <div style={{ marginTop: 10 }}>
-                <Btn size="sm" variant="outline" onClick={onRetryApi}>
-                  Retry connection
-                </Btn>
-              </div>
-            )}
-          </div>
+        {step.kind === 'password' && (
+          <>
+            <Inp
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <Inp
+              label="Password"
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void goPassword()}
+            />
+            <Btn
+              full
+              onClick={() => void goPassword()}
+              disabled={loading || !email.trim() || !pass.trim()}
+            >
+              {loading ? 'Signing in…' : 'Continue'}
+            </Btn>
+            <p style={{ marginTop: 16, fontSize: 13 }}>
+              <a href={PATHS.forgotPassword} style={{ color: G.gold }}>
+                Forgot password?
+              </a>
+            </p>
+          </>
         )}
 
-        <div
-          style={{
-            background: G.card,
-            border: `1px solid ${G.border}`,
-            borderRadius: 18,
-            padding: '28px 26px 24px',
-            boxShadow: G.shadowHover,
-          }}
-        >
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ ...TYPE.cardTitle, color: G.text, fontWeight: 600 }}>Sign in</div>
-            <div style={{ fontSize: 13, color: G.muted, marginTop: 4, lineHeight: 1.4 }}>
-              Use your company email and password to continue.
-            </div>
-          </div>
+        {step.kind === 'mfa' && (
+          <>
+            <Inp
+              label="Authenticator or recovery code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void goMfa()}
+            />
+            <Btn
+              full
+              onClick={() => void goMfa()}
+              disabled={loading || code.trim().length < 4}
+            >
+              {loading ? 'Verifying…' : 'Verify'}
+            </Btn>
+            <Btn
+              full
+              variant="ghost"
+              style={{ marginTop: 8 }}
+              onClick={() => {
+                setStep({ kind: 'password' });
+                setCode('');
+                setErr('');
+              }}
+            >
+              Back
+            </Btn>
+          </>
+        )}
 
-          <Err msg={err} />
-          <Inp
-            label="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-            type="email"
-            autoCapitalize="none"
-            disabled={!apiEnabled}
-          />
-          <Inp
-            label="Password"
-            value={pass}
-            onChange={(e) => setPass(e.target.value)}
-            placeholder="Enter your password"
-            type="password"
-            onKeyDown={(e) => e.key === 'Enter' && void go()}
-            disabled={!apiEnabled}
-          />
+        {step.kind === 'enroll' && !step.recovery && (
+          <>
+            {step.qr ? (
+              <img
+                src={step.qr}
+                alt="MFA QR code"
+                style={{
+                  display: 'block',
+                  margin: '0 auto 12px',
+                  borderRadius: 8,
+                  background: '#fff',
+                }}
+              />
+            ) : null}
+            {step.secret ? (
+              <div
+                style={{
+                  fontSize: 12,
+                  color: G.muted,
+                  wordBreak: 'break-all',
+                  marginBottom: 12,
+                }}
+              >
+                Manual key: <code>{step.secret}</code>
+              </div>
+            ) : null}
+            <Inp
+              label="6-digit code"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void goEnrollConfirm()}
+            />
+            <Btn
+              full
+              onClick={() => void goEnrollConfirm()}
+              disabled={loading || code.trim().length < 6}
+            >
+              {loading ? 'Enabling…' : 'Enable MFA & sign in'}
+            </Btn>
+          </>
+        )}
+
+        {step.kind === 'enroll' && step.recovery && (
+          <>
+            <ul style={{ fontSize: 13, paddingLeft: 18, marginBottom: 16 }}>
+              {step.recovery.map((c) => (
+                <li key={c} style={{ fontFamily: 'monospace' }}>
+                  {c}
+                </li>
+              ))}
+            </ul>
+            <Btn
+              full
+              onClick={() => {
+                const token = localStorage.getItem('ts_token');
+                if (!token) {
+                  setErr('Session missing — sign in again');
+                  setStep({ kind: 'password' });
+                  return;
+                }
+                void authApi.me().then((me) => {
+                  onLogin({
+                    id: me.id,
+                    name: me.name,
+                    email: me.email,
+                    role: me.role,
+                    companyId: me.companyId,
+                    tenantKey: me.tenantKey ?? null,
+                    permissions: me.permissions ?? [],
+                    customRoleId: me.customRoleId ?? null,
+                    customRoleName: me.customRoleName ?? null,
+                  });
+                });
+              }}
+            >
+              I saved my codes — continue
+            </Btn>
+          </>
+        )}
+
+        {!apiEnabled && onRetryApi ? (
           <Btn
             full
-            size="lg"
-            onClick={() => void go()}
-            style={{ marginTop: 10 }}
-            disabled={loading || !apiEnabled}
+            variant="ghost"
+            style={{ marginTop: 12 }}
+            onClick={() => onRetryApi()}
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            Retry API
           </Btn>
-        </div>
-
-        <p
-          style={{
-            margin: '20px 0 0',
-            textAlign: 'center',
-            fontSize: 12,
-            color: G.muted,
-            lineHeight: 1.5,
-          }}
-        >
-          Secured access for authorized Fleetquix operators only.
-        </p>
+        ) : null}
       </div>
     </div>
   );

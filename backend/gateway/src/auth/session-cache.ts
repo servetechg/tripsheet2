@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 export type SessionSnapshot = {
   tokenVersion: number;
   lockedUntil: string | null;
+  status?: string | null;
+  authAllowed?: boolean;
+  sessionActive?: boolean;
 };
 
 interface CacheEntry {
@@ -12,7 +15,7 @@ interface CacheEntry {
 }
 
 /**
- * Short-TTL cache of auth-service tokenVersion / lockout for gateway checks.
+ * Short-TTL cache of auth-service tokenVersion / lockout / session for gateway checks.
  */
 @Injectable()
 export class SessionVersionCache {
@@ -26,22 +29,34 @@ export class SessionVersionCache {
     );
   }
 
-  async get(userId: string, forceRefresh = false): Promise<SessionSnapshot | null> {
+  private cacheKey(userId: string, sessionId?: string | null) {
+    return sessionId ? `${userId}:${sessionId}` : userId;
+  }
+
+  async get(
+    userId: string,
+    forceRefresh = false,
+    sessionId?: string | null,
+  ): Promise<SessionSnapshot | null> {
+    const key = this.cacheKey(userId, sessionId);
     if (!forceRefresh) {
-      const hit = this.cache.get(userId);
+      const hit = this.cache.get(key);
       if (hit && hit.expiresAt > Date.now()) return hit.value;
     } else {
-      this.cache.delete(userId);
+      this.cache.delete(key);
     }
 
     const base =
       this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
-    const key =
+    const apiKey =
       this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
     try {
+      const q = sessionId
+        ? `?sid=${encodeURIComponent(sessionId)}`
+        : '';
       const res = await fetch(
-        `${base.replace(/\/$/, '')}/internal/users/${encodeURIComponent(userId)}/session`,
-        { headers: { 'x-internal-api-key': key } },
+        `${base.replace(/\/$/, '')}/internal/users/${encodeURIComponent(userId)}/session${q}`,
+        { headers: { 'x-internal-api-key': apiKey } },
       );
       if (!res.ok) {
         this.logger.warn(`session lookup failed for ${userId}: HTTP ${res.status}`);
@@ -51,8 +66,17 @@ export class SessionVersionCache {
       const value: SessionSnapshot = {
         tokenVersion: Number(data.tokenVersion ?? 0),
         lockedUntil: data.lockedUntil || null,
+        status: data.status ?? null,
+        sessionActive:
+          data.sessionActive !== undefined ? Boolean(data.sessionActive) : true,
+        authAllowed:
+          data.authAllowed !== undefined
+            ? Boolean(data.authAllowed)
+            : data.status
+              ? data.status === 'active'
+              : true,
       };
-      this.cache.set(userId, { value, expiresAt: Date.now() + this.ttlMs });
+      this.cache.set(key, { value, expiresAt: Date.now() + this.ttlMs });
       return value;
     } catch (e) {
       this.logger.warn(`session lookup error: ${String(e)}`);

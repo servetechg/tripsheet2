@@ -5,6 +5,7 @@ import {
   Headers,
   Param,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -35,9 +36,28 @@ export class InternalAuthController {
   session(
     @Param('id') id: string,
     @Headers('x-internal-api-key') key: string | undefined,
+    @Query('sid') sid?: string,
   ) {
     this.assertKey(key);
-    return this.authService.getSessionSnapshot(id);
+    return this.authService.getSessionSnapshot(id, sid);
+  }
+
+  @Post('security-events')
+  securityEvent(
+    @Headers('x-internal-api-key') key: string | undefined,
+    @Body()
+    body: {
+      type: string;
+      to: string;
+      companyId?: string;
+      userId?: string;
+      detail?: string;
+      ip?: string;
+      userAgent?: string;
+    },
+  ) {
+    this.assertKey(key);
+    return this.authService.ingestSecurityNotify(body);
   }
 
   private assertKey(key: string | undefined) {

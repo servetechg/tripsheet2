@@ -21,6 +21,17 @@ enum Role {
   maintenance_coordinator
 }
 
+/// Chapter 4 account lifecycle. Temporary lockout still uses lockedUntil.
+enum UserStatus {
+  pending
+  invited
+  active
+  inactive
+  suspended
+  locked
+  archived
+}
+
 model User {
   id               String       @id @default(cuid())
   email            String       @unique
@@ -30,14 +41,30 @@ model User {
   companyId        String?
   /// Tenant company_local.CustomRole.id — JWT grants come from that role when set.
   customRoleId     String?
+  status           UserStatus   @default(active)
+  suspendedAt      DateTime?
+  archivedAt       DateTime?
+  /// Soft-delete marker (never hard-delete users with history).
+  deletedAt        DateTime?
   failedLoginCount Int          @default(0)
   lockedUntil      DateTime?
   tokenVersion     Int          @default(0)
+  /// Chapter 4 Phase 5: TOTP MFA
+  mfaEnabled       Boolean      @default(false)
+  /// AES-GCM blob of base32 TOTP secret (pending or active)
+  mfaSecretEnc     String?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   loginEvents      LoginEvent[]
+  passwordResets   PasswordResetToken[]
+  passwordHistory  PasswordHistory[]
+  sessions         Session[]
+  mfaRecoveryCodes MfaRecoveryCode[]
+  securityEvents   SecurityEvent[]
 
   @@index([customRoleId])
+  @@index([companyId, status])
+  @@index([status])
 }
 
 model LoginEvent {
@@ -55,6 +82,83 @@ model LoginEvent {
   @@index([userId, createdAt])
   @@index([companyId, createdAt])
   @@index([email, createdAt])
+}
+
+/// Chapter 4 Phase 2: self-serve password reset (single-use, expiring).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Chapter 4 Phase 3: prior password hashes (never plaintext).
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Chapter 4 Phase 4: refreshable device session (opaque refresh hashed).
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  userAgent        String    @default("")
+  ip               String    @default("")
+  deviceLabel      String    @default("")
+  trusted          Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  revokeReason     String    @default("")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([userId, createdAt])
+  @@index([userId, lastSeenAt])
+}
+
+/// Chapter 4 Phase 5: one-time MFA recovery codes (hashed).
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@unique([userId, codeHash])
+}
+
+/// Chapter 4 Phase 6: security event subset (not full SIEM / impossible-travel).
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  companyId String?
+  type      String
+  severity  String   @default("info")
+  message   String
+  ip        String   @default("")
+  userAgent String   @default("")
+  meta      Json?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([companyId, createdAt])
+  @@index([type, createdAt])
 }
 
 model Permission {

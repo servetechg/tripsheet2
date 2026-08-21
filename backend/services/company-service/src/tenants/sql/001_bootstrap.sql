@@ -157,6 +157,7 @@ CREATE TABLE IF NOT EXISTS driver."Invite" (
   "email" TEXT,
   "name" TEXT,
   "driverId" TEXT,
+  "expiresAt" TEXT,
   "createdAt" TEXT NOT NULL DEFAULT '',
   "completedAt" TEXT,
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()

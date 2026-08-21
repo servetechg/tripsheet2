@@ -57,6 +57,70 @@ function LoginHistoryList({ companyId }: { companyId: string }) {
   );
 }
 
+function SecurityEventsList({ companyId }: { companyId: string }) {
+  const [rows, setRows] = useState<
+    Array<{
+      id: string;
+      type: string;
+      severity: string;
+      message: string;
+      ip: string;
+      createdAt: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    void authApi
+      .securityEvents({ scope: 'company', limit: 30, companyId })
+      .then(setRows)
+      .catch(() => setRows([]));
+  }, [companyId]);
+
+  if (!rows.length) {
+    return (
+      <div style={{ color: G.muted, fontSize: 13 }}>
+        No security events yet. Logins, password changes, lockouts, role
+        changes, MFA disable, and invite acceptance are recorded here and
+        queued as email notifications when the notification service is
+        configured.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {rows.map((r) => (
+        <div
+          key={r.id}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 12,
+            fontSize: 12,
+          }}
+        >
+          <span>
+            <span
+              style={{
+                color: r.severity === 'warning' ? G.danger : G.muted,
+              }}
+            >
+              {r.type.replace('security.', '')}
+            </span>
+            {' · '}
+            {r.message.slice(0, 90)}
+            {r.message.length > 90 ? '…' : ''}
+            {r.ip ? ` · ${r.ip}` : ''}
+          </span>
+          <span style={{ color: G.muted, flexShrink: 0 }}>
+            {new Date(r.createdAt).toLocaleString()}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type Sub =
   | 'profile'
   | 'settings'
@@ -113,9 +177,22 @@ export function CompanySettingsTab({
   });
   const [inviteLink, setInviteLink] = useState('');
   const [inviteBusy, setInviteBusy] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDto[]>([]);
 
   const cid = company.id;
+
+  const reloadInvites = () =>
+    invitesApi
+      .list(cid)
+      .then((rows) =>
+        setPendingInvites(
+          (rows || []).filter(
+            (i: any) => i.status === 'pending' || i.status === 'expired',
+          ),
+        ),
+      )
+      .catch(() => setPendingInvites([]));
 
   const reload = async () => {
     if (!apiEnabled || !cid) return;
@@ -152,6 +229,7 @@ export function CompanySettingsTab({
   useEffect(() => {
     if ((sub !== 'users' && sub !== 'roles') || !apiEnabled || !cid) return;
     void authApi.listUsers(cid).then(setStaff).catch(() => setStaff([]));
+    void reloadInvites();
     void companiesApi
       .listCustomRoles(cid)
       .then(setCustomRoles)
@@ -285,6 +363,7 @@ export function CompanySettingsTab({
                       setInviteLink(link);
                       notify(`Invite created for ${inviteForm.role}`);
                       void refreshAll?.(cid);
+                      void reloadInvites();
                       return authApi.listUsers(cid).then(setStaff);
                     })
                     .catch((err: any) =>
@@ -302,6 +381,81 @@ export function CompanySettingsTab({
               )}
             </>
           )}
+          {pendingInvites.length > 0 && (
+            <>
+              <Divider />
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                Pending invites
+              </div>
+              {pendingInvites.map((inv) => (
+                <div
+                  key={inv.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: 12,
+                    marginBottom: 8,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span>
+                    {inv.email || '—'} · {inv.kind}/{inv.role} · {inv.status}
+                    {inv.expiresAt ? (
+                      <span style={{ color: G.muted }}>
+                        {' '}
+                        · expires {new Date(inv.expiresAt).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {can('users.create') && inv.status === 'pending' && (
+                      <Btn
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          void invitesApi
+                            .revoke(inv.id)
+                            .then(() => reloadInvites())
+                            .then(() => notify('Invite revoked'))
+                            .catch((err: any) =>
+                              notify(err?.message || 'Revoke failed', 'error'),
+                            );
+                        }}
+                      >
+                        Revoke
+                      </Btn>
+                    )}
+                    {can('users.create') && (
+                      <Btn
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          void invitesApi
+                            .regenerate(inv.id)
+                            .then((created) => {
+                              const link = `${window.location.origin}/invite?invite=${encodeURIComponent(created.token)}`;
+                              setInviteLink(link);
+                              return reloadInvites();
+                            })
+                            .then(() => notify('Invite regenerated'))
+                            .catch((err: any) =>
+                              notify(
+                                err?.message || 'Regenerate failed',
+                                'error',
+                              ),
+                            );
+                        }}
+                      >
+                        Resend
+                      </Btn>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
           <Divider />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {staff.map((u) => {
@@ -310,6 +464,8 @@ export function CompanySettingsTab({
               const value = u.customRoleId
                 ? `custom:${u.customRoleId}`
                 : `sys:${u.role}`;
+              const st = u.status || 'active';
+              const canStatus = can('users.suspend') && !isSuperAdminRole(u.role);
               return (
                 <div
                   key={u.id}
@@ -319,10 +475,23 @@ export function CompanySettingsTab({
                     alignItems: 'center',
                     gap: 12,
                     fontSize: 13,
+                    flexWrap: 'wrap',
                   }}
                 >
                   <span>
-                    {u.name} · {u.email}
+                    {u.name} · {u.email}{' '}
+                    <Pill
+                      small
+                      color={
+                        st === 'active'
+                          ? G.success
+                          : st === 'suspended' || st === 'locked'
+                            ? G.danger
+                            : G.muted
+                      }
+                    >
+                      {st}
+                    </Pill>
                     {u.customRoleName ? (
                       <span style={{ color: G.muted }}>
                         {' '}
@@ -330,6 +499,14 @@ export function CompanySettingsTab({
                       </span>
                     ) : null}
                   </span>
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                    }}
+                  >
                   {can('users.assign_role') && !locked ? (
                     <Sel
                       value={value}
@@ -392,6 +569,127 @@ export function CompanySettingsTab({
                         u.role}
                     </span>
                   )}
+                  {canStatus && st === 'active' && (
+                    <Btn
+                      variant="ghost"
+                      size="sm"
+                      style={{ marginBottom: 0, fontSize: 12 }}
+                      onClick={() => {
+                        void authApi
+                          .setUserStatus(u.id, 'suspended')
+                          .then(() => authApi.listUsers(cid).then(setStaff))
+                          .then(() =>
+                            notify(
+                              'User suspended. Active sessions are revoked.',
+                            ),
+                          )
+                          .catch((err: any) =>
+                            notify(err?.message || 'Suspend failed', 'error'),
+                          );
+                      }}
+                    >
+                      Suspend
+                    </Btn>
+                  )}
+                  {canStatus && st === 'active' && (
+                    <Btn
+                      variant="ghost"
+                      size="sm"
+                      style={{ marginBottom: 0, fontSize: 12 }}
+                      onClick={() => {
+                        void authApi
+                          .setUserStatus(u.id, 'locked')
+                          .then(() => authApi.listUsers(cid).then(setStaff))
+                          .then(() =>
+                            notify(
+                              'User locked. Active sessions are revoked.',
+                            ),
+                          )
+                          .catch((err: any) =>
+                            notify(err?.message || 'Lock failed', 'error'),
+                          );
+                      }}
+                    >
+                      Lock
+                    </Btn>
+                  )}
+                  {canStatus &&
+                    (st === 'locked' ||
+                      (st === 'active' &&
+                        u.lockedUntil &&
+                        new Date(u.lockedUntil).getTime() > Date.now())) && (
+                      <Btn
+                        variant="ghost"
+                        size="sm"
+                        style={{ marginBottom: 0, fontSize: 12 }}
+                        onClick={() => {
+                          void authApi
+                            .unlockUser(u.id)
+                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() =>
+                              notify(
+                                'User unlocked. Temporary lockout cleared.',
+                              ),
+                            )
+                            .catch((err: any) =>
+                              notify(
+                                err?.message || 'Unlock failed',
+                                'error',
+                              ),
+                            );
+                        }}
+                      >
+                        Unlock
+                      </Btn>
+                    )}
+                  {canStatus &&
+                    (st === 'suspended' || st === 'inactive') && (
+                      <Btn
+                        variant="ghost"
+                        size="sm"
+                        style={{ marginBottom: 0, fontSize: 12 }}
+                        onClick={() => {
+                          void authApi
+                            .setUserStatus(u.id, 'active')
+                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => notify('User reactivated'))
+                            .catch((err: any) =>
+                              notify(
+                                err?.message || 'Reactivate failed',
+                                'error',
+                              ),
+                            );
+                        }}
+                      >
+                        Reactivate
+                      </Btn>
+                    )}
+                  {canStatus && st !== 'archived' && !locked && (
+                    <Btn
+                      variant="danger"
+                      size="sm"
+                      style={{ marginBottom: 0, fontSize: 12 }}
+                      onClick={() => {
+                        if (
+                          !window.confirm(
+                            `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
+                          )
+                        ) {
+                          return;
+                        }
+                        void authApi
+                          .setUserStatus(u.id, 'archived')
+                          .then(() => authApi.listUsers(cid).then(setStaff))
+                          .then(() => notify('User archived'))
+                          .catch((err: any) =>
+                            notify(err?.message || 'Archive failed', 'error'),
+                          );
+                      }}
+                    >
+                      Archive
+                    </Btn>
+                  )}
+                  </div>
                 </div>
               );
             })}
@@ -891,8 +1189,14 @@ export function CompanySettingsTab({
           <SectionTitle>Security policy</SectionTitle>
           <div style={{ color: G.muted, fontSize: 13, marginBottom: 16 }}>
             New and changed passwords follow this policy. Existing logins
-            (including seed passwords) keep working until the user changes
-            them. MFA is stored as a flag only — TOTP is not shipped.
+            (including seed passwords like admin123) keep working until the
+            user changes them. Complexity adds Chapter 4 rules: 12+, upper,
+            lower, number, special character, and no name/email. Access JWTs
+            are short-lived; refresh tokens last for Session days. Idle
+            timeout applies on refresh (server) and optionally in the browser.
+            Require MFA enforces TOTP authenticator enrollment at login (User
+            menu → Authenticator). SSO / Entra / SAML are not available in this
+            release.
           </div>
           <G2 cols={3}>
             <Inp
@@ -902,6 +1206,16 @@ export function CompanySettingsTab({
                 setSecurity((s: any) => ({
                   ...s,
                   passwordMinLength: Number(e.target.value) || 8,
+                }))
+              }
+            />
+            <Inp
+              label="Password history (0 = off)"
+              value={String(security.passwordHistoryCount ?? 10)}
+              onChange={(e) =>
+                setSecurity((s: any) => ({
+                  ...s,
+                  passwordHistoryCount: Number(e.target.value) || 0,
                 }))
               }
             />
@@ -922,6 +1236,16 @@ export function CompanySettingsTab({
                 setSecurity((s: any) => ({
                   ...s,
                   idleTimeoutMinutes: Number(e.target.value) || 0,
+                }))
+              }
+            />
+            <Inp
+              label="Invite link TTL (days)"
+              value={String(security.inviteTtlDays ?? 7)}
+              onChange={(e) =>
+                setSecurity((s: any) => ({
+                  ...s,
+                  inviteTtlDays: Number(e.target.value) || 7,
                 }))
               }
             />
@@ -956,7 +1280,8 @@ export function CompanySettingsTab({
                   }))
                 }
               />{' '}
-              Require complexity (12+ / upper / lower / number)
+              Require complexity (12+ / upper / lower / number / special / no
+              name-email)
             </label>
             <label style={{ fontSize: 12, color: G.muted, paddingTop: 22 }}>
               <input
@@ -969,7 +1294,7 @@ export function CompanySettingsTab({
                   }))
                 }
               />{' '}
-              Require MFA (flag only — does not block login)
+              Require MFA (authenticator at login)
             </label>
           </G2>
           <Btn
@@ -987,12 +1312,24 @@ export function CompanySettingsTab({
           <Divider />
           <SectionTitle>Login history</SectionTitle>
           <LoginHistoryList companyId={cid} />
+          <Divider />
+          <SectionTitle>Security events</SectionTitle>
+          <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
+            Subset of Chapter 4 security hooks (not impossible-travel). Email
+            notifications are queued when NOTIFICATION_SERVICE_URL is set.
+          </div>
+          <SecurityEventsList companyId={cid} />
         </Card>
       )}
 
       {sub === 'notifications' && (
         <Card>
           <SectionTitle>Admin notification rules</SectionTitle>
+          <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
+            Includes security.* rules (login, password, role, MFA, invite,
+            lockout) seeded for each company. Delivery remains a queue until
+            SMTP is configured.
+          </div>
           {rules.map((r) => (
             <div
               key={r.id}

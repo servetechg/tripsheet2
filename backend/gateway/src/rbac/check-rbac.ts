@@ -70,9 +70,39 @@ expectDeny(
 );
 expectAllow('POST', '/api/companies/c1/custom-roles', 'company_owner', []);
 
+expectAllow('POST', '/api/auth/forgot-password', '');
+expectAllow('POST', '/api/auth/reset-password', '');
+expectAllow('POST', '/api/auth/refresh', '');
+expectAllow('POST', '/api/auth/mfa/challenge', '');
+expectAllow('POST', '/api/auth/mfa/enroll-login/start', '');
+expectAllow('POST', '/api/auth/mfa/enroll-login/confirm', '');
+expectAllow(
+  'POST',
+  '/api/auth/users/u1/unlock',
+  'company_owner',
+  ['users.suspend'],
+);
+expectDeny(
+  'POST',
+  '/api/auth/users/u1/unlock',
+  'dispatcher',
+  ['users.view', 'users.create'],
+);
 expectAllow('POST', '/api/auth/change-password', 'dispatcher', ['dispatch.view']);
 expectAllow('POST', '/api/auth/logout-all', 'accountant', ['accounting.view']);
 expectAllow('GET', '/api/auth/login-history', 'dispatcher', ['dispatch.view']);
+expectAllow(
+  'PATCH',
+  '/api/auth/users/u1',
+  'hr_manager',
+  ['users.suspend'],
+);
+expectDeny(
+  'PATCH',
+  '/api/auth/users/u1',
+  'dispatcher',
+  ['dispatch.view', 'dispatch.create'],
+);
 
 expectAllow('GET', '/api/loads', 'driver', ['dispatch.view']);
 expectDeny('POST', '/api/loads', 'driver', ['dispatch.view', 'payroll.view']);

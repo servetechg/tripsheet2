@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import type { ThemeMode } from '@/lib/theme';
 import { Icons } from '@/components/ui/Icons';
-import { authApi, setToken, ApiError } from '@/lib/api';
+import { authApi, setTokens, ApiError } from '@/lib/api';
 import { useSession } from '@/context/SessionContext';
+import { SessionsDevicesPanel } from '@/features/auth/SessionsDevicesPanel';
+import { MfaSettingsPanel } from '@/features/auth/MfaSettingsPanel';
 
 type UserMenuProps = {
   name?: string;
@@ -38,6 +40,8 @@ export function UserMenu({
   const [newPassword, setNewPassword] = useState('');
   const [pwErr, setPwErr] = useState('');
   const [pwBusy, setPwBusy] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
   const { logout } = useSession();
   const rootRef = useRef<HTMLDivElement>(null);
   const displayName = name || companyLabel || 'Admin';
@@ -207,6 +211,40 @@ export function UserMenu({
             )}
           </div>
 
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              setMfaOpen(true);
+            }}
+          >
+            <span>Authenticator (MFA)</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              setSessionsOpen(true);
+            }}
+          >
+            <span>Sessions & devices</span>
+          </button>
           <button
             type="button"
             role="menuitem"
@@ -390,7 +428,7 @@ export function UserMenu({
                   void authApi
                     .changePassword({ currentPassword, newPassword })
                     .then((res) => {
-                      setToken(res.accessToken);
+                      setTokens(res.accessToken, res.refreshToken || null);
                       setPwOpen(false);
                     })
                     .catch((e) => {
@@ -415,6 +453,11 @@ export function UserMenu({
           </div>
         </div>
       )}
+
+      {sessionsOpen && (
+        <SessionsDevicesPanel onClose={() => setSessionsOpen(false)} />
+      )}
+      {mfaOpen && <MfaSettingsPanel onClose={() => setMfaOpen(false)} />}
 
       <style>{`
         @media (min-width: 640px) {
