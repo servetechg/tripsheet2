@@ -38,4 +38,9 @@ export class UpdateUserDto {
   @ValidateIf((_, v) => v !== null)
   @IsString()
   customRoleId?: string | null;
+
+  /** Chapter 4 lifecycle: active | inactive | suspended | locked | archived */
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

@@ -15,19 +15,64 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  const refresh = localStorage.getItem('ts_refresh');
+  if (!refresh) return false;
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${BASE}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: refresh }),
+        });
+        if (!res.ok) return false;
+        const body = (await res.json()) as {
+          accessToken?: string;
+          refreshToken?: string;
+        };
+        if (!body.accessToken || !body.refreshToken) return false;
+        setTokens(body.accessToken, body.refreshToken);
+        return true;
+      } catch {
+        return false;
+      } finally {
+        refreshInFlight = null;
+      }
+    })();
+  }
+  return refreshInFlight;
+}
+
 export async function api<T>(
   path: string,
-  options: RequestInit = {},
+  options: RequestInit & { skipAuthRefresh?: boolean } = {},
 ): Promise<T> {
+  const { skipAuthRefresh, ...init } = options;
   const res = await fetch(`${BASE}${path}`, {
-    ...options,
+    ...init,
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders(),
-      ...(options.headers ?? {}),
+      ...(init.headers ?? {}),
     },
   });
   if (!res.ok) {
+    const isAuthPath =
+      path.startsWith('/auth/login') ||
+      path.startsWith('/auth/refresh') ||
+      path.startsWith('/auth/mfa/challenge') ||
+      path.startsWith('/auth/mfa/enroll-login') ||
+      path.startsWith('/auth/forgot-password') ||
+      path.startsWith('/auth/reset-password');
+    if (res.status === 401 && !skipAuthRefresh && !isAuthPath) {
+      const ok = await tryRefreshAccessToken();
+      if (ok) {
+        return api<T>(path, { ...options, skipAuthRefresh: true });
+      }
+    }
     let body: unknown = null;
     const text = await res.text().catch(() => res.statusText);
     try {
@@ -36,7 +81,7 @@ export async function api<T>(
       body = text;
     }
     if (res.status === 401) {
-      localStorage.removeItem('ts_token');
+      clearTokens();
       window.dispatchEvent(new Event('ts:auth-expired'));
     }
     const msg =
@@ -62,12 +107,58 @@ export async function pingApi(): Promise<boolean> {
 }
 
 export type SessionDto = {
+  id?: string;
   sessionDays: number;
+  accessTokenMinutes?: number;
   idleTimeoutMinutes: number;
-  passwordPolicy?: { minLength: number; complexity: boolean; hint: string };
+  passwordPolicy?: {
+    minLength: number;
+    complexity: boolean;
+    historyCount?: number;
+    hint: string;
+  };
   mfaRequired: boolean;
-  mfaFlag: boolean;
+  mfaEnabled?: boolean;
+  /** Company policy: MFA enrollment required at login. */
+  requireMfa: boolean;
+  idleNote?: string;
 };
+
+export type DeviceSessionDto = {
+  id: string;
+  deviceLabel: string;
+  userAgent: string;
+  ip: string;
+  trusted: boolean;
+  current: boolean;
+  active: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  revokeReason: string;
+};
+
+export type AuthTokens = {
+  accessToken: string;
+  refreshToken?: string;
+  user: AuthUserDto;
+  session?: SessionDto;
+  recoveryCodes?: string[];
+};
+
+export type LoginResult =
+  | AuthTokens
+  | {
+      mfaRequired: true;
+      mfaToken: string;
+      message?: string;
+    }
+  | {
+      mfaEnrollmentRequired: true;
+      mfaToken: string;
+      message?: string;
+    };
 
 export type AuthUserDto = {
   id: string;
@@ -75,10 +166,15 @@ export type AuthUserDto = {
   name: string;
   role: string;
   companyId: string | null;
+  status?: string;
+  lockedUntil?: string | null;
+  suspendedAt?: string | null;
+  archivedAt?: string | null;
   tenantKey?: string | null;
   permissions?: string[];
   customRoleId?: string | null;
   customRoleName?: string | null;
+  mfaEnabled?: boolean;
   session?: SessionDto;
   createdAt?: string;
   updatedAt?: string;
@@ -86,20 +182,121 @@ export type AuthUserDto = {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    api<{ accessToken: string; user: AuthUserDto; session?: SessionDto }>(
-      '/auth/login',
+    api<LoginResult>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+  me: () => api<AuthUserDto>('/auth/me'),
+  mfaChallenge: (mfaToken: string, code: string) =>
+    api<AuthTokens>('/auth/mfa/challenge', {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken, code }),
+      skipAuthRefresh: true,
+    }),
+  mfaEnrollLoginStart: (mfaToken: string) =>
+    api<{
+      secret: string;
+      otpauthUrl: string;
+      qrCodeDataUrl?: string;
+      mfaToken: string;
+      message?: string;
+    }>('/auth/mfa/enroll-login/start', {
+      method: 'POST',
+      body: JSON.stringify({ mfaToken }),
+      skipAuthRefresh: true,
+    }),
+  mfaEnrollLoginConfirm: (mfaToken: string, code: string) =>
+    api<AuthTokens & { recoveryCodes?: string[] }>(
+      '/auth/mfa/enroll-login/confirm',
       {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ mfaToken, code }),
+        skipAuthRefresh: true,
       },
     ),
-  me: () => api<AuthUserDto>('/auth/me'),
-  changePassword: (body: { currentPassword: string; newPassword: string }) =>
-    api<{ accessToken: string; user: AuthUserDto; session?: SessionDto }>(
-      '/auth/change-password',
-      { method: 'POST', body: JSON.stringify(body) },
+  mfaStatus: () =>
+    api<{
+      mfaEnabled: boolean;
+      recoveryCodesRemaining: number;
+      companyRequiresMfa: boolean;
+    }>('/auth/mfa/status'),
+  mfaEnrollStart: () =>
+    api<{
+      secret: string;
+      otpauthUrl: string;
+      qrCodeDataUrl?: string;
+      message?: string;
+    }>('/auth/mfa/enroll/start', { method: 'POST', body: '{}' }),
+  mfaEnrollConfirm: (code: string, password?: string) =>
+    api<{
+      ok: boolean;
+      mfaEnabled: boolean;
+      recoveryCodes: string[];
+      message?: string;
+    }>('/auth/mfa/enroll/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ code, password }),
+    }),
+  mfaDisable: (password: string, code: string) =>
+    api<{ ok: boolean; mfaEnabled: boolean }>('/auth/mfa/disable', {
+      method: 'POST',
+      body: JSON.stringify({ password, code }),
+    }),
+  mfaRegenerateRecovery: (password: string, code: string) =>
+    api<{ ok: boolean; recoveryCodes: string[]; message?: string }>(
+      '/auth/mfa/recovery/regenerate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ password, code }),
+      },
     ),
+  changePassword: (body: { currentPassword: string; newPassword: string }) =>
+    api<AuthTokens>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  logout: (refreshToken?: string) =>
+    api<{ ok: boolean }>('/auth/logout', {
+      method: 'POST',
+      body: JSON.stringify(refreshToken ? { refreshToken } : {}),
+    }),
   logoutAll: () => api<{ ok: boolean }>('/auth/logout-all', { method: 'POST' }),
+  sessionHistory: (limit = 40) =>
+    api<{
+      sessions: DeviceSessionDto[];
+      loginEvents: Array<{
+        id: string;
+        success: boolean;
+        reason: string;
+        ip: string;
+        userAgent: string;
+        createdAt: string;
+      }>;
+      idleNote: string;
+    }>(`/auth/sessions/history?limit=${limit}`),
+  patchSession: (
+    id: string,
+    body: { deviceLabel?: string; trusted?: boolean },
+  ) =>
+    api<{ id: string; deviceLabel: string; trusted: boolean }>(
+      `/auth/sessions/${id}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  revokeSession: (id: string) =>
+    api<{ ok: boolean }>(`/auth/sessions/${id}/revoke`, {
+      method: 'POST',
+      body: '{}',
+    }),
+  forgotPassword: (email: string) =>
+    api<{ ok: boolean; message?: string; resetUrl?: string }>(
+      '/auth/forgot-password',
+      { method: 'POST', body: JSON.stringify({ email }) },
+    ),
+  resetPassword: (token: string, newPassword: string) =>
+    api<{ ok: boolean; message?: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, newPassword }),
+    }),
   loginHistory: (opts?: {
     userId?: string;
     scope?: 'company';
@@ -127,6 +324,28 @@ export const authApi = {
       }>
     >(`/auth/login-history${suffix}`);
   },
+  securityEvents: (opts?: {
+    scope?: 'self' | 'company';
+    limit?: number;
+    companyId?: string;
+  }) => {
+    const q = new URLSearchParams();
+    if (opts?.scope) q.set('scope', opts.scope);
+    if (opts?.limit) q.set('limit', String(opts.limit));
+    if (opts?.companyId) q.set('companyId', opts.companyId);
+    const suffix = q.toString() ? `?${q}` : '';
+    return api<
+      Array<{
+        id: string;
+        type: string;
+        severity: string;
+        message: string;
+        ip: string;
+        createdAt: string;
+        userId?: string | null;
+      }>
+    >(`/auth/security-events${suffix}`);
+  },
   listUsers: (companyId?: string) =>
     api<AuthUserDto[]>(
       companyId
@@ -148,6 +367,19 @@ export const authApi = {
     api<AuthUserDto>(`/auth/users/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(body),
+    }),
+  setUserStatus: (
+    id: string,
+    status: 'active' | 'inactive' | 'suspended' | 'locked' | 'archived',
+  ) =>
+    api<AuthUserDto>(`/auth/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+  unlockUser: (id: string) =>
+    api<AuthUserDto>(`/auth/users/${id}/unlock`, {
+      method: 'POST',
+      body: '{}',
     }),
   listRoles: () =>
     api<
@@ -420,6 +652,10 @@ export const invitesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  revoke: (id: string) =>
+    api<any>(`/invites/${id}/revoke`, { method: 'POST', body: '{}' }),
+  regenerate: (id: string) =>
+    api<any>(`/invites/${id}/regenerate`, { method: 'POST', body: '{}' }),
 };
 
 export const assetsApi = {
@@ -638,13 +874,33 @@ export const notificationsApi = {
     }),
 };
 
+export function setTokens(access: string | null, refresh?: string | null) {
+  if (access) localStorage.setItem('ts_token', access);
+  else localStorage.removeItem('ts_token');
+  if (refresh) localStorage.setItem('ts_refresh', refresh);
+  else if (refresh === null) localStorage.removeItem('ts_refresh');
+}
+
+export function clearTokens() {
+  localStorage.removeItem('ts_token');
+  localStorage.removeItem('ts_refresh');
+}
+
+/** @deprecated prefer setTokens */
 export function setToken(token: string | null) {
   if (token) localStorage.setItem('ts_token', token);
-  else localStorage.removeItem('ts_token');
+  else {
+    localStorage.removeItem('ts_token');
+    localStorage.removeItem('ts_refresh');
+  }
 }
 
 export function getToken() {
   return localStorage.getItem('ts_token');
+}
+
+export function getRefreshToken() {
+  return localStorage.getItem('ts_refresh');
 }
 
 export { BASE as API_BASE };

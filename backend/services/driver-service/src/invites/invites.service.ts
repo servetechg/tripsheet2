@@ -30,6 +30,12 @@ export class InvitesService {
     return this.prisma.invite.findMany({
       where: companyId ? { companyId } : undefined,
       orderBy: { updatedAt: 'desc' },
+    }).then(async (rows) => {
+      const out: typeof rows = [];
+      for (const row of rows) {
+        out.push(await this.refreshExpiry(row));
+      }
+      return out;
     });
   }
 
@@ -48,8 +54,12 @@ export class InvitesService {
       assertPermission('drivers.invite');
     }
 
+    const ttlDays = await this.fetchInviteTtlDays(dto.companyId);
     const token = randomBytes(16).toString('hex');
     const createdAt = new Date().toISOString();
+    const expiresAt = new Date(
+      Date.now() + ttlDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
     const invite = await this.prisma.invite.create({
       data: {
         token,
@@ -60,10 +70,11 @@ export class InvitesService {
         email: dto.email?.trim().toLowerCase() || null,
         name: dto.name?.trim() || null,
         createdAt,
+        expiresAt,
       },
     });
 
-    if (kind === 'staff' && invite.email) {
+    if (invite.email) {
       void this.queueInviteEmail(invite);
     }
     return invite;
@@ -71,11 +82,15 @@ export class InvitesService {
 
   async findByToken(token: string) {
     const invite = await this.prisma.invite.findUnique({ where: { token } });
-    if (!invite || invite.status !== 'pending') {
+    if (!invite) {
+      throw new NotFoundException('Invite not found or no longer pending');
+    }
+    const fresh = await this.refreshExpiry(invite);
+    if (fresh.status !== 'pending') {
       throw new NotFoundException('Invite not found or no longer pending');
     }
     const passwordPolicy = await this.fetchPasswordPolicy(invite.companyId);
-    return { ...invite, passwordPolicy };
+    return { ...fresh, passwordPolicy };
   }
 
   async complete(token: string, dto: CompleteInviteDto) {
@@ -83,9 +98,10 @@ export class InvitesService {
     if (!invite) {
       throw new NotFoundException(`Invite ${token} not found`);
     }
-    if (invite.status !== 'pending') {
+    const fresh = await this.refreshExpiry(invite);
+    if (fresh.status !== 'pending') {
       throw new BadRequestException(
-        `This invite is already ${invite.status}. Ask your admin for a new link.`,
+        `This invite is already ${fresh.status}. Ask your admin for a new link.`,
       );
     }
 
@@ -261,6 +277,12 @@ export class InvitesService {
         });
       });
 
+      void this.queueInviteAcceptedNotify({
+        companyId: invite.companyId,
+        email,
+        role: 'driver',
+        kind: 'driver',
+      });
       return { driver: result };
     } catch (err) {
       if (
@@ -411,7 +433,93 @@ export class InvitesService {
         name: dto.profile.name.trim(),
       },
     });
+    void this.queueInviteAcceptedNotify({
+      companyId: invite.companyId,
+      email,
+      role: invite.role,
+      kind: 'staff',
+    });
     return { ok: true, userId, role: invite.role, kind: 'staff' };
+  }
+
+  async revoke(id: string) {
+    const invite = await this.prisma.invite.findUnique({ where: { id } });
+    if (!invite) throw new NotFoundException('Invite not found');
+    if (invite.status === 'completed') {
+      throw new BadRequestException('Completed invites cannot be revoked');
+    }
+    if (invite.kind === 'driver') {
+      assertPermission('drivers.invite');
+    } else {
+      assertPermission('users.create');
+      assertPermission('users.assign_role');
+    }
+    return this.prisma.invite.update({
+      where: { id },
+      data: { status: 'revoked' },
+    });
+  }
+
+  async regenerate(id: string) {
+    const existing = await this.prisma.invite.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Invite not found');
+    if (existing.status === 'completed') {
+      throw new BadRequestException('Completed invites cannot be regenerated');
+    }
+    if (existing.kind === 'staff') {
+      assertPermission('users.create');
+      assertPermission('users.assign_role');
+    } else {
+      assertPermission('drivers.invite');
+    }
+    if (existing.status === 'pending') {
+      await this.prisma.invite.update({
+        where: { id },
+        data: { status: 'revoked' },
+      });
+    }
+    return this.create({
+      companyId: existing.companyId,
+      kind: existing.kind === 'staff' ? 'staff' : 'driver',
+      role: existing.role,
+      email: existing.email || undefined,
+      name: existing.name || undefined,
+    });
+  }
+
+  private async refreshExpiry<
+    T extends { id: string; status: string; expiresAt: string | null },
+  >(invite: T): Promise<T> {
+    if (invite.status !== 'pending') return invite;
+    if (invite.expiresAt && Date.parse(invite.expiresAt) <= Date.now()) {
+      const updated = await this.prisma.invite.update({
+        where: { id: invite.id },
+        data: { status: 'expired' },
+      });
+      return updated as unknown as T;
+    }
+    return invite;
+  }
+
+  private async fetchInviteTtlDays(companyId: string): Promise<number> {
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/internal/tenants/${encodeURIComponent(companyId)}/security-policy`,
+        { headers: { 'x-internal-api-key': key } },
+      );
+      if (!res.ok) return 7;
+      const row = (await res.json()) as { inviteTtlDays?: number };
+      const n = Number(row.inviteTtlDays);
+      if (!Number.isFinite(n)) return 7;
+      return Math.min(90, Math.max(1, Math.trunc(n)));
+    } catch {
+      return 7;
+    }
   }
 
   private async queueInviteEmail(invite: {
@@ -445,6 +553,35 @@ export class InvitesService {
     }
   }
 
+  private async queueInviteAcceptedNotify(input: {
+    companyId: string;
+    email: string;
+    role: string;
+    kind: string;
+  }) {
+    const authUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      await fetch(`${authUrl.replace(/\/$/, '')}/internal/security-events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': key,
+        },
+        body: JSON.stringify({
+          type: 'security.invite_accepted',
+          to: input.email,
+          companyId: input.companyId,
+          detail: `Role: ${input.role} (${input.kind}).`,
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(`invite accepted security notify failed: ${String(e)}`);
+    }
+  }
+
   private async fetchPasswordPolicy(companyId: string) {
     const base =
       this.config.get<string>('COMPANY_SERVICE_URL') ||
@@ -468,7 +605,7 @@ export class InvitesService {
         minLength,
         complexity,
         hint: complexity
-          ? `At least ${minLength} characters, with upper, lower, and a number`
+          ? `At least ${minLength} characters, with upper, lower, a number, and a special character (not your name or email)`
           : `At least ${minLength} characters`,
       };
     } catch (e) {

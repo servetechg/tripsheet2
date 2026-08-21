@@ -15,6 +15,9 @@
     "test:rbac:live": "ts-node --transpile-only scripts/rbac/personas.test.ts",
     "test:rbac:live:keep": "ts-node --transpile-only scripts/rbac/personas.test.ts --keep",
     "test:rbac:live:existing": "ts-node --transpile-only scripts/rbac/personas.test.ts --existing",
+    "test:auth:live": "ts-node --transpile-only scripts/auth/chapter4.test.ts",
+    "test:auth:live:keep": "ts-node --transpile-only scripts/auth/chapter4.test.ts --keep",
+    "test:auth:live:existing": "ts-node --transpile-only scripts/auth/chapter4.test.ts --existing",
     "test:load": "ts-node --transpile-only scripts/multi-tenant/load.test.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },

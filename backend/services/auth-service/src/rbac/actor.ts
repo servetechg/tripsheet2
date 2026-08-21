@@ -7,6 +7,7 @@ export type JwtActor = {
   role?: string;
   permissions?: string[];
   companyId?: string | null;
+  sid?: string;
 };
 
 export function isPrivilegedActor(role: string | undefined) {

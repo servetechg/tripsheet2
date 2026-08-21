@@ -92,6 +92,39 @@ export class TenantLocalService {
     }
   }
 
+  /** Ensure invite TTL policy + Invite.expiresAt. */
+  async ensureInviteLifecycleSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('006_invite_lifecycle.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Ensure password history count on SecurityPolicy. */
+  async ensurePasswordPolicySchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('007_password_policy.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Ensure default security notification rules. */
+  async ensureSecurityNotificationsSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('008_security_notifications.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
   private loadSql(name: string): string {
     const candidates = [
       join(__dirname, '..', 'tenants', 'sql', name),
@@ -450,6 +483,8 @@ export class TenantLocalService {
   async getSecurityPolicy(companyId: string) {
     await this.ensurePhase5Schema(companyId);
     await this.ensureAuthHardeningSchema(companyId);
+    await this.ensureInviteLifecycleSchema(companyId);
+    await this.ensurePasswordPolicySchema(companyId);
     const c = await this.tenantClient(companyId);
     try {
       let res = await c.query(
@@ -488,6 +523,8 @@ export class TenantLocalService {
            "lockoutThreshold"=COALESCE($7,"lockoutThreshold"),
            "lockoutMinutes"=COALESCE($8,"lockoutMinutes"),
            "idleTimeoutMinutes"=COALESCE($9,"idleTimeoutMinutes"),
+           "inviteTtlDays"=COALESCE($10,"inviteTtlDays"),
+           "passwordHistoryCount"=COALESCE($11,"passwordHistoryCount"),
            "updatedAt"=NOW()
          WHERE "companyId"=$1`,
         [
@@ -512,6 +549,12 @@ export class TenantLocalService {
           body.idleTimeoutMinutes != null
             ? Math.min(480, Math.max(0, Number(body.idleTimeoutMinutes)))
             : null,
+          body.inviteTtlDays != null
+            ? Math.min(90, Math.max(1, Number(body.inviteTtlDays)))
+            : null,
+          body.passwordHistoryCount != null
+            ? Math.min(24, Math.max(0, Number(body.passwordHistoryCount)))
+            : null,
         ],
       );
       return this.getSecurityPolicy(companyId);
@@ -523,6 +566,7 @@ export class TenantLocalService {
   // ── Notification rules ───────────────────────────────────────────
   async listNotificationRules(companyId: string) {
     await this.ensurePhase5Schema(companyId);
+    await this.ensureSecurityNotificationsSchema(companyId);
     const c = await this.tenantClient(companyId);
     try {
       let res = await c.query(

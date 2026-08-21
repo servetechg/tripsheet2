@@ -15,6 +15,12 @@ export type GateDecision =
 const PUBLIC: RegExp[] = [
   /^\/health$/,
   /^\/api\/auth\/login$/,
+  /^\/api\/auth\/refresh$/,
+  /^\/api\/auth\/mfa\/challenge$/,
+  /^\/api\/auth\/mfa\/enroll-login\/start$/,
+  /^\/api\/auth\/mfa\/enroll-login\/confirm$/,
+  /^\/api\/auth\/forgot-password$/,
+  /^\/api\/auth\/reset-password$/,
   /^\/api\/invites\/by-token\//,
   /^\/api\/invites\/[^/]+\/complete$/,
 ];
@@ -63,8 +69,13 @@ function rule(
   }
   if (p.startsWith('/api/auth/users')) {
     if (m === 'GET') return { codes: ['users.view'] };
+    if (m === 'POST' && /\/unlock$/.test(p)) {
+      return { codes: ['users.suspend'] };
+    }
     if (m === 'POST') return { codes: ['users.create'] };
-    return { codes: ['users.edit', 'users.assign_role'] };
+    return {
+      codes: ['users.edit', 'users.assign_role', 'users.suspend'],
+    };
   }
   if (p.startsWith('/api/auth')) return { codes: 'any' };
 

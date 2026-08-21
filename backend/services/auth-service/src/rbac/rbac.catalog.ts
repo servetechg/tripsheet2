@@ -223,6 +223,8 @@ export const SYSTEM_ROLES: SystemRoleDef[] = [
       'drivers.wage.view',
       'users.view',
       'users.create',
+      'users.edit',
+      'users.suspend',
       'compliance.view',
       'reports.view',
     ],

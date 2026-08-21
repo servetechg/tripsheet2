@@ -12,7 +12,8 @@ import { applyTheme } from '@/lib/theme';
 import {
   authApi,
   getToken,
-  setToken,
+  clearTokens,
+  getRefreshToken,
   ApiError,
 } from '@/lib/api';
 import type { AppUser } from '@/context/AppDataContext';
@@ -86,7 +87,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
-    setToken(null);
+    const refresh = getRefreshToken();
+    if (getToken()) {
+      void authApi.logout(refresh || undefined).catch(() => undefined);
+    }
+    clearTokens();
     setUser(null);
     sessionStorage.removeItem(IDLE_KEY);
   }, []);
@@ -94,13 +99,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const toggleTheme = useCallback(() => {
     setThemeMode((m) => {
       const next: ThemeMode = m === 'dark' ? 'light' : 'dark';
-      // Apply before re-render so inline styles reading `G` pick up new tokens
       commitTheme(next);
       return next;
     });
   }, []);
 
-  // Restore session from JWT on first load / refresh
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -116,10 +119,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           rememberIdle(me.session?.idleTimeoutMinutes);
         }
       } catch (e) {
-        setToken(null);
+        clearTokens();
         if (!cancelled) setUser(null);
         if (!(e instanceof ApiError && e.status === 401)) {
-          // keep bootstrapping false; login will show API errors from AppData
+          // swallow non-401 during bootstrap
         }
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -130,14 +133,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Global 401 from api() → force logout
   useEffect(() => {
-    const onExpired = () => logout();
+    const onExpired = () => {
+      clearTokens();
+      setUser(null);
+      sessionStorage.removeItem(IDLE_KEY);
+    };
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
-  }, [logout]);
+  }, []);
 
-  // Optional idle timeout from tenant SecurityPolicy (client-side).
   useEffect(() => {
     if (!user) return;
     const mins = Number(sessionStorage.getItem(IDLE_KEY) || 0);

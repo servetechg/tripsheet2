@@ -175,6 +175,24 @@ export class ProvisioningService {
       } catch (e) {
         this.logger.warn(`Staff invite SQL skipped: ${String(e)}`);
       }
+      try {
+        const inviteLife = this.loadSqlFile('006_invite_lifecycle.sql');
+        await tenantClient.query(inviteLife);
+      } catch (e) {
+        this.logger.warn(`Invite lifecycle SQL skipped: ${String(e)}`);
+      }
+      try {
+        const pwPolicy = this.loadSqlFile('007_password_policy.sql');
+        await tenantClient.query(pwPolicy);
+      } catch (e) {
+        this.logger.warn(`Password policy SQL skipped: ${String(e)}`);
+      }
+      try {
+        const secNotify = this.loadSqlFile('008_security_notifications.sql');
+        await tenantClient.query(secNotify);
+      } catch (e) {
+        this.logger.warn(`Security notifications SQL skipped: ${String(e)}`);
+      }
       await this.seedDefaults(tenantClient, companyId, company.name);
     } catch (e: any) {
       const msg = e?.message || String(e);

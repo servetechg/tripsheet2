@@ -20,11 +20,18 @@ export type JwtPayload = {
   permissions?: string[];
   driverId?: string | null;
   tv?: number;
+  sid?: string;
 };
 
 const PUBLIC_PATHS: RegExp[] = [
   /^\/health$/,
   /^\/api\/auth\/login$/,
+  /^\/api\/auth\/refresh$/,
+  /^\/api\/auth\/mfa\/challenge$/,
+  /^\/api\/auth\/mfa\/enroll-login\/start$/,
+  /^\/api\/auth\/mfa\/enroll-login\/confirm$/,
+  /^\/api\/auth\/forgot-password$/,
+  /^\/api\/auth\/reset-password$/,
   /^\/api\/invites\/by-token\//,
   /^\/api\/invites\/[^/]+\/complete$/,
 ];
@@ -64,12 +71,25 @@ export class TenantResolverMiddleware implements NestMiddleware {
     }
 
     if (payload.sub) {
-      let session = await this.sessions.get(payload.sub);
+      let session = await this.sessions.get(payload.sub, false, payload.sid);
       const jwtTv = Number(payload.tv ?? 0);
       if (session && session.tokenVersion !== jwtTv) {
-        session = await this.sessions.get(payload.sub, true);
+        session = await this.sessions.get(payload.sub, true, payload.sid);
       }
       if (session) {
+        if (session.authAllowed === false) {
+          throw new UnauthorizedException(
+            session.sessionActive === false
+              ? 'Session revoked. Sign in again.'
+              : session.status === 'suspended'
+                ? 'Account suspended'
+                : session.status === 'archived'
+                  ? 'Account archived'
+                  : session.status === 'locked'
+                    ? 'Account locked'
+                    : 'Account not allowed to sign in',
+          );
+        }
         if (
           session.lockedUntil &&
           Date.parse(session.lockedUntil) > Date.now()

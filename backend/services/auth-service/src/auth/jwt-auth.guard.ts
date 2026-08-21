@@ -40,10 +40,21 @@ export class JwtAuthGuard implements CanActivate {
 
     const row = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { tokenVersion: true, lockedUntil: true },
+      select: { tokenVersion: true, lockedUntil: true, status: true },
     });
     if (!row) {
       throw new UnauthorizedException('Invalid or expired token');
+    }
+    if (row.status !== 'active') {
+      throw new UnauthorizedException(
+        row.status === 'suspended'
+          ? 'Account suspended'
+          : row.status === 'archived'
+            ? 'Account archived'
+            : row.status === 'locked'
+              ? 'Account locked'
+              : 'Account not allowed to sign in',
+      );
     }
     if (row.lockedUntil && row.lockedUntil.getTime() > Date.now()) {
       throw new UnauthorizedException('Account locked. Try again later.');
@@ -51,6 +62,25 @@ export class JwtAuthGuard implements CanActivate {
     const tv = Number(payload.tv ?? 0);
     if (row.tokenVersion !== tv) {
       throw new UnauthorizedException('Token revoked. Sign in again.');
+    }
+
+    const sid =
+      typeof (payload as { sid?: string }).sid === 'string'
+        ? (payload as { sid: string }).sid
+        : undefined;
+    if (sid) {
+      const sess = await this.prisma.session.findUnique({
+        where: { id: sid },
+        select: { userId: true, revokedAt: true, expiresAt: true },
+      });
+      if (
+        !sess ||
+        sess.userId !== payload.sub ||
+        sess.revokedAt ||
+        sess.expiresAt.getTime() <= Date.now()
+      ) {
+        throw new UnauthorizedException('Session revoked. Sign in again.');
+      }
     }
 
     (request as Request & { user?: unknown }).user = payload;

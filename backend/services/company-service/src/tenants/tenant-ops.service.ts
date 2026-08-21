@@ -185,6 +185,9 @@ export class TenantOpsService {
         await this.tenantLocal.ensureCustomRolesSchema(row.companyId);
         await this.tenantLocal.ensureAuthHardeningSchema(row.companyId);
         await this.tenantLocal.ensureStaffInviteSchema(row.companyId);
+        await this.tenantLocal.ensureInviteLifecycleSchema(row.companyId);
+        await this.tenantLocal.ensurePasswordPolicySchema(row.companyId);
+        await this.tenantLocal.ensureSecurityNotificationsSchema(row.companyId);
         await this.tenantLocal.getSecurityPolicy(row.companyId);
         entry.orgOk = true;
 

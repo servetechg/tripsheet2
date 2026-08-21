@@ -13,6 +13,8 @@ import { ToastHost } from '@/components/feedback/Toast';
 import { useAppData, type AppUser } from '@/context/AppDataContext';
 import { useSession } from '@/context/SessionContext';
 import { LoginScreen } from '@/features/auth/LoginScreen';
+import { ForgotPasswordScreen } from '@/features/auth/ForgotPasswordScreen';
+import { ResetPasswordScreen } from '@/features/auth/ResetPasswordScreen';
 import { SuperAdminPanel } from '@/features/companies/SuperAdminPanel';
 import { CompanyAdminPanel } from '@/features/admin/CompanyAdminPanel';
 import { DriverDashboard } from '@/features/drivers/DriverDashboard';
@@ -686,6 +688,8 @@ export function AppRoutes() {
     <>
       <Routes>
         <Route path={PATHS.login} element={<LoginRoute />} />
+        <Route path={PATHS.forgotPassword} element={<ForgotPasswordScreen />} />
+        <Route path={PATHS.resetPassword} element={<ResetPasswordScreen />} />
         <Route path={PATHS.invite} element={<InviteRoute />} />
         <Route
           path={PATHS.workspace}
