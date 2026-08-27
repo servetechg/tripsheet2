@@ -4,10 +4,11 @@ import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons }
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
+import { companiesApi } from '@/lib/api';
 
 export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack }: any) {
   const isACI = type === "ACI";
-  const PORTS = isACI ? CA_PORTS : US_PORTS;
+  const PORTS_FALLBACK = isACI ? CA_PORTS : US_PORTS;
   const carrierCode = isACI ? (carrier.cbsaCarrierCode||"XXXX") : (carrier.scacCode||"XXXX");
 
   const emptyShipment = () => ({
@@ -16,10 +17,16 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     ccn: genCCN(carrierCode),
     shipperName:"", shipperAddress:"", shipperCity:"", shipperCountry: isACI?"US":"CA",
     consigneeName:"", consigneeAddress:"", consigneeCity:"", consigneeCountry: isACI?"CA":"US",
-    commodityDesc:"", pieces:"", weight:"", weightUnit:"KG",
+    commodityId:"", commodityDesc:"", pieces:"", weight:"", weightUnit:"KG",
     countryOfOrigin:"US",
   });
 
+  const [commodities, setCommodities] = useState<any[]>([]);
+  const [ports, setPorts] = useState<Array<{ code: string; name: string; id?: string; ace?: boolean; aci?: boolean; paps?: boolean; pars?: boolean }>>([]);
+  const [portCaps, setPortCaps] = useState<{ paps?: boolean; pars?: boolean }>({
+    paps: !isACI,
+    pars: isACI,
+  });
   const [f, setF] = useState({
     crn:         editData?.crn         || genCRN(carrierCode, type),
     portCode:    editData?.portCode    || (isACI ? "0407" : "3505"),
@@ -40,10 +47,74 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     tripLoadId:  editData?.tripLoadId  || "",
   });
 
+  useEffect(() => {
+    if (!company?.id) {
+      setPorts(PORTS_FALLBACK);
+      return;
+    }
+    void companiesApi
+      .commodities(company.id, true)
+      .then(setCommodities)
+      .catch(() => setCommodities([]));
+    void companiesApi
+      .portsOfEntry(company.id, {
+        selectableOnly: true,
+        country: isACI ? 'CA' : 'US',
+      })
+      .then((list) => {
+        if (Array.isArray(list) && list.length) {
+          setPorts(list);
+          const match =
+            list.find((p: any) => p.code === f.portCode) || list[0];
+          if (match) {
+            setPortCaps({ paps: Boolean(match.paps), pars: Boolean(match.pars) });
+          }
+        } else {
+          setPorts(PORTS_FALLBACK);
+        }
+      })
+      .catch(() => setPorts(PORTS_FALLBACK));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company?.id, isACI]);
+
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   const updShip = (id,k,v) => setF(x=>({...x, shipments: x.shipments.map(s=>s.id===id?{...s,[k]:v}:s)}));
   const addShip = () => setF(x=>({...x, shipments:[...x.shipments, emptyShipment()]}));
   const removeShip = (id) => setF(x=>({...x, shipments:x.shipments.filter(s=>s.id!==id)}));
+
+  const onPortChange = async (code: string) => {
+    upd('portCode', code);
+    const local = ports.find((p) => p.code === code);
+    if (local?.id && company?.id) {
+      try {
+        const c = await companiesApi.portCustoms(company.id, local.id);
+        setPortCaps({ paps: Boolean(c.customsPaps), pars: Boolean(c.customsPars) });
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    setPortCaps({
+      paps: Boolean(local?.paps ?? !isACI),
+      pars: Boolean(local?.pars ?? isACI),
+    });
+  };
+
+  const pickCommodity = (shipId: string, commodityId: string) => {
+    const c = commodities.find((x: any) => x.id === commodityId);
+    setF((x) => ({
+      ...x,
+      shipments: x.shipments.map((s: any) =>
+        s.id === shipId
+          ? {
+              ...s,
+              commodityId,
+              commodityDesc: c?.name || s.commodityDesc,
+            }
+          : s,
+      ),
+    }));
+  };
 
   const selectedTruck   = trucks.find(t=>t.id===f.truckId);
   const selectedTrailer = trailers.find(t=>t.id===f.trailerId);
@@ -67,12 +138,28 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       truckNo:   selectedTruck?.unitNo   || "",
       trailerNo: selectedTrailer?.unitNo || "",
       driverName:selectedDriver?.name    || "",
-      portName:  PORTS.find(p=>p.code===f.portCode)?.name || f.portCode,
+      portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
     });
   };
 
-  const SHIP_TYPES_ACI = ["PARS","In-Bond","CSA","Courier LVS","Postal","Emergency Repair","Empty"];
-  const SHIP_TYPES_ACE = ["PAPS","In-Bond","IT (Immediate Transport)","T&E","IE","Empty"];
+  const SHIP_TYPES_ACI = [
+    ...(portCaps.pars ? ['PARS'] : []),
+    'In-Bond',
+    'CSA',
+    'Courier LVS',
+    'Postal',
+    'Emergency Repair',
+    'Empty',
+  ];
+  const SHIP_TYPES_ACE = [
+    ...(portCaps.paps ? ['PAPS'] : []),
+    'In-Bond',
+    'IT (Immediate Transport)',
+    'T&E',
+    'IE',
+    'Empty',
+  ];
+  const PORTS = ports.length ? ports : PORTS_FALLBACK;
 
   return (
     <div style={{ ...pagePlain() }}>
@@ -142,9 +229,19 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
               <Inp label="Conveyance Reference No. (CRN)" value={f.crn} onChange={e=>upd("crn",e.target.value)} placeholder={carrierCode+"XXXXX"} />
               <div style={{ fontSize:9, color:G.muted, marginTop:-8, marginBottom:8 }}>Starts with carrier code · Unique per crossing</div>
             </div>
-            <Sel label={isACI?"Port of Entry (Canada)":"Port of Entry (USA)"} value={f.portCode} onChange={e=>upd("portCode",e.target.value)}>
+            <Sel label={isACI?"Port of Entry (Canada)":"Port of Entry (USA)"} value={f.portCode} onChange={e=>void onPortChange(e.target.value)}>
               {PORTS.map(p=><option key={p.code} value={p.code}>{p.code} — {p.name}</option>)}
             </Sel>
+            <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
+              Customs options from master:{' '}
+              {isACI
+                ? portCaps.pars
+                  ? 'ACI · PARS available'
+                  : 'ACI (PARS not flagged at this port)'
+                : portCaps.paps
+                  ? 'ACE · PAPS available'
+                  : 'ACE (PAPS not flagged at this port)'}
+            </div>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <Inp label="ETA Date" value={f.eta} onChange={e=>upd("eta",e.target.value)} placeholder="e.g. 2026-06-15" type="date" />
@@ -213,6 +310,19 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
                   <div style={{ fontSize:9, color:G.muted, marginTop:-8, marginBottom:8 }}>Must start with carrier code · Unique per shipment</div>
                 </div>
                 <div>
+                  <Sel
+                    label="Commodity (master)"
+                    value={s.commodityId || ''}
+                    onChange={(e: any) => pickCommodity(s.id, e.target.value)}
+                  >
+                    <option value="">— Or type description —</option>
+                    {commodities.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.hazmat ? ' · HAZMAT' : ''}
+                      </option>
+                    ))}
+                  </Sel>
                   <Inp label="Commodity Description *" value={s.commodityDesc} onChange={e=>updShip(s.id,"commodityDesc",e.target.value)} placeholder="e.g. Auto parts, dry goods" />
                 </div>
               </div>

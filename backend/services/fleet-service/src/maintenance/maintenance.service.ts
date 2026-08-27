@@ -41,6 +41,7 @@ export class MaintenanceService {
             ? Number(body.odometer)
             : null,
         vendor: String(body.vendor || ''),
+        vendorId: body.vendorId ? String(body.vendorId) : null,
       },
     });
   }
@@ -70,6 +71,12 @@ export class MaintenanceService {
               : Number(body.odometer)
             : undefined,
         vendor: body.vendor !== undefined ? String(body.vendor) : undefined,
+        vendorId:
+          body.vendorId !== undefined
+            ? body.vendorId
+              ? String(body.vendorId)
+              : null
+            : undefined,
         unitNo: body.unitNo !== undefined ? String(body.unitNo) : undefined,
       },
     });

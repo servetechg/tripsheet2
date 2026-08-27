@@ -1,4 +1,6 @@
 export { Btn } from './Btn';
+export { Modal } from './Modal';
+export type { ModalProps } from './Modal';
 export { Card } from './Card';
 export { Inp } from './Inp';
 export { FieldInp } from './FieldInp';

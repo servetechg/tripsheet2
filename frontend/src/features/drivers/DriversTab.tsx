@@ -5,6 +5,7 @@ import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { invitesApi, authApi, driversApi, notificationsApi } from '@/lib/api';
 import { DriverProfile } from './DriverProfile';
@@ -26,6 +27,7 @@ export function DriversTab({
   refreshAll,
 }: any) {
   const { can } = useCan();
+  const confirm = useConfirm();
   const [view, setView] = useState('list');
   const [selectedDriver, setSD] = useState<any>(null);
   const [show, setShow] = useState(false);
@@ -228,7 +230,13 @@ export function DriversTab({
   };
 
   const removeDriver = async (d: any) => {
-    if (!window.confirm(`Remove ${d.name}?`)) return;
+    const ok = await confirm({
+      title: 'Remove driver',
+      message: `Remove ${d.name}?`,
+      confirmLabel: 'Remove',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       if (apiEnabled) {
         const recordId = d.driverRecordId;

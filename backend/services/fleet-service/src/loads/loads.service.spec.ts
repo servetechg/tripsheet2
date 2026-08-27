@@ -16,6 +16,15 @@ describe('LoadsService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    asset: {
+      findUnique: jest.Mock;
+    };
+  };
+  const config = {
+    get: jest.fn((key: string) => {
+      if (key === 'DRIVER_SERVICE_URL') return '';
+      return undefined;
+    }),
   };
 
   beforeEach(() => {
@@ -28,8 +37,15 @@ describe('LoadsService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      asset: {
+        findUnique: jest.fn(),
+      },
     };
-    service = new LoadsService(prisma as any);
+    config.get.mockImplementation((key: string) => {
+      if (key === 'DRIVER_SERVICE_URL') return '';
+      return undefined;
+    });
+    service = new LoadsService(prisma as any, config as any);
   });
 
   describe('create', () => {
@@ -74,6 +90,26 @@ describe('LoadsService', () => {
 
       expect(result.id).toBe('L1');
       expect(prisma.load.create).toHaveBeenCalled();
+    });
+
+    it('rejects Out of Service truck', async () => {
+      prisma.load.findFirst.mockResolvedValue(null);
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 't1',
+        companyId: 'c1',
+        unitNo: 'T-101',
+        status: 'out_of_service',
+      });
+      await expect(
+        service.create({
+          companyId: 'c1',
+          driverId: 'd1',
+          truckId: 't1',
+          origin: 'Calgary',
+          destination: 'Toronto',
+        } as any),
+      ).rejects.toThrow(/Out of Service/);
+      expect(prisma.load.create).not.toHaveBeenCalled();
     });
   });
 

@@ -84,10 +84,19 @@ export async function api<T>(
       clearTokens();
       window.dispatchEvent(new Event('ts:auth-expired'));
     }
-    const msg =
+    let msg =
       typeof body === 'object' && body && 'message' in body
         ? String((body as { message: unknown }).message)
         : text || res.statusText;
+    if (
+      res.status === 503 &&
+      typeof body === 'object' &&
+      body &&
+      'detail' in body &&
+      (body as { detail?: unknown }).detail
+    ) {
+      msg = String((body as { detail: unknown }).detail);
+    }
     throw new ApiError(res.status, msg, body);
   }
   if (res.status === 204) return undefined as T;
@@ -103,6 +112,35 @@ export async function pingApi(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+export type ServiceHealth = {
+  name: string;
+  ok: boolean;
+  status?: number;
+  error?: string;
+};
+
+/** Gateway aggregate check — lists downstream services that are down. */
+export async function checkBackendServices(): Promise<{
+  ok: boolean;
+  down: string[];
+  services: ServiceHealth[];
+}> {
+  try {
+    const res = await fetch(`${BASE.replace(/\/api$/, '')}/health/services`, {
+      method: 'GET',
+    });
+    if (!res.ok) return { ok: false, down: [], services: [] };
+    const body = (await res.json()) as {
+      down?: string[];
+      services?: ServiceHealth[];
+    };
+    const down = body.down || [];
+    return { ok: down.length === 0, down, services: body.services || [] };
+  } catch {
+    return { ok: false, down: [], services: [] };
   }
 }
 
@@ -450,6 +488,248 @@ export const companiesApi = {
       `/companies/${encodeURIComponent(id)}/branches/${encodeURIComponent(branchId)}`,
       { method: 'DELETE' },
     ),
+  locations: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/locations${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createLocation: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/locations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchLocation: (id: string, locId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/locations/${encodeURIComponent(locId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  brokers: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/brokers${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createBroker: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/brokers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchBroker: (id: string, brokerId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/brokers/${encodeURIComponent(brokerId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  customers: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/customers${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createCustomer: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/customers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchCustomer: (id: string, customerId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/customers/${encodeURIComponent(customerId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  consignees: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/consignees${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createConsignee: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/consignees`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchConsignee: (id: string, consigneeId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/consignees/${encodeURIComponent(consigneeId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  carriers: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/carriers${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createCarrier: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/carriers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchCarrier: (id: string, carrierId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/carriers/${encodeURIComponent(carrierId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  mergeMdm: (
+    id: string,
+    body: { entityType: string; survivorId: string; absorbId: string },
+  ) =>
+    api(`/companies/${encodeURIComponent(id)}/mdm/merge`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  exportMdm: (id: string, entity: string) =>
+    api<{ entity: string; filename: string; csv: string }>(
+      `/companies/${encodeURIComponent(id)}/mdm/export?entity=${encodeURIComponent(entity)}`,
+    ),
+  importMdm: (
+    id: string,
+    body: { entity: string; csv: string; dryRun: boolean },
+  ) =>
+    api<{
+      dryRun: boolean;
+      entity: string;
+      created: number;
+      wouldCreate?: number;
+      skipped: number;
+      errorCount: number;
+      errors: Array<{ row: number; field: string; message: string }>;
+      preview: unknown[];
+    }>(`/companies/${encodeURIComponent(id)}/mdm/import`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  commodities: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/commodities${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createCommodity: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/commodities`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchCommodity: (id: string, commodityId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/commodities/${encodeURIComponent(commodityId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  warehouses: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/warehouses${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createWarehouse: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/warehouses`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchWarehouse: (id: string, warehouseId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/warehouses/${encodeURIComponent(warehouseId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  borderCrossings: (id: string) =>
+    api<any[]>(`/companies/${encodeURIComponent(id)}/border-crossings`),
+  portsOfEntry: (
+    id: string,
+    opts?: { selectableOnly?: boolean; country?: string },
+  ) => {
+    const q = new URLSearchParams();
+    if (opts?.selectableOnly) q.set('selectableOnly', '1');
+    if (opts?.country) q.set('country', opts.country);
+    const qs = q.toString();
+    return api<any[]>(
+      `/companies/${encodeURIComponent(id)}/ports-of-entry${qs ? `?${qs}` : ''}`,
+    );
+  },
+  portCustoms: (id: string, portId: string) =>
+    api<any>(
+      `/companies/${encodeURIComponent(id)}/ports-of-entry/${encodeURIComponent(portId)}/customs`,
+    ),
+  patchPortOfEntry: (id: string, portId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/ports-of-entry/${encodeURIComponent(portId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  maintenanceVendors: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/maintenance-vendors${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createMaintenanceVendor: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/maintenance-vendors`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchMaintenanceVendor: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/maintenance-vendors/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  fuelStations: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/fuel-stations${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createFuelStation: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/fuel-stations`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchFuelStation: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/fuel-stations/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  insuranceProviders: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/insurance-providers${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createInsuranceProvider: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/insurance-providers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchInsuranceProvider: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/insurance-providers/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  costCenters: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/cost-centers${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createCostCenter: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/cost-centers`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchCostCenter: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/cost-centers/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  payrollCategories: (id: string, selectableOnly = false) =>
+    api<any[]>(
+      `/companies/${encodeURIComponent(id)}/payroll-categories${selectableOnly ? '?selectableOnly=1' : ''}`,
+    ),
+  createPayrollCategory: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/payroll-categories`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchPayrollCategory: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/payroll-categories/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  referenceData: (
+    id: string,
+    opts?: { selectableOnly?: boolean; kind?: string },
+  ) => {
+    const q = new URLSearchParams();
+    if (opts?.selectableOnly) q.set('selectableOnly', '1');
+    if (opts?.kind) q.set('kind', opts.kind);
+    const qs = q.toString();
+    return api<any[]>(
+      `/companies/${encodeURIComponent(id)}/reference-data${qs ? `?${qs}` : ''}`,
+    );
+  },
+  createReferenceData: (id: string, body: unknown) =>
+    api(`/companies/${encodeURIComponent(id)}/reference-data`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  patchReferenceData: (id: string, rowId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/reference-data/${encodeURIComponent(rowId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
   departments: (id: string) =>
     api<any[]>(`/companies/${encodeURIComponent(id)}/departments`),
   saveDepartment: (id: string, body: unknown) =>
@@ -664,12 +944,21 @@ export const assetsApi = {
     if (type) q.set('type', type);
     return api<any[]>(`/assets?${q}`);
   },
+  equipmentTypes: (companyId: string) =>
+    api<Array<{ id: string; code: string; name: string; system: boolean }>>(
+      `/assets/equipment-types?companyId=${encodeURIComponent(companyId)}`,
+    ),
   create: (body: unknown) =>
     api('/assets', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: unknown) =>
     api(`/assets/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   toggleActive: (id: string) =>
     api(`/assets/${id}/toggle-active`, { method: 'PATCH' }),
+  setStatus: (id: string, status: string) =>
+    api(`/assets/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
   remove: (id: string) => api(`/assets/${id}`, { method: 'DELETE' }),
 };
 

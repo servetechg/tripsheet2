@@ -3,9 +3,11 @@ import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { useCan } from '@/lib/permissions';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { CustomRolesPanel } from './CustomRolesPanel';
+import { MasterDataPanel } from './MasterDataPanel';
 
 function LoginHistoryList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -149,6 +151,7 @@ export function CompanySettingsTab({
   initialSub?: Sub;
 }) {
   const { can } = useCan();
+  const confirm = useConfirm();
   const [sub, setSub] = useState<Sub>(initialSub || 'profile');
   const [ent, setEnt] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
@@ -243,6 +246,7 @@ export function CompanySettingsTab({
       { id: 'roles', label: 'Roles' },
       { id: 'settings', label: 'Settings' },
       { id: 'branches', label: 'Branches' },
+      { id: 'masterdata', label: 'Master data' },
       { id: 'departments', label: 'Departments' },
       { id: 'branding', label: 'Branding' },
       { id: 'documents', label: 'Documents' },
@@ -670,20 +674,22 @@ export function CompanySettingsTab({
                       size="sm"
                       style={{ marginBottom: 0, fontSize: 12 }}
                       onClick={() => {
-                        if (
-                          !window.confirm(
-                            `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
-                          )
-                        ) {
-                          return;
-                        }
-                        void authApi
-                          .setUserStatus(u.id, 'archived')
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() => notify('User archived'))
-                          .catch((err: any) =>
-                            notify(err?.message || 'Archive failed', 'error'),
-                          );
+                        void (async () => {
+                          const ok = await confirm({
+                            title: 'Archive user',
+                            message: `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
+                            confirmLabel: 'Archive',
+                            variant: 'danger',
+                          });
+                          if (!ok) return;
+                          void authApi
+                            .setUserStatus(u.id, 'archived')
+                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => notify('User archived'))
+                            .catch((err: any) =>
+                              notify(err?.message || 'Archive failed', 'error'),
+                            );
+                        })();
                       }}
                     >
                       Archive
@@ -919,6 +925,8 @@ export function CompanySettingsTab({
           </div>
         </Card>
       )}
+
+      {sub === 'masterdata' && <MasterDataPanel companyId={cid} />}
 
       {sub === 'departments' && (
         <Card>

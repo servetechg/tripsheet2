@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Skeleton } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
+import { ServiceHealthBanner } from '@/components/feedback/ServiceHealthBanner';
 import { AppShell } from '@/components/layout/AppShell';
 import { DispatchTab } from '@/features/dispatch/DispatchTab';
 import { TrackTab } from '@/features/tracking/TrackTab';
@@ -146,6 +147,7 @@ export function CompanyAdminPanel({
       onToggleTheme={onToggleTheme}
       onLogout={onLogout}
     >
+      <ServiceHealthBanner />
       {tabLoading ? (
         <Skeleton rows={4} />
       ) : (

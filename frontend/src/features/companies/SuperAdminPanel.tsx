@@ -5,10 +5,12 @@ import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
+import { ServiceHealthBanner } from '@/components/feedback/ServiceHealthBanner';
 import { AppShell } from '@/components/layout/AppShell';
 import { companiesApi, authApi, plansApi, tenantsApi } from '@/lib/api';
 import { isCompanyOwnerRole } from '@tripsheet/shared';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
 
 export function SuperAdminPanel({
@@ -24,6 +26,7 @@ export function SuperAdminPanel({
   activeTab,
   onTabChange,
 }: any) {
+  const confirmAction = useConfirm();
   const [tab, setTab] = useState('companies');
   const currentTab = activeTab || tab;
   const changeTab = onTabChange || setTab;
@@ -174,6 +177,7 @@ export function SuperAdminPanel({
       onToggleTheme={onToggleTheme}
       onLogout={onLogout}
     >
+      <ServiceHealthBanner />
       {ok && <OkBox msg={ok} />}
 
       {currentTab === 'ops' ? (
@@ -405,9 +409,24 @@ export function SuperAdminPanel({
                     label=""
                     value={c.plan?.code || 'starter'}
                     onChange={(e) => {
+                      const planCode = e.target.value;
                       void companiesApi
-                        .changePlan(c.id, e.target.value)
-                        .then(() => refreshAll?.('all'))
+                        .changePlan(c.id, planCode)
+                        .then((updated: any) => {
+                          setCompanies((prev: any[]) =>
+                            prev.map((co) =>
+                              co.id === c.id
+                                ? {
+                                    ...co,
+                                    plan: updated.plan,
+                                    planId: updated.planId,
+                                    subscription: updated.subscription,
+                                  }
+                                : co,
+                            ),
+                          );
+                          notify(`Plan updated to ${updated.plan?.name || planCode}`);
+                        })
                         .catch((err: any) =>
                           notify(err?.message || 'Plan change failed', 'error'),
                         );
@@ -475,25 +494,28 @@ export function SuperAdminPanel({
                         size="sm"
                         variant="danger"
                         onClick={() => {
-                          if (
-                            !confirm(
-                              'Delete this company\'s rows from shared DBs? Tenant DB keeps the data.',
-                            )
-                          ) {
-                            return;
-                          }
-                          void tenantsApi
-                            .archiveShared(c.id)
-                            .then(() => {
-                              notify('Shared data archived');
-                              return refreshAll?.('all');
-                            })
-                            .catch((err: any) =>
-                              notify(
-                                err?.message || 'Archive failed',
-                                'error',
-                              ),
-                            );
+                          void (async () => {
+                            const approved = await confirmAction({
+                              title: 'Archive shared data',
+                              message:
+                                "Delete this company's rows from shared DBs? Tenant DB keeps the data.",
+                              confirmLabel: 'Delete shared rows',
+                              variant: 'danger',
+                            });
+                            if (!approved) return;
+                            void tenantsApi
+                              .archiveShared(c.id)
+                              .then(() => {
+                                notify('Shared data archived');
+                                return refreshAll?.('all');
+                              })
+                              .catch((err: any) =>
+                                notify(
+                                  err?.message || 'Archive failed',
+                                  'error',
+                                ),
+                              );
+                          })();
                         }}
                       >
                         Archive shared

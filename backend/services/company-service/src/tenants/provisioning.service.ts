@@ -15,6 +15,20 @@ import {
   parseAdminUrl,
   quoteIdent,
 } from '../platform/pg-admin.util';
+import {
+  buildCommodityNormalizedKey,
+  DEFAULT_COMMODITIES,
+} from '../mdm/catalog.util';
+import {
+  DEFAULT_PORTS,
+  uniqueBorderCrossingNames,
+} from '../mdm/border.util';
+import {
+  DEFAULT_COST_CENTERS,
+  DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_PAYROLL_CATEGORIES,
+  REF_KIND_EXPENSE,
+} from '../mdm/ops-ref.util';
 
 @Injectable()
 export class ProvisioningService {
@@ -193,7 +207,47 @@ export class ProvisioningService {
       } catch (e) {
         this.logger.warn(`Security notifications SQL skipped: ${String(e)}`);
       }
+      try {
+        const mdmFleet = this.loadSqlFile('009_mdm_fleet_phase1.sql');
+        await tenantClient.query(mdmFleet);
+      } catch (e) {
+        this.logger.warn(`MDM fleet Phase 1 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const mdmParties = this.loadSqlFile('010_mdm_parties_phase2.sql');
+        await tenantClient.query(mdmParties);
+      } catch (e) {
+        this.logger.warn(`MDM parties Phase 2 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const mdmCarriers = this.loadSqlFile('011_mdm_carriers_phase3.sql');
+        await tenantClient.query(mdmCarriers);
+      } catch (e) {
+        this.logger.warn(`MDM carriers Phase 3 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const mdmCatalogs = this.loadSqlFile('012_mdm_catalogs_phase4.sql');
+        await tenantClient.query(mdmCatalogs);
+      } catch (e) {
+        this.logger.warn(`MDM catalogs Phase 4 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const mdmBorder = this.loadSqlFile('013_mdm_border_phase5.sql');
+        await tenantClient.query(mdmBorder);
+      } catch (e) {
+        this.logger.warn(`MDM border Phase 5 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const mdmOps = this.loadSqlFile('014_mdm_ops_phase6.sql');
+        await tenantClient.query(mdmOps);
+      } catch (e) {
+        this.logger.warn(`MDM ops Phase 6 SQL skipped: ${String(e)}`);
+      }
       await this.seedDefaults(tenantClient, companyId, company.name);
+      await this.seedEquipmentTypes(tenantClient, companyId);
+      await this.seedCommodities(tenantClient, companyId);
+      await this.seedBorderPorts(tenantClient, companyId);
+      await this.seedOpsRefs(tenantClient, companyId);
     } catch (e: any) {
       const msg = e?.message || String(e);
       await this.fail(companyId, dbName, msg, opts?.actorName);
@@ -334,6 +388,134 @@ export class ProvisioningService {
          VALUES ($1,$2,$3,$4,$5)
          ON CONFLICT ("companyId","code") DO NOTHING`,
         [`acct_${companyId}_${code}`, companyId, code, name, type],
+      );
+    }
+  }
+
+  private async seedEquipmentTypes(client: Client, companyId: string) {
+    const types: Array<{ code: string; name: string }> = [
+      { code: 'dry_van', name: 'Dry Van' },
+      { code: 'reefer', name: 'Reefer' },
+      { code: 'flatbed', name: 'Flatbed' },
+      { code: 'step_deck', name: 'Step Deck' },
+      { code: 'double_drop', name: 'Double Drop' },
+      { code: 'rgn', name: 'RGN' },
+      { code: 'power_only', name: 'Power Only' },
+      { code: 'container', name: 'Container' },
+      { code: 'tanker', name: 'Tanker' },
+      { code: 'hopper', name: 'Hopper' },
+      { code: 'car_hauler', name: 'Car Hauler' },
+    ];
+    for (const t of types) {
+      await client.query(
+        `INSERT INTO fleet."EquipmentType"
+          ("id","companyId","code","name","system","status")
+         VALUES ($1,$2,$3,$4,true,'active')
+         ON CONFLICT ("companyId","code") DO NOTHING`,
+        [`eqt_${companyId}_${t.code}`, companyId, t.code, t.name],
+      );
+    }
+  }
+
+  private async seedCommodities(client: Client, companyId: string) {
+    for (const t of DEFAULT_COMMODITIES) {
+      const key = buildCommodityNormalizedKey(t.name);
+      await client.query(
+        `INSERT INTO company_local."Commodity"
+          ("id","companyId","name","nmfc","hazmat","status","normalizedKey","system")
+         VALUES ($1,$2,$3,$4,$5,'active',$6,true)
+         ON CONFLICT ("companyId","normalizedKey") DO NOTHING`,
+        [
+          `cmd_${companyId}_${t.code}`.slice(0, 64),
+          companyId,
+          t.name,
+          t.nmfc || '',
+          t.hazmat,
+          key,
+        ],
+      );
+    }
+  }
+
+  private async seedBorderPorts(client: Client, companyId: string) {
+    for (const name of uniqueBorderCrossingNames()) {
+      await client.query(
+        `INSERT INTO company_local."BorderCrossing"
+          ("id","companyId","name","countries","status","system")
+         VALUES ($1,$2,$3,'CA-US','active',true)
+         ON CONFLICT ("companyId","name") DO NOTHING`,
+        [
+          `bcx_${companyId}_${name}`.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64),
+          companyId,
+          name,
+        ],
+      );
+    }
+    const crossings = await client.query(
+      `SELECT "id","name" FROM company_local."BorderCrossing" WHERE "companyId"=$1`,
+      [companyId],
+    );
+    const byName = new Map(
+      crossings.rows.map((r: { id: string; name: string }) => [r.name, r.id]),
+    );
+    for (const p of DEFAULT_PORTS) {
+      await client.query(
+        `INSERT INTO company_local."PortOfEntry"
+          ("id","companyId","code","name","country","borderCrossingId","borderCrossingName",
+           "fastLane","ace","aci","paps","pars","restrictions","status","system")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active',true)
+         ON CONFLICT ("companyId","code") DO NOTHING`,
+        [
+          `poe_${companyId}_${p.code}`.slice(0, 64),
+          companyId,
+          p.code,
+          p.name,
+          p.country,
+          byName.get(p.borderCrossing) || null,
+          p.borderCrossing,
+          Boolean(p.fastLane),
+          p.ace,
+          p.aci,
+          p.paps,
+          p.pars,
+          p.restrictions || '',
+        ],
+      );
+    }
+  }
+
+  private async seedOpsRefs(client: Client, companyId: string) {
+    for (const t of DEFAULT_COST_CENTERS) {
+      await client.query(
+        `INSERT INTO company_local."CostCenter"
+          ("id","companyId","code","name","status","system")
+         VALUES ($1,$2,$3,$4,'active',true)
+         ON CONFLICT ("companyId","code") DO NOTHING`,
+        [`cc_${companyId}_${t.code}`.slice(0, 64), companyId, t.code, t.name],
+      );
+    }
+    for (const t of DEFAULT_PAYROLL_CATEGORIES) {
+      await client.query(
+        `INSERT INTO company_local."PayrollCategory"
+          ("id","companyId","code","name","status","system")
+         VALUES ($1,$2,$3,$4,'active',true)
+         ON CONFLICT ("companyId","code") DO NOTHING`,
+        [`pay_${companyId}_${t.code}`.slice(0, 64), companyId, t.code, t.name],
+      );
+    }
+    for (const t of DEFAULT_EXPENSE_CATEGORIES) {
+      await client.query(
+        `INSERT INTO company_local."ReferenceData"
+          ("id","companyId","kind","code","name","status","system")
+         VALUES ($1,$2,$3,$4,$5,'active',true)
+         ON CONFLICT ("companyId","kind","code") DO NOTHING`,
+        [
+          `ref_${companyId}_${t.code}`.slice(0, 64),
+          companyId,
+          REF_KIND_EXPENSE,
+          t.code,
+          t.name,
+        ],
       );
     }
   }

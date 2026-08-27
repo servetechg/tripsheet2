@@ -5,6 +5,17 @@ import { AxiosRequestConfig, Method } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { Request } from 'express';
 
+const SERVICE_LABELS: Record<string, string> = {
+  AUTH_SERVICE_URL: 'Auth',
+  COMPANY_SERVICE_URL: 'Company',
+  DRIVER_SERVICE_URL: 'Driver',
+  FLEET_SERVICE_URL: 'Fleet',
+  MANIFEST_SERVICE_URL: 'Manifest',
+  TRIPSHEET_SERVICE_URL: 'TripSheet',
+  ACCOUNTING_SERVICE_URL: 'Accounting',
+  NOTIFICATION_SERVICE_URL: 'Notification',
+};
+
 const FORWARD_HEADERS = [
   'authorization',
   'content-type',
@@ -85,11 +96,13 @@ export class ProxyService {
       if (err instanceof HttpException) {
         throw err;
       }
+      const label = SERVICE_LABELS[serviceKey] || serviceKey;
       this.logger.warn(`Proxy failed ${method} ${url}: ${String(err)}`);
       throw new HttpException(
         {
-          message: 'Upstream service unavailable',
-          detail: 'Upstream service unavailable or not ready',
+          message: `${label} service unavailable`,
+          detail: `${label} service is not running or not reachable. Ensure all backend services are started (npm run start:dev in /backend).`,
+          service: label.toLowerCase(),
           target: url,
         },
         503,

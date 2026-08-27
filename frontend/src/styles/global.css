@@ -75,6 +75,24 @@ textarea {
   transform-origin: bottom;
 }
 
+.ts-modal-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.ts-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ts-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ts-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .ts-stat-card,
   .ts-btn,

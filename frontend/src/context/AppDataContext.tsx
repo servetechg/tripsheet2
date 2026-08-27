@@ -14,6 +14,7 @@ import type { Role } from '@tripsheet/shared';
 import { isCompanyOwnerRole } from '@tripsheet/shared';
 import {
   pingApi,
+  checkBackendServices,
   companiesApi,
   authApi,
   driversApi,
@@ -55,6 +56,7 @@ export type AppUser = AuthUserDto & {
 interface AppData {
   apiEnabled: boolean;
   apiError: string | null;
+  servicesDown: string[];
   loading: boolean;
   refreshAll: (companyId?: string | null) => Promise<void>;
 
@@ -88,12 +90,20 @@ function asCompany(c: any): Company {
     tagline: c.tagline ?? '',
     address: c.address ?? '',
     active: c.active !== false,
-  };
+    // Super Admin + entitlements need full platform row (plan, tenant DB, slug)
+    slug: c.slug,
+    status: c.status,
+    planId: c.planId,
+    plan: c.plan,
+    subscription: c.subscription,
+    tenantDatabase: c.tenantDatabase,
+  } as Company;
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const [apiEnabled, setApiEnabled] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [servicesDown, setServicesDown] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -118,6 +128,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       return;
     }
     setApiError(null);
+
+    const health = await checkBackendServices();
+    setServicesDown(health.down);
 
     try {
       const cos = await companiesApi.list();
@@ -205,6 +218,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     () => ({
       apiEnabled,
       apiError,
+      servicesDown,
       loading,
       refreshAll,
       companies,
@@ -229,6 +243,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     [
       apiEnabled,
       apiError,
+      servicesDown,
       loading,
       refreshAll,
       companies,

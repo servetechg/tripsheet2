@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { G, pagePlain } from '@/lib/theme';
 import { Card, Pill, SectionTitle, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
 import { DocViewer } from '@/features/documents/DocViewer';
@@ -26,6 +27,7 @@ export function DriverProfile({
   refreshAll,
 }: any) {
   const { can } = useCan();
+  const confirm = useConfirm();
   const [docTab, setDocTab] = useState('documents');
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
@@ -173,7 +175,13 @@ export function DriverProfile({
   };
 
   const deleteDoc = async (docId: string) => {
-    if (!window.confirm('Delete this document?')) return;
+    const ok = await confirm({
+      title: 'Delete document',
+      message: 'Delete this document?',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       if (apiEnabled) {
         await documentsApi.remove(docId);

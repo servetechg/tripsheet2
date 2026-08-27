@@ -2,14 +2,22 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { getTenantStore } from '@tripsheet/tenant-runtime';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  assetAssignmentBlockReason,
+  canAssignAssetStatus,
+} from '../assets/asset-status';
 import { ActiveLoadsDto } from './dto/active-loads.dto';
 import { CreateLoadDto } from './dto/create-load.dto';
 import { ListLoadsDto } from './dto/list-loads.dto';
 import { UpdateLoadDto } from './dto/update-load.dto';
 import { UpdateLoadStatusDto } from './dto/update-load-status.dto';
+import { validateCrossBorderLoadFields } from './cross-border';
 
 const ACTIVE_STATUSES = ['assigned', 'in_transit'] as const;
 
@@ -22,7 +30,12 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class LoadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(LoadsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   findAll(query: ListLoadsDto) {
     return this.prisma.load.findMany({
@@ -57,6 +70,13 @@ export class LoadsService {
     }
 
     await this.assertNoActiveLoad(dto.driverId);
+    await this.assertDriverAssignable(dto.driverId, dto.companyId);
+    await this.assertAssetsAssignable({
+      companyId: dto.companyId,
+      truckId: dto.truckId,
+      trailerId: dto.trailerId,
+    });
+    this.assertCrossBorderReady(dto);
 
     const status = dto.status ?? 'assigned';
     if (status !== 'assigned' && status !== 'in_transit') {
@@ -94,6 +114,26 @@ export class LoadsService {
         speed: dto.speed,
         heading: dto.heading,
         lastUpdate: dto.lastUpdate,
+        brokerId: dto.brokerId,
+        customerId: dto.customerId,
+        originLocationId: dto.originLocationId,
+        destinationLocationId: dto.destinationLocationId,
+        brokerName: dto.brokerName,
+        carrierId: dto.carrierId,
+        carrierName: dto.carrierName,
+        commodityId: dto.commodityId,
+        commodityName: dto.commodityName,
+        crossBorder: Boolean(dto.crossBorder),
+        portOfEntryId: dto.portOfEntryId,
+        portOfEntryCode: dto.portOfEntryCode,
+        portOfEntryName: dto.portOfEntryName,
+        customsProgram: dto.customsProgram
+          ? String(dto.customsProgram).toUpperCase()
+          : null,
+        customsAce: Boolean(dto.customsAce),
+        customsAci: Boolean(dto.customsAci),
+        customsPaps: Boolean(dto.customsPaps),
+        customsPars: Boolean(dto.customsPars),
       },
     });
   }
@@ -105,15 +145,63 @@ export class LoadsService {
       this.assertTransition(existing.status, dto.status);
     }
 
+    const nextStatus = (dto.status ?? existing.status) as string;
+    const isActive = ACTIVE_STATUSES.includes(
+      nextStatus as (typeof ACTIVE_STATUSES)[number],
+    );
+
     if (
       dto.driverId !== undefined &&
       dto.driverId !== existing.driverId &&
-      ACTIVE_STATUSES.includes(
-        (dto.status ?? existing.status) as (typeof ACTIVE_STATUSES)[number],
-      )
+      isActive
     ) {
       await this.assertNoActiveLoad(dto.driverId, id);
+      await this.assertDriverAssignable(
+        dto.driverId,
+        existing.companyId,
+      );
     }
+
+    if (isActive) {
+      if (dto.truckId !== undefined || dto.trailerId !== undefined) {
+        await this.assertAssetsAssignable({
+          companyId: existing.companyId,
+          truckId: dto.truckId !== undefined ? dto.truckId : null,
+          trailerId: dto.trailerId !== undefined ? dto.trailerId : null,
+        });
+      }
+    }
+
+    this.assertCrossBorderReady({
+      crossBorder:
+        dto.crossBorder !== undefined
+          ? Boolean(dto.crossBorder)
+          : Boolean(existing.crossBorder),
+      portOfEntryId:
+        dto.portOfEntryId !== undefined
+          ? dto.portOfEntryId
+          : existing.portOfEntryId,
+      customsProgram:
+        dto.customsProgram !== undefined
+          ? dto.customsProgram
+          : existing.customsProgram,
+      customsAce:
+        dto.customsAce !== undefined
+          ? Boolean(dto.customsAce)
+          : Boolean(existing.customsAce),
+      customsAci:
+        dto.customsAci !== undefined
+          ? Boolean(dto.customsAci)
+          : Boolean(existing.customsAci),
+      customsPaps:
+        dto.customsPaps !== undefined
+          ? Boolean(dto.customsPaps)
+          : Boolean(existing.customsPaps),
+      customsPars:
+        dto.customsPars !== undefined
+          ? Boolean(dto.customsPars)
+          : Boolean(existing.customsPars),
+    });
 
     return this.prisma.load.update({
       where: { id },
@@ -144,6 +232,29 @@ export class LoadsService {
         heading: dto.heading,
         lastUpdate: dto.lastUpdate,
         status: dto.status,
+        brokerId: dto.brokerId,
+        customerId: dto.customerId,
+        originLocationId: dto.originLocationId,
+        destinationLocationId: dto.destinationLocationId,
+        brokerName: dto.brokerName,
+        carrierId: dto.carrierId,
+        carrierName: dto.carrierName,
+        commodityId: dto.commodityId,
+        commodityName: dto.commodityName,
+        crossBorder: dto.crossBorder,
+        portOfEntryId: dto.portOfEntryId,
+        portOfEntryCode: dto.portOfEntryCode,
+        portOfEntryName: dto.portOfEntryName,
+        customsProgram:
+          dto.customsProgram !== undefined
+            ? dto.customsProgram
+              ? String(dto.customsProgram).toUpperCase()
+              : null
+            : undefined,
+        customsAce: dto.customsAce,
+        customsAci: dto.customsAci,
+        customsPaps: dto.customsPaps,
+        customsPars: dto.customsPars,
       },
     });
   }
@@ -187,6 +298,21 @@ export class LoadsService {
     return this.prisma.load.delete({ where: { id } });
   }
 
+  private assertCrossBorderReady(input: {
+    crossBorder?: boolean;
+    portOfEntryId?: string | null;
+    customsProgram?: string | null;
+    customsAce?: boolean;
+    customsAci?: boolean;
+    customsPaps?: boolean;
+    customsPars?: boolean;
+  }) {
+    const errors = validateCrossBorderLoadFields(input);
+    if (errors.length) {
+      throw new BadRequestException(errors.join('; '));
+    }
+  }
+
   private assertTransition(from: string, to: string) {
     const allowed = ALLOWED_TRANSITIONS[from] ?? [];
     if (!allowed.includes(to)) {
@@ -208,6 +334,114 @@ export class LoadsService {
       throw new ConflictException(
         `Driver ${driverId} already has an active load (${active.id})`,
       );
+    }
+  }
+
+  private async assertAssetsAssignable(input: {
+    companyId: string;
+    truckId?: string | null;
+    trailerId?: string | null;
+  }) {
+    const ids: Array<{ id: string; kind: 'truck' | 'trailer' }> = [];
+    if (input.truckId) ids.push({ id: input.truckId, kind: 'truck' });
+    if (input.trailerId) ids.push({ id: input.trailerId, kind: 'trailer' });
+
+    for (const { id, kind } of ids) {
+      const asset = await this.prisma.asset.findUnique({ where: { id } });
+      if (!asset) {
+        throw new BadRequestException(
+          `${kind === 'truck' ? 'Truck' : 'Trailer'} ${id} not found`,
+        );
+      }
+      if (asset.companyId && asset.companyId !== input.companyId) {
+        throw new BadRequestException(
+          `${kind === 'truck' ? 'Truck' : 'Trailer'} belongs to another company`,
+        );
+      }
+      if (!canAssignAssetStatus(asset.status)) {
+        const reason = assetAssignmentBlockReason(asset.status, asset.unitNo);
+        await this.auditAssignmentDeny({
+          companyId: input.companyId,
+          entityType: 'asset',
+          entityId: asset.id,
+          reason,
+          meta: { kind, status: asset.status, unitNo: asset.unitNo },
+        });
+        throw new BadRequestException(reason);
+      }
+    }
+  }
+
+  private async assertDriverAssignable(driverId: string, companyId: string) {
+    const base =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}`,
+        {
+          headers: {
+            'x-company-id': companyId,
+            ...(getTenantStore()?.userId
+              ? { 'x-user-id': getTenantStore()!.userId! }
+              : {}),
+          },
+        },
+      );
+      if (res.status === 404) {
+        // driverId may be auth user id — allow if driver-service has no match
+        return;
+      }
+      if (!res.ok) return;
+      const driver = (await res.json()) as {
+        active?: boolean;
+        name?: string;
+        companyId?: string;
+      };
+      if (driver.active === false) {
+        const reason = `Driver ${driver.name || driverId} is inactive and cannot be assigned`;
+        await this.auditAssignmentDeny({
+          companyId,
+          entityType: 'driver',
+          entityId: driverId,
+          reason,
+          meta: { active: false },
+        });
+        throw new BadRequestException(reason);
+      }
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      this.logger.warn(`driver assignability check skipped: ${String(e)}`);
+    }
+  }
+
+  private async auditAssignmentDeny(input: {
+    companyId: string;
+    entityType: string;
+    entityId: string;
+    reason: string;
+    meta?: Record<string, unknown>;
+  }) {
+    const store = getTenantStore();
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    try {
+      await fetch(`${base.replace(/\/$/, '')}/audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId: input.companyId || store?.companyId || null,
+          actorId: store?.userId || null,
+          actorName: store?.email || '',
+          action: 'mdm.assignment_denied',
+          entityType: input.entityType,
+          entityId: input.entityId,
+          meta: { reason: input.reason, ...(input.meta || {}) },
+        }),
+      });
+    } catch (e) {
+      this.logger.warn(`assignment deny audit failed: ${String(e)}`);
     }
   }
 

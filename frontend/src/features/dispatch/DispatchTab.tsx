@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
 import {
   Btn,
@@ -27,9 +27,11 @@ import { FREIGHT_LOCATIONS } from '@/lib/locations';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { loadsApi, driversApi, notificationsApi } from '@/lib/api';
+import { loadsApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
 import { matchesDriverRef } from '@/lib/driverIds';
+import { canAssignAsset } from '@/lib/assetStatus';
 import { useCan } from '@/lib/permissions';
 
 type FormErrors = Partial<
@@ -50,7 +52,9 @@ type FormErrors = Partial<
     | 'miles'
     | 'stop1'
     | 'stop2'
-    | 'notes',
+    | 'notes'
+    | 'portOfEntryId'
+    | 'customsProgram',
     string
   >
 >;
@@ -73,15 +77,35 @@ export function DispatchTab({
   refreshAll,
 }: any) {
   const { can } = useCan();
+  const confirm = useConfirm();
   const [show, setShow] = useState(false);
   const [editLoad, setEditLoad] = useState<any>(null);
   const [docErr, setDocErr] = useState('');
   const [fieldErr, setFieldErr] = useState<FormErrors>({});
   const [busy, setBusy] = useState(false);
+  const [brokers, setBrokers] = useState<any[]>([]);
+  const [carriers, setCarriers] = useState<any[]>([]);
+  const [commodities, setCommodities] = useState<any[]>([]);
+  const [ports, setPorts] = useState<any[]>([]);
+  const [mdmLocations, setMdmLocations] = useState<any[]>([]);
   const emptyForm = {
     driverId: '',
     truckId: '',
     trailerId: '',
+    brokerId: '',
+    carrierId: '',
+    commodityId: '',
+    crossBorder: false,
+    portOfEntryId: '',
+    customsProgram: '',
+    customsAce: false,
+    customsAci: false,
+    customsPaps: false,
+    customsPars: false,
+    portOfEntryCode: '',
+    portOfEntryName: '',
+    originLocationId: '',
+    destinationLocationId: '',
     origin: '',
     destination: '',
     pickupTime: '',
@@ -99,6 +123,74 @@ export function DispatchTab({
     stop2: '',
   };
   const [f, setF] = useState(emptyForm);
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) return;
+    void companiesApi
+      .brokers(company.id, true)
+      .then(setBrokers)
+      .catch(() => setBrokers([]));
+    void companiesApi
+      .carriers(company.id, true)
+      .then(setCarriers)
+      .catch(() => setCarriers([]));
+    void companiesApi
+      .commodities(company.id, true)
+      .then(setCommodities)
+      .catch(() => setCommodities([]));
+    void companiesApi
+      .portsOfEntry(company.id, { selectableOnly: true })
+      .then(setPorts)
+      .catch(() => setPorts([]));
+    void companiesApi
+      .locations(company.id, true)
+      .then(setMdmLocations)
+      .catch(() => setMdmLocations([]));
+  }, [apiEnabled, company?.id, show]);
+
+  const applyPort = async (portId: string) => {
+    if (!portId || !company?.id) {
+      setF((x) => ({
+        ...x,
+        portOfEntryId: '',
+        portOfEntryCode: '',
+        portOfEntryName: '',
+        customsProgram: '',
+        customsAce: false,
+        customsAci: false,
+        customsPaps: false,
+        customsPars: false,
+      }));
+      return;
+    }
+    try {
+      const customs = await companiesApi.portCustoms(company.id, portId);
+      setF((x) => ({
+        ...x,
+        portOfEntryId: portId,
+        portOfEntryCode: customs.portOfEntryCode || '',
+        portOfEntryName: customs.portOfEntryName || '',
+        customsAce: Boolean(customs.customsAce),
+        customsAci: Boolean(customs.customsAci),
+        customsPaps: Boolean(customs.customsPaps),
+        customsPars: Boolean(customs.customsPars),
+        customsProgram: customs.defaultProgram || '',
+      }));
+    } catch {
+      const p = ports.find((x: any) => x.id === portId);
+      setF((x) => ({
+        ...x,
+        portOfEntryId: portId,
+        portOfEntryCode: p?.code || '',
+        portOfEntryName: p?.name || '',
+        customsAce: Boolean(p?.ace),
+        customsAci: Boolean(p?.aci),
+        customsPaps: Boolean(p?.paps),
+        customsPars: Boolean(p?.pars),
+        customsProgram: p?.ace ? 'ACE' : p?.aci ? 'ACI' : '',
+      }));
+    }
+  };
   const upd = (k: string, v: string) => {
     setF((x) => ({ ...x, [k]: v }));
     setFieldErr((e) => {
@@ -121,6 +213,20 @@ export function DispatchTab({
       driverId: l.driverId || '',
       truckId: l.truckId || '',
       trailerId: l.trailerId || '',
+      brokerId: l.brokerId || '',
+      carrierId: l.carrierId || '',
+      commodityId: l.commodityId || '',
+      crossBorder: Boolean(l.crossBorder),
+      portOfEntryId: l.portOfEntryId || '',
+      customsProgram: l.customsProgram || '',
+      customsAce: Boolean(l.customsAce),
+      customsAci: Boolean(l.customsAci),
+      customsPaps: Boolean(l.customsPaps),
+      customsPars: Boolean(l.customsPars),
+      portOfEntryCode: l.portOfEntryCode || '',
+      portOfEntryName: l.portOfEntryName || '',
+      originLocationId: l.originLocationId || '',
+      destinationLocationId: l.destinationLocationId || '',
       origin: l.origin || '',
       destination: l.destination || '',
       pickupTime: toDatetimeLocal(l.pickupTime || ''),
@@ -192,6 +298,25 @@ export function DispatchTab({
     }
     if (blank(f.pickupTime)) errs.pickupTime = 'Pickup date & time is required';
 
+    if (f.crossBorder) {
+      if (blank(f.portOfEntryId)) {
+        errs.portOfEntryId = 'Port of entry is required for cross-border';
+      }
+      if (blank(f.customsProgram)) {
+        errs.customsProgram = 'Select ACE or ACI';
+      } else if (
+        f.customsProgram === 'ACE' &&
+        !f.customsAce
+      ) {
+        errs.customsProgram = 'Selected port does not support ACE';
+      } else if (
+        f.customsProgram === 'ACI' &&
+        !f.customsAci
+      ) {
+        errs.customsProgram = 'Selected port does not support ACI';
+      }
+    }
+
     const pickupMs = f.pickupTime ? new Date(f.pickupTime).getTime() : NaN;
     const etaMs = f.eta ? new Date(f.eta).getTime() : NaN;
     if (f.pickupTime && Number.isNaN(pickupMs)) {
@@ -253,6 +378,9 @@ export function DispatchTab({
   const payloadFromForm = () => {
     const truck = trucks.find((t: any) => t.id === f.truckId);
     const trailer = trailers.find((t: any) => t.id === f.trailerId);
+    const broker = brokers.find((b: any) => b.id === f.brokerId);
+    const carrier = carriers.find((c: any) => c.id === f.carrierId);
+    const commodity = commodities.find((c: any) => c.id === f.commodityId);
     const stops = [f.stop1, f.stop2]
       .filter((s) => !blank(s))
       .map((location, i) => ({ seq: i + 1, location }));
@@ -260,6 +388,25 @@ export function DispatchTab({
       driverId: f.driverId,
       truckId: f.truckId,
       trailerId: f.trailerId,
+      brokerId: f.brokerId || undefined,
+      brokerName: broker?.name || undefined,
+      carrierId: f.carrierId || undefined,
+      carrierName: carrier?.name || undefined,
+      commodityId: f.commodityId || undefined,
+      commodityName: commodity?.name || undefined,
+      crossBorder: Boolean(f.crossBorder),
+      portOfEntryId: f.crossBorder ? f.portOfEntryId || undefined : undefined,
+      portOfEntryCode: f.crossBorder ? f.portOfEntryCode || undefined : undefined,
+      portOfEntryName: f.crossBorder ? f.portOfEntryName || undefined : undefined,
+      customsProgram: f.crossBorder
+        ? f.customsProgram || undefined
+        : undefined,
+      customsAce: Boolean(f.crossBorder && f.customsAce),
+      customsAci: Boolean(f.crossBorder && f.customsAci),
+      customsPaps: Boolean(f.crossBorder && f.customsPaps),
+      customsPars: Boolean(f.crossBorder && f.customsPars),
+      originLocationId: f.originLocationId || undefined,
+      destinationLocationId: f.destinationLocationId || undefined,
       origin: f.origin.trim(),
       destination: f.destination.trim(),
       pickupTime: datetimeLocalToIso(f.pickupTime),
@@ -408,7 +555,13 @@ export function DispatchTab({
   };
 
   const deleteLoad = async (id: string) => {
-    if (!window.confirm('Delete this load? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete load',
+      message: 'Delete this load? This cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       if (apiEnabled) {
         await loadsApi.remove(id);
@@ -548,7 +701,8 @@ export function DispatchTab({
               )}
               {drivers.map((d: any) => {
                 const missing = checkDriverDocs(d.id);
-                const canDispatch = missing.length === 0;
+                const driverActive = d.active !== false;
+                const canDispatch = missing.length === 0 && driverActive;
                 const onLoad = loads.find(
                   (l: any) =>
                     l.driverId === d.id &&
@@ -561,6 +715,11 @@ export function DispatchTab({
                     onClick={() => {
                       if (canDispatch && !onLoad) upd('driverId', d.id);
                     }}
+                    title={
+                      !driverActive
+                        ? 'Driver is inactive and cannot be assigned'
+                        : undefined
+                    }
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
@@ -606,14 +765,15 @@ export function DispatchTab({
                           }}
                         >
                           {Icons.alert({ size: 12, color: G.danger })}
-                          Missing:{' '}
-                          {missing
-                            .map(
-                              (id: string) =>
-                                DRIVER_DOC_TYPES.find((x) => x.id === id)
-                                  ?.label || id,
-                            )
-                            .join(', ')}
+                          {!driverActive
+                            ? 'Inactive — cannot assign'
+                            : `Missing: ${missing
+                                .map(
+                                  (id: string) =>
+                                    DRIVER_DOC_TYPES.find((x) => x.id === id)
+                                      ?.label || id,
+                                )
+                                .join(', ')}`}
                         </div>
                       )}
                       {canDispatch && onLoad && (
@@ -662,6 +822,183 @@ export function DispatchTab({
             <div />
           </G2>
           <G2 cols={2}>
+            <Sel
+              label="Broker"
+              value={f.brokerId}
+              onChange={(e: any) => upd('brokerId', e.target.value)}
+            >
+              <option value="">— Optional —</option>
+              {brokers.map((b: any) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                  {b.mc ? ` · MC ${b.mc}` : ''}
+                </option>
+              ))}
+            </Sel>
+            <Sel
+              label="Subcontract carrier"
+              value={f.carrierId}
+              onChange={(e: any) => upd('carrierId', e.target.value)}
+            >
+              <option value="">— Own fleet / none —</option>
+              {carriers.map((c: any) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.mc ? ` · MC ${c.mc}` : ''}
+                </option>
+              ))}
+            </Sel>
+          </G2>
+          <div style={{ fontSize: 11, color: G.muted, marginBottom: 8 }}>
+            Brokers and subcontract carriers come from Company → Master data
+            (active/watch only). Not the same as e-manifest Carrier Profile.
+          </div>
+          <Sel
+            label="Commodity"
+            value={f.commodityId}
+            onChange={(e: any) => upd('commodityId', e.target.value)}
+          >
+            <option value="">— Optional —</option>
+            {commodities.map((c: any) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.hazmat ? ' · HAZMAT' : ''}
+              </option>
+            ))}
+          </Sel>
+          <G2 cols={2}>
+            <Sel
+              label="Cross-border"
+              value={f.crossBorder ? 'yes' : 'no'}
+              onChange={(e: any) => {
+                const on = e.target.value === 'yes';
+                setF((x) => ({
+                  ...x,
+                  crossBorder: on,
+                  ...(on
+                    ? {}
+                    : {
+                        portOfEntryId: '',
+                        portOfEntryCode: '',
+                        portOfEntryName: '',
+                        customsProgram: '',
+                        customsAce: false,
+                        customsAci: false,
+                        customsPaps: false,
+                        customsPars: false,
+                      }),
+                }));
+              }}
+            >
+              <option value="no">No — domestic</option>
+              <option value="yes">Yes — CA↔US</option>
+            </Sel>
+            {f.crossBorder && (
+              <div>
+                <Sel
+                  label="Port of entry *"
+                  value={f.portOfEntryId}
+                  onChange={(e: any) => void applyPort(e.target.value)}
+                >
+                  <option value="">— Select POE —</option>
+                  {ports.map((p: any) => (
+                    <option key={p.id} value={p.id}>
+                      {p.code} · {p.name} ({p.country})
+                    </option>
+                  ))}
+                </Sel>
+                {fieldErr.portOfEntryId && (
+                  <Err>{fieldErr.portOfEntryId}</Err>
+                )}
+              </div>
+            )}
+          </G2>
+          {f.crossBorder && (
+            <>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  marginBottom: 8,
+                  fontSize: 12,
+                }}
+              >
+                {f.customsAce && <Pill>ACE</Pill>}
+                {f.customsAci && <Pill>ACI</Pill>}
+                {f.customsPaps && <Pill>PAPS</Pill>}
+                {f.customsPars && <Pill>PARS</Pill>}
+                {!f.portOfEntryId && (
+                  <span style={{ color: G.muted }}>
+                    Select a port to populate customs options
+                  </span>
+                )}
+              </div>
+              <div>
+                <Sel
+                  label="Customs program *"
+                  value={f.customsProgram}
+                  onChange={(e: any) => upd('customsProgram', e.target.value)}
+                >
+                  <option value="">— Select —</option>
+                  {f.customsAce && <option value="ACE">ACE (US)</option>}
+                  {f.customsAci && <option value="ACI">ACI (Canada)</option>}
+                </Sel>
+                {fieldErr.customsProgram && (
+                  <Err>{fieldErr.customsProgram}</Err>
+                )}
+              </div>
+            </>
+          )}
+          <G2 cols={2}>
+            <Sel
+              label="Origin from master"
+              value={f.originLocationId}
+              onChange={(e: any) => {
+                const id = e.target.value;
+                const loc = mdmLocations.find((x: any) => x.id === id);
+                upd('originLocationId', id);
+                if (loc) {
+                  const label = [loc.name, loc.city, loc.region]
+                    .filter(Boolean)
+                    .join(', ');
+                  if (label) upd('origin', label);
+                }
+              }}
+            >
+              <option value="">— Or type below —</option>
+              {mdmLocations.map((loc: any) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name || loc.city}
+                  {loc.city ? ` · ${loc.city}` : ''}
+                </option>
+              ))}
+            </Sel>
+            <Sel
+              label="Destination from master"
+              value={f.destinationLocationId}
+              onChange={(e: any) => {
+                const id = e.target.value;
+                const loc = mdmLocations.find((x: any) => x.id === id);
+                upd('destinationLocationId', id);
+                if (loc) {
+                  const label = [loc.name, loc.city, loc.region]
+                    .filter(Boolean)
+                    .join(', ');
+                  if (label) upd('destination', label);
+                }
+              }}
+            >
+              <option value="">— Or type below —</option>
+              {mdmLocations.map((loc: any) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name || loc.city}
+                  {loc.city ? ` · ${loc.city}` : ''}
+                </option>
+              ))}
+            </Sel>
+          </G2>
+          <G2 cols={2}>
             <div>
               <Sel
                 label="Truck *"
@@ -670,7 +1007,7 @@ export function DispatchTab({
               >
                 <option value="">— Select truck —</option>
                 {trucks
-                  .filter((t: any) => t.status === 'active')
+                  .filter((t: any) => canAssignAsset(t.status))
                   .map((t: any) => (
                     <option key={t.id} value={t.id}>
                       #{t.unitNo} · {t.year} {t.make} {t.model}
@@ -697,7 +1034,7 @@ export function DispatchTab({
             >
               <option value="">— Select trailer —</option>
               {trailers
-                .filter((t: any) => t.status === 'active')
+                .filter((t: any) => canAssignAsset(t.status))
                 .map((t: any) => (
                   <option key={t.id} value={t.id}>
                     #{t.unitNo} · {t.make} {t.model}

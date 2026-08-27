@@ -45,6 +45,9 @@ model Invoice {
   id            String   @id @default(cuid())
   companyId     String
   customerName  String
+  customerId    String?
+  brokerName    String   @default("")
+  brokerId      String?
   loadId        String?
   tripNo        String   @default("")
   status        String   @default("draft") // draft | sent | partial | paid | void
@@ -63,6 +66,8 @@ model Invoice {
   @@index([companyId])
   @@index([status])
   @@index([loadId])
+  @@index([customerId])
+  @@index([brokerId])
 }
 
 model Bill {

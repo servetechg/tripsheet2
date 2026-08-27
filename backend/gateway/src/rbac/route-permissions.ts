@@ -90,10 +90,14 @@ function rule(
       if (m === 'GET') return { codes: ['users.view', 'users.assign_role'] };
       return { codes: ['users.assign_role'] };
     }
+    if (/\/mdm\/(import|export)/.test(p)) {
+      return { codes: ['company.locations', 'company.edit'] };
+    }
     if (m === 'GET') return { codes: 'any' };
     if (/\/api-keys/.test(p)) return { codes: ['admin.api_keys'] };
     if (/\/security/.test(p) && mutating(m)) return { codes: ['admin.security'] };
-    if (/\/locations|\/branches/.test(p)) return { codes: ['company.locations', 'company.edit'] };
+    if (/\/locations|\/branches|\/brokers|\/customers|\/consignees|\/carriers|\/commodities|\/warehouses|\/ports-of-entry|\/border-crossings|\/maintenance-vendors|\/fuel-stations|\/insurance-providers|\/cost-centers|\/payroll-categories|\/reference-data|\/mdm\/(merge|import|export)/.test(p))
+      return { codes: ['company.locations', 'company.edit'] };
     return { codes: ['company.edit'] };
   }
 

@@ -188,6 +188,12 @@ export class TenantOpsService {
         await this.tenantLocal.ensureInviteLifecycleSchema(row.companyId);
         await this.tenantLocal.ensurePasswordPolicySchema(row.companyId);
         await this.tenantLocal.ensureSecurityNotificationsSchema(row.companyId);
+        await this.tenantLocal.ensureMdmFleetSchema(row.companyId);
+        await this.tenantLocal.ensureMdmPartiesSchema(row.companyId);
+        await this.tenantLocal.ensureMdmCarriersSchema(row.companyId);
+        await this.tenantLocal.ensureMdmCatalogsSchema(row.companyId);
+        await this.tenantLocal.ensureMdmBorderSchema(row.companyId);
+        await this.tenantLocal.ensureMdmOpsSchema(row.companyId);
         await this.tenantLocal.getSecurityPolicy(row.companyId);
         entry.orgOk = true;
 
