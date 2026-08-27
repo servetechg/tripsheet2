@@ -108,6 +108,36 @@ expectAllow('GET', '/api/loads', 'driver', ['dispatch.view']);
 expectDeny('POST', '/api/loads', 'driver', ['dispatch.view', 'payroll.view']);
 expectDeny('GET', '/api/invoices', 'dispatcher', ['dispatch.view', 'dispatch.create']);
 expectAllow('GET', '/api/invoices', 'accountant', ['accounting.view', 'dispatch.view']);
+expectAllow(
+  'GET',
+  '/api/companies/c1/mdm/export',
+  'company_owner',
+  [],
+);
+expectAllow(
+  'GET',
+  '/api/companies/c1/mdm/export',
+  'dispatcher',
+  ['company.locations'],
+);
+expectDeny(
+  'GET',
+  '/api/companies/c1/mdm/export',
+  'dispatcher',
+  ['dispatch.view', 'dispatch.create'],
+);
+expectAllow(
+  'POST',
+  '/api/companies/c1/mdm/import',
+  'dispatcher',
+  ['company.edit'],
+);
+expectDeny(
+  'POST',
+  '/api/companies/c1/mdm/import',
+  'dispatcher',
+  ['dispatch.create'],
+);
 expectAllow('GET', '/api/audit', 'company_owner', []);
 expectDeny('GET', '/api/audit', 'dispatcher', ['dispatch.view', 'dispatch.create']);
 expectDeny('POST', '/api/tenants/x/provision', 'dispatcher', ['dispatch.create']);

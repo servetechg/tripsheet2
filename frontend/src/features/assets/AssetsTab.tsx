@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
-import { assetsApi } from '@/lib/api';
+import { assetsApi, companiesApi } from '@/lib/api';
+import {
+  ASSET_STATUSES,
+  assetStatusLabel,
+  canAssignAsset,
+  normalizeAssetStatus,
+} from '@/lib/assetStatus';
 
 const emptyAsset = {
   type: 'truck',
@@ -17,6 +23,8 @@ const emptyAsset = {
   plate: '',
   notes: '',
   insuranceExpiry: '',
+  insuranceProviderId: '',
+  insuranceProviderName: '',
   plateExpiry: '',
   permitExpiry: '',
 };
@@ -36,6 +44,15 @@ export function AssetsTab({
   const [f, setF] = useState(emptyAsset);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [insurers, setInsurers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) return;
+    void companiesApi
+      .insuranceProviders(company.id, true)
+      .then((list) => setInsurers(Array.isArray(list) ? list : []))
+      .catch(() => setInsurers([]));
+  }, [apiEnabled, company?.id]);
 
   const myTrucks = assets.filter(
     (a: any) => a.companyId === company.id && a.type === 'truck',
@@ -52,7 +69,7 @@ export function AssetsTab({
       : assetTab === 'trailers'
         ? myTrailers
         : myEquipment;
-  const activeCount = list.filter((a: any) => a.status === 'active').length;
+  const activeCount = list.filter((a: any) => canAssignAsset(a.status)).length;
   const typeLabel =
     assetTab === 'trucks'
       ? 'TRUCK'
@@ -83,7 +100,7 @@ export function AssetsTab({
     const body = {
       ...f,
       type,
-      status: 'active' as const,
+      status: 'available' as const,
       unitNo: f.unitNo.trim(),
       companyId: company.id,
     };
@@ -116,7 +133,10 @@ export function AssetsTab({
             a.id === id
               ? {
                   ...a,
-                  status: a.status === 'active' ? 'inactive' : 'active',
+                  status:
+                    normalizeAssetStatus(a.status) === 'available'
+                      ? 'retired'
+                      : 'available',
                 }
               : a,
           ),
@@ -124,6 +144,21 @@ export function AssetsTab({
       }
     } catch (e: any) {
       notify(e?.message || 'Toggle failed', 'error');
+    }
+  };
+
+  const setAssetStatus = async (id: string, status: string) => {
+    try {
+      if (apiEnabled) {
+        await assetsApi.setStatus(id, status);
+        await refreshAll?.();
+      } else {
+        setAssets((p: any[]) =>
+          p.map((a) => (a.id === id ? { ...a, status } : a)),
+        );
+      }
+    } catch (e: any) {
+      notify(e?.message || 'Status update failed', 'error');
     }
   };
 
@@ -277,6 +312,26 @@ export function AssetsTab({
             />
           </G2>
           <G2 cols={2}>
+            <Sel
+              label="Insurance provider"
+              value={f.insuranceProviderId}
+              onChange={(e: any) => {
+                const id = e.target.value;
+                const p = insurers.find((x: any) => x.id === id);
+                setF((x) => ({
+                  ...x,
+                  insuranceProviderId: id,
+                  insuranceProviderName: p?.name || '',
+                }));
+              }}
+            >
+              <option value="">— Optional —</option>
+              {insurers.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Sel>
             <Inp
               label="Insurance expiry"
               value={f.insuranceExpiry}
@@ -285,6 +340,8 @@ export function AssetsTab({
               }
               placeholder="YYYY-MM-DD"
             />
+          </G2>
+          <G2 cols={2}>
             <Inp
               label="Plate expiry"
               value={f.plateExpiry}
@@ -293,15 +350,15 @@ export function AssetsTab({
               }
               placeholder="YYYY-MM-DD"
             />
+            <Inp
+              label="Permit expiry"
+              value={f.permitExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, permitExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
+            />
           </G2>
-          <Inp
-            label="Permit expiry"
-            value={f.permitExpiry}
-            onChange={(e: any) =>
-              setF((x) => ({ ...x, permitExpiry: e.target.value }))
-            }
-            placeholder="YYYY-MM-DD"
-          />
           <Inp
             label="Notes"
             value={f.notes}
@@ -375,8 +432,16 @@ export function AssetsTab({
                   >
                     #{a.unitNo}
                   </span>
-                  <Pill color={a.status === 'active' ? G.success : G.muted}>
-                    {a.status.toUpperCase()}
+                  <Pill
+                    color={
+                      canAssignAsset(a.status)
+                        ? G.success
+                        : normalizeAssetStatus(a.status) === 'out_of_service'
+                          ? G.danger
+                          : G.muted
+                    }
+                  >
+                    {assetStatusLabel(a.status)}
                   </Pill>
                   {loads.find(
                     (l: any) =>
@@ -400,7 +465,11 @@ export function AssetsTab({
                 )}
                 {(a.insuranceExpiry || a.plateExpiry || a.permitExpiry) && (
                   <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
-                    Ins {a.insuranceExpiry || '—'} · Plate {a.plateExpiry || '—'}{' '}
+                    Ins {a.insuranceExpiry || '—'}
+                    {a.insuranceProviderName
+                      ? ` (${a.insuranceProviderName})`
+                      : ''}{' '}
+                    · Plate {a.plateExpiry || '—'}{' '}
                     · Permit {a.permitExpiry || '—'}
                   </div>
                 )}
@@ -417,22 +486,40 @@ export function AssetsTab({
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  value={normalizeAssetStatus(a.status)}
+                  onChange={(e) => void setAssetStatus(a.id, e.target.value)}
+                  style={{
+                    background: '#0a0a0e',
+                    border: `1px solid ${G.border}`,
+                    color: G.text,
+                    borderRadius: 7,
+                    padding: '6px 8px',
+                    fontSize: 11,
+                  }}
+                >
+                  {ASSET_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => toggleStatus(a.id)}
                   style={{
                     background: 'transparent',
                     border: `1px solid ${
-                      a.status === 'active' ? G.muted : G.success
+                      canAssignAsset(a.status) ? G.muted : G.success
                     }`,
-                    color: a.status === 'active' ? G.muted : G.success,
+                    color: canAssignAsset(a.status) ? G.muted : G.success,
                     borderRadius: 7,
                     padding: '6px 12px',
                     fontSize: 11,
                     cursor: 'pointer',
                   }}
                 >
-                  {a.status === 'active' ? 'DEACTIVATE' : 'ACTIVATE'}
+                  {canAssignAsset(a.status) ? 'RETIRE' : 'MAKE AVAILABLE'}
                 </button>
                 <button
                   onClick={() => remove(a.id)}

@@ -1,0 +1,3 @@
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "carrierId" TEXT;
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "carrierName" TEXT;
+CREATE INDEX IF NOT EXISTS "Load_carrierId_idx" ON "Load"("carrierId");

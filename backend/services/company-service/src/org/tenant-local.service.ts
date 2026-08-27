@@ -16,6 +16,20 @@ import {
   sanitizePermissionCodes,
   slugifyRoleCode,
 } from './custom-role.util';
+import {
+  buildCommodityNormalizedKey,
+  DEFAULT_COMMODITIES,
+} from '../mdm/catalog.util';
+import {
+  DEFAULT_PORTS,
+  uniqueBorderCrossingNames,
+} from '../mdm/border.util';
+import {
+  DEFAULT_COST_CENTERS,
+  DEFAULT_EXPENSE_CATEGORIES,
+  DEFAULT_PAYROLL_CATEGORIES,
+  REF_KIND_EXPENSE,
+} from '../mdm/ops-ref.util';
 
 type AuditActor = { id?: string; name?: string };
 
@@ -46,6 +60,11 @@ export class TenantLocalService {
     const client = new Client({ connectionString: url });
     await client.connect();
     return client;
+  }
+
+  /** Public tenant pg client for MDM module (caller must `.end()`). */
+  openTenantClient(companyId: string): Promise<Client> {
+    return this.tenantClient(companyId);
   }
 
   /** Ensure Phase 5 org tables exist (idempotent). */
@@ -120,6 +139,185 @@ export class TenantLocalService {
     try {
       const sql = this.loadSql('008_security_notifications.sql');
       await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 1: asset status + EquipmentType catalog. */
+  async ensureMdmFleetSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('009_mdm_fleet_phase1.sql');
+      await client.query(sql);
+      const types: Array<{ code: string; name: string }> = [
+        { code: 'dry_van', name: 'Dry Van' },
+        { code: 'reefer', name: 'Reefer' },
+        { code: 'flatbed', name: 'Flatbed' },
+        { code: 'step_deck', name: 'Step Deck' },
+        { code: 'double_drop', name: 'Double Drop' },
+        { code: 'rgn', name: 'RGN' },
+        { code: 'power_only', name: 'Power Only' },
+        { code: 'container', name: 'Container' },
+        { code: 'tanker', name: 'Tanker' },
+        { code: 'hopper', name: 'Hopper' },
+        { code: 'car_hauler', name: 'Car Hauler' },
+      ];
+      for (const t of types) {
+        await client.query(
+          `INSERT INTO fleet."EquipmentType"
+            ("id","companyId","code","name","system","status")
+           VALUES ($1,$2,$3,$4,true,'active')
+           ON CONFLICT ("companyId","code") DO NOTHING`,
+          [`eqt_${companyId}_${t.code}`, companyId, t.code, t.name],
+        );
+      }
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 2: Location + Broker/Customer/Consignee. */
+  async ensureMdmPartiesSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('010_mdm_parties_phase2.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 3: subcontract Carrier (+ Load.carrierId). */
+  async ensureMdmCarriersSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('011_mdm_carriers_phase3.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 4: Commodity + Warehouse catalogs. */
+  async ensureMdmCatalogsSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('012_mdm_catalogs_phase4.sql');
+      await client.query(sql);
+      for (const t of DEFAULT_COMMODITIES) {
+        const key = buildCommodityNormalizedKey(t.name);
+        await client.query(
+          `INSERT INTO company_local."Commodity"
+            ("id","companyId","name","nmfc","hazmat","status","normalizedKey","system")
+           VALUES ($1,$2,$3,$4,$5,'active',$6,true)
+           ON CONFLICT ("companyId","normalizedKey") DO NOTHING`,
+          [
+            `cmd_${companyId}_${t.code}`.slice(0, 64),
+            companyId,
+            t.name,
+            t.nmfc || '',
+            t.hazmat,
+            key,
+          ],
+        );
+      }
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 5: Border crossings + Ports of Entry. */
+  async ensureMdmBorderSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('013_mdm_border_phase5.sql');
+      await client.query(sql);
+      for (const name of uniqueBorderCrossingNames()) {
+        await client.query(
+          `INSERT INTO company_local."BorderCrossing"
+            ("id","companyId","name","countries","status","system")
+           VALUES ($1,$2,$3,'CA-US','active',true)
+           ON CONFLICT ("companyId","name") DO NOTHING`,
+          [`bcx_${companyId}_${name}`.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 64), companyId, name],
+        );
+      }
+      const crossings = await client.query(
+        `SELECT "id","name" FROM company_local."BorderCrossing" WHERE "companyId"=$1`,
+        [companyId],
+      );
+      const byName = new Map(
+        crossings.rows.map((r: { id: string; name: string }) => [r.name, r.id]),
+      );
+      for (const p of DEFAULT_PORTS) {
+        const bcxId = byName.get(p.borderCrossing) || null;
+        await client.query(
+          `INSERT INTO company_local."PortOfEntry"
+            ("id","companyId","code","name","country","borderCrossingId","borderCrossingName",
+             "fastLane","ace","aci","paps","pars","restrictions","status","system")
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'active',true)
+           ON CONFLICT ("companyId","code") DO NOTHING`,
+          [
+            `poe_${companyId}_${p.code}`.slice(0, 64),
+            companyId,
+            p.code,
+            p.name,
+            p.country,
+            bcxId,
+            p.borderCrossing,
+            Boolean(p.fastLane),
+            p.ace,
+            p.aci,
+            p.paps,
+            p.pars,
+            p.restrictions || '',
+          ],
+        );
+      }
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 5 MDM Phase 6: vendors, fuel, insurance, cost/payroll refs. */
+  async ensureMdmOpsSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('014_mdm_ops_phase6.sql');
+      await client.query(sql);
+      for (const t of DEFAULT_COST_CENTERS) {
+        await client.query(
+          `INSERT INTO company_local."CostCenter"
+            ("id","companyId","code","name","status","system")
+           VALUES ($1,$2,$3,$4,'active',true)
+           ON CONFLICT ("companyId","code") DO NOTHING`,
+          [`cc_${companyId}_${t.code}`.slice(0, 64), companyId, t.code, t.name],
+        );
+      }
+      for (const t of DEFAULT_PAYROLL_CATEGORIES) {
+        await client.query(
+          `INSERT INTO company_local."PayrollCategory"
+            ("id","companyId","code","name","status","system")
+           VALUES ($1,$2,$3,$4,'active',true)
+           ON CONFLICT ("companyId","code") DO NOTHING`,
+          [`pay_${companyId}_${t.code}`.slice(0, 64), companyId, t.code, t.name],
+        );
+      }
+      for (const t of DEFAULT_EXPENSE_CATEGORIES) {
+        await client.query(
+          `INSERT INTO company_local."ReferenceData"
+            ("id","companyId","kind","code","name","status","system")
+           VALUES ($1,$2,$3,$4,$5,'active',true)
+           ON CONFLICT ("companyId","kind","code") DO NOTHING`,
+          [
+            `ref_${companyId}_${t.code}`.slice(0, 64),
+            companyId,
+            REF_KIND_EXPENSE,
+            t.code,
+            t.name,
+          ],
+        );
+      }
     } finally {
       await client.end().catch(() => undefined);
     }

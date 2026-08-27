@@ -1,4 +1,5 @@
 import { IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { ASSET_STATUS_INPUT } from '../asset-status';
 
 export class CreateAssetDto {
   @IsString()
@@ -33,8 +34,8 @@ export class CreateAssetDto {
   plate?: string;
 
   @IsOptional()
-  @IsIn(['active', 'inactive'])
-  status?: 'active' | 'inactive';
+  @IsIn([...ASSET_STATUS_INPUT])
+  status?: (typeof ASSET_STATUS_INPUT)[number];
 
   @IsOptional()
   @IsString()
@@ -51,4 +52,16 @@ export class CreateAssetDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  equipmentTypeCode?: string;
+
+  @IsOptional()
+  @IsString()
+  insuranceProviderId?: string;
+
+  @IsOptional()
+  @IsString()
+  insuranceProviderName?: string;
 }

@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import type { ThemeMode } from '@/lib/theme';
 import { Icons } from '@/components/ui/Icons';
+import { Btn, Inp, Modal } from '@/components/ui';
 import { authApi, setTokens, ApiError } from '@/lib/api';
+import { useConfirm } from '@/context/ConfirmContext';
 import { useSession } from '@/context/SessionContext';
 import { SessionsDevicesPanel } from '@/features/auth/SessionsDevicesPanel';
 import { MfaSettingsPanel } from '@/features/auth/MfaSettingsPanel';
@@ -43,6 +45,7 @@ export function UserMenu({
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [mfaOpen, setMfaOpen] = useState(false);
   const { logout } = useSession();
+  const confirm = useConfirm();
   const rootRef = useRef<HTMLDivElement>(null);
   const displayName = name || companyLabel || 'Admin';
   const initials = initialsFrom(name, companyLabel || 'A');
@@ -277,11 +280,15 @@ export function UserMenu({
             }}
             onClick={() => {
               setOpen(false);
-              if (
-                window.confirm(
-                  'Sign out this account on all devices? You will need to log in again.',
-                )
-              ) {
+              void (async () => {
+                const ok = await confirm({
+                  title: 'Sign out all sessions',
+                  message:
+                    'Sign out this account on all devices? You will need to log in again.',
+                  confirmLabel: 'Sign out all',
+                  variant: 'danger',
+                });
+                if (!ok) return;
                 void authApi
                   .logoutAll()
                   .catch(() => undefined)
@@ -289,7 +296,7 @@ export function UserMenu({
                     logout();
                     onLogout?.();
                   });
-              }
+              })();
             }}
           >
             <span>Sign out all sessions</span>
@@ -345,82 +352,20 @@ export function UserMenu({
         </div>
       )}
 
-      {pwOpen && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: G.overlay,
-            zIndex: 500,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: 16,
-          }}
-          onClick={() => !pwBusy && setPwOpen(false)}
-        >
-          <div
-            style={{
-              background: G.card,
-              border: `1px solid ${G.border}`,
-              borderRadius: RADIUS.xl,
-              padding: 20,
-              width: 360,
-              maxWidth: '100%',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 12 }}>Change password</div>
-            <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
-              This signs out other sessions. Existing weak passwords can still
-              log in until you change them here.
-            </div>
-            {pwErr && (
-              <div style={{ color: G.danger, fontSize: 12, marginBottom: 8 }}>
-                {pwErr}
-              </div>
-            )}
-            <input
-              type="password"
-              placeholder="Current password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              style={{
-                width: '100%',
-                marginBottom: 8,
-                padding: 10,
-                borderRadius: 8,
-                border: `1px solid ${G.border}`,
-                background: G.card2,
-                color: G.text,
-              }}
-            />
-            <input
-              type="password"
-              placeholder="New password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              style={{
-                width: '100%',
-                marginBottom: 12,
-                padding: 10,
-                borderRadius: 8,
-                border: `1px solid ${G.border}`,
-                background: G.card2,
-                color: G.text,
-              }}
-            />
+      {pwOpen ? (
+        <Modal
+          open
+          title="Change password"
+          onClose={() => !pwBusy && setPwOpen(false)}
+          maxWidth={400}
+          closeOnBackdrop={!pwBusy}
+          showClose={false}
+          footer={
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                disabled={pwBusy}
-                onClick={() => setPwOpen(false)}
-                style={{ ...itemStyle, width: 'auto' }}
-              >
+              <Btn variant="outline" disabled={pwBusy} onClick={() => setPwOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
+              </Btn>
+              <Btn
                 disabled={pwBusy}
                 onClick={() => {
                   setPwErr('');
@@ -440,19 +385,36 @@ export function UserMenu({
                     })
                     .finally(() => setPwBusy(false));
                 }}
-                style={{
-                  ...itemStyle,
-                  width: 'auto',
-                  background: G.gold,
-                  color: G.onGold,
-                }}
               >
                 {pwBusy ? 'Saving…' : 'Save'}
-              </button>
+              </Btn>
             </div>
+          }
+        >
+          <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
+            This signs out other sessions. Existing weak passwords can still
+            log in until you change them here.
           </div>
-        </div>
-      )}
+          {pwErr ? (
+            <div style={{ color: G.danger, fontSize: 12, marginBottom: 8 }}>
+              {pwErr}
+            </div>
+          ) : null}
+          <Inp
+            type="password"
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Inp
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            style={{ marginBottom: 0 }}
+          />
+        </Modal>
+      ) : null}
 
       {sessionsOpen && (
         <SessionsDevicesPanel onClose={() => setSessionsOpen(false)} />

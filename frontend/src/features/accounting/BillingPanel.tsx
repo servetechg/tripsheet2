@@ -9,6 +9,7 @@ import {
   paymentsApi,
   accountsApi,
   auditApi,
+  companiesApi,
 } from '@/lib/api';
 
 export function BillingPanel({
@@ -24,8 +25,13 @@ export function BillingPanel({
   const [bills, setBills] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [accounts, setAccounts] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [brokers, setBrokers] = useState<any[]>([]);
   const [inv, setInv] = useState({
     customerName: '',
+    customerId: '',
+    brokerId: '',
+    brokerName: '',
     loadId: '',
     issueDate: '',
     dueDate: '',
@@ -51,16 +57,20 @@ export function BillingPanel({
   const loadAll = async () => {
     if (!apiEnabled) return;
     try {
-      const [i, b, p, a] = await Promise.all([
+      const [i, b, p, a, c, br] = await Promise.all([
         invoicesApi.list(company.id),
         billsApi.list(company.id),
         paymentsApi.list(company.id),
         accountsApi.list(company.id),
+        companiesApi.customers(company.id, true).catch(() => []),
+        companiesApi.brokers(company.id, true).catch(() => []),
       ]);
       setInvoices(i);
       setBills(b);
       setPayments(p);
       setAccounts(a);
+      setCustomers(Array.isArray(c) ? c : []);
+      setBrokers(Array.isArray(br) ? br : []);
     } catch (e: any) {
       notify(e?.message || 'Billing load failed', 'error');
     }
@@ -86,6 +96,9 @@ export function BillingPanel({
       await invoicesApi.create({
         companyId: company.id,
         customerName: inv.customerName,
+        customerId: inv.customerId || null,
+        brokerId: inv.brokerId || null,
+        brokerName: inv.brokerName || '',
         loadId: inv.loadId || null,
         tripNo: load?.tripNo || '',
         issueDate: inv.issueDate,
@@ -176,8 +189,48 @@ export function BillingPanel({
 
       {section === 'invoices' && (
         <Card>
+          <Sel
+            label="Customer (master)"
+            value={inv.customerId}
+            onChange={(e: any) => {
+              const id = e.target.value;
+              const c = customers.find((x: any) => x.id === id);
+              setInv({
+                ...inv,
+                customerId: id,
+                customerName: c?.name || inv.customerName,
+              });
+            }}
+          >
+            <option value="">— Or type name below —</option>
+            {customers.map((c: any) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Sel>
+          <Sel
+            label="Broker (master)"
+            value={inv.brokerId}
+            onChange={(e: any) => {
+              const id = e.target.value;
+              const b = brokers.find((x: any) => x.id === id);
+              setInv({
+                ...inv,
+                brokerId: id,
+                brokerName: b?.name || '',
+              });
+            }}
+          >
+            <option value="">— Optional —</option>
+            {brokers.map((b: any) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </Sel>
           <Inp
-            label="Customer"
+            label="Customer name"
             value={inv.customerName}
             onChange={(e: any) => setInv({ ...inv, customerName: e.target.value })}
           />

@@ -14,6 +14,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:rbac": "ts-node --transpile-only src/assets/check-asset-status.ts && ts-node --transpile-only src/loads/check-cross-border.ts && ts-node --transpile-only src/loads/check-chapter5-acceptance.ts",
+    "test:mdm:acceptance": "ts-node --transpile-only src/loads/check-chapter5-acceptance.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {

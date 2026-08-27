@@ -3,7 +3,7 @@ import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { blank } from '@/lib/format';
-import { maintenanceApi, dvirApi, auditApi } from '@/lib/api';
+import { maintenanceApi, dvirApi, auditApi, companiesApi } from '@/lib/api';
 
 export function FleetOpsTab({
   company,
@@ -15,6 +15,7 @@ export function FleetOpsTab({
   const [tab, setTab] = useState<'maintenance' | 'dvir' | 'expiry'>('maintenance');
   const [rows, setRows] = useState<any[]>([]);
   const [dvirs, setDvirs] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>([]);
   const [f, setF] = useState({
     assetId: '',
     type: 'pm',
@@ -23,6 +24,7 @@ export function FleetOpsTab({
     performedAt: '',
     nextDueAt: '',
     vendor: '',
+    vendorId: '',
   });
   const [d, setD] = useState({
     assetId: '',
@@ -35,12 +37,14 @@ export function FleetOpsTab({
   const load = async () => {
     if (!apiEnabled) return;
     try {
-      const [m, v] = await Promise.all([
+      const [m, v, vendorsList] = await Promise.all([
         maintenanceApi.list(company.id),
         dvirApi.list(company.id),
+        companiesApi.maintenanceVendors(company.id, true).catch(() => []),
       ]);
       setRows(m);
       setDvirs(v);
+      setVendors(Array.isArray(vendorsList) ? vendorsList : []);
     } catch (e: any) {
       notify(e?.message || 'Failed to load fleet ops', 'error');
     }
@@ -57,6 +61,7 @@ export function FleetOpsTab({
       return;
     }
     const asset = assets.find((a: any) => a.id === f.assetId);
+    const vendor = vendors.find((v: any) => v.id === f.vendorId);
     try {
       await maintenanceApi.create({
         companyId: company.id,
@@ -67,7 +72,8 @@ export function FleetOpsTab({
         cost: Number(f.cost || 0),
         performedAt: f.performedAt,
         nextDueAt: f.nextDueAt || null,
-        vendor: f.vendor,
+        vendor: vendor?.name || f.vendor,
+        vendorId: f.vendorId || null,
       });
       await auditApi.create({
         companyId: company.id,
@@ -86,6 +92,7 @@ export function FleetOpsTab({
         performedAt: '',
         nextDueAt: '',
         vendor: '',
+        vendorId: '',
       });
       await load();
     } catch (e: any) {
@@ -188,6 +195,22 @@ export function FleetOpsTab({
               onChange={(e: any) => setF({ ...f, nextDueAt: e.target.value })}
               placeholder="YYYY-MM-DD"
             />
+            <Sel
+              label="Vendor"
+              value={f.vendorId}
+              onChange={(e: any) => {
+                const id = e.target.value;
+                const v = vendors.find((x: any) => x.id === id);
+                setF({ ...f, vendorId: id, vendor: v?.name || '' });
+              }}
+            >
+              <option value="">— Optional —</option>
+              {vendors.map((v: any) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </Sel>
             <Btn onClick={() => void addMaintenance()}>Save maintenance</Btn>
           </div>
           {rows.map((r) => (
@@ -203,6 +226,7 @@ export function FleetOpsTab({
                 {r.type.toUpperCase()} · #{r.unitNo}
               </strong>{' '}
               {r.title} · ${Number(r.cost).toFixed(2)} · {r.performedAt}
+              {r.vendor ? ` · ${r.vendor}` : ''}
               {r.nextDueAt && (
                 <span style={{ marginLeft: 8 }}>
                   <Pill>Next {r.nextDueAt}</Pill>

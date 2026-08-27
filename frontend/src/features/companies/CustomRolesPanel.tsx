@@ -7,6 +7,7 @@ import {
   type CustomRoleDto,
 } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { useCan } from '@/lib/permissions';
 import { CUSTOM_ROLE_BASE_ROLES, ROLE_LABELS } from '@tripsheet/shared';
 
@@ -20,6 +21,7 @@ type SysRole = {
 
 export function CustomRolesPanel({ companyId }: { companyId: string }) {
   const { can } = useCan();
+  const confirm = useConfirm();
   const canWrite = can('users.assign_role');
   const [roles, setRoles] = useState<CustomRoleDto[]>([]);
   const [catalog, setCatalog] = useState<Perm[]>([]);
@@ -152,9 +154,14 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
 
   const remove = async () => {
     if (selectedId === 'new') return;
-    if (!window.confirm('Delete this custom role? Assigned users keep their system base role until reassigned.')) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Delete custom role',
+      message:
+        'Delete this custom role? Assigned users keep their system base role until reassigned.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await companiesApi.deleteCustomRole(companyId, selectedId);

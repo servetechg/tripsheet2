@@ -17,6 +17,11 @@ import { UpdateAssetDto } from './dto/update-asset.dto';
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
+  @Get('equipment-types')
+  listEquipmentTypes(@Query('companyId') companyId: string) {
+    return this.assetsService.listEquipmentTypes(companyId);
+  }
+
   @Get()
   findAll(@Query() query: ListAssetsDto) {
     return this.assetsService.findAll(query);
@@ -35,6 +40,11 @@ export class AssetsController {
   @Patch(':id/toggle-active')
   toggleActive(@Param('id') id: string) {
     return this.assetsService.toggleActive(id);
+  }
+
+  @Patch(':id/status')
+  setStatus(@Param('id') id: string, @Body() body: { status?: string }) {
+    return this.assetsService.setStatus(id, String(body?.status || ''));
   }
 
   @Delete(':id')

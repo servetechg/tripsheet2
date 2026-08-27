@@ -23,10 +23,12 @@ export function MessagesTab({
   const [c, setC] = useState({ body: '' });
   const [smsTo, setSmsTo] = useState('');
   const [smsBody, setSmsBody] = useState('');
+  const [loadErr, setLoadErr] = useState('');
 
   const refresh = async () => {
     if (!apiEnabled) return;
     try {
+      setLoadErr('');
       const m = await messagesApi.list(company.id);
       setMsgs(m);
       if (loadId) {
@@ -34,7 +36,10 @@ export function MessagesTab({
         setComments(cm);
       }
     } catch (e: any) {
-      notify(e?.message || 'Failed to load messages', 'error');
+      setLoadErr(
+        e?.message ||
+          'Messages could not be loaded. The notification service may be offline — run npm run start:dev in /backend.',
+      );
     }
   };
 
@@ -119,6 +124,20 @@ export function MessagesTab({
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <SectionTitle>Communication</SectionTitle>
+      {loadErr ? (
+        <div
+          style={{
+            background: G.errTint,
+            border: `1px solid ${G.danger}44`,
+            borderRadius: 10,
+            padding: '12px 14px',
+            fontSize: 13,
+            color: G.errText,
+          }}
+        >
+          {loadErr}
+        </div>
+      ) : null}
       <Card>
         <SectionTitle>Driver / internal messages</SectionTitle>
         <Sel

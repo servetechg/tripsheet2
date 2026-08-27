@@ -80,6 +80,9 @@ export class BillingService {
       data: {
         companyId,
         customerName,
+        customerId: body.customerId ? String(body.customerId) : null,
+        brokerName: String(body.brokerName || ''),
+        brokerId: body.brokerId ? String(body.brokerId) : null,
         loadId: body.loadId ? String(body.loadId) : null,
         tripNo: String(body.tripNo || ''),
         status: String(body.status || 'draft'),
@@ -101,6 +104,8 @@ export class BillingService {
     const data: Record<string, unknown> = {};
     for (const key of [
       'customerName',
+      'customerId',
+      'brokerName',
       'tripNo',
       'status',
       'issueDate',
@@ -112,6 +117,9 @@ export class BillingService {
     }
     if (body.loadId !== undefined) {
       data.loadId = body.loadId ? String(body.loadId) : null;
+    }
+    if (body.brokerId !== undefined) {
+      data.brokerId = body.brokerId ? String(body.brokerId) : null;
     }
     if (body.lines !== undefined) {
       const lines = Array.isArray(body.lines) ? body.lines : [];
