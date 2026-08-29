@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tripsheet/shared": "file:../shared",
+    "lucide-react": "^1.37.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.6.2"

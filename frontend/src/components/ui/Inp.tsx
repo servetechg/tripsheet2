@@ -11,7 +11,7 @@ export function Inp({ label, style: sx, inputStyle, ...p }: InpProps) {
   return (
     <div style={{ marginBottom: 12, ...sx }}>
       {label && <label style={labelBase()}>{label}</label>}
-      <input style={{ ...inputBase(), ...inputStyle }} {...p} />
+      <input className="ts-input" style={{ ...inputBase(), ...inputStyle }} {...p} />
     </div>
   );
 }

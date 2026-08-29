@@ -17,18 +17,17 @@ export function NotificationBell({
       aria-label="Notifications"
       onClick={onClick}
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        border: `1px solid ${G.border}`,
-        background: G.card,
-        color: G.muted2,
+        width: 34,
+        height: 34,
+        borderRadius: '50%',
+        border: 'none',
+        background: 'transparent',
+        color: G.text,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
         position: 'relative',
-        boxShadow: G.shadow,
         fontFamily: 'inherit',
       }}
     >

@@ -11,7 +11,7 @@ export function Sel({ label, children, style: sx, ...p }: SelProps) {
   return (
     <div style={{ marginBottom: 12, ...sx }}>
       {label && <label style={labelBase()}>{label}</label>}
-      <select style={{ ...inputBase(), appearance: 'none', cursor: 'pointer' }} {...p}>
+      <select className="ts-input" style={{ ...inputBase(), appearance: 'none', cursor: 'pointer' }} {...p}>
         {children}
       </select>
     </div>

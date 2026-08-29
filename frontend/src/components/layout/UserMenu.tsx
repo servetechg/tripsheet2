@@ -92,15 +92,16 @@ export function UserMenu({
       >
         <div
           style={{
-            width: 34,
-            height: 34,
-            borderRadius: 11,
-            background: `linear-gradient(145deg, ${G.gold}, ${G.goldDim})`,
-            color: G.onGold,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            background: G.goldBg,
+            color: G.gold,
+            border: `1px solid ${G.gold}33`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontWeight: 700,
+            fontWeight: 600,
             fontSize: 12,
             flexShrink: 0,
           }}

@@ -32,11 +32,11 @@ export function BottomNav({ tabs, active, onChange }: any) {
             type="button"
             onClick={() => onChange(t.id)}
             style={{
-              flex: '0 0 auto',
-              minWidth: 68,
+              flex: '1',
+              minWidth: 64,
               background: 'none',
               border: 'none',
-              padding: '10px 8px 8px',
+              padding: '10px 8px',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
@@ -47,8 +47,8 @@ export function BottomNav({ tabs, active, onChange }: any) {
           >
             <span
               style={{
-                width: 22,
-                height: 22,
+                width: 20,
+                height: 20,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -60,7 +60,7 @@ export function BottomNav({ tabs, active, onChange }: any) {
             <span
               style={{
                 fontSize: 10,
-                letterSpacing: 0.2,
+                letterSpacing: -0.1,
                 color,
                 fontWeight: on ? 600 : 500,
                 lineHeight: 1.2,

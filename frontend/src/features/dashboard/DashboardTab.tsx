@@ -528,10 +528,10 @@ export function DashboardTab({
             style={{
               border: `1px solid ${G.border}`,
               borderRadius: RADIUS.lg,
-              overflow: 'hidden',
+              overflowX: 'auto',
             }}
           >
-            <table className="ts-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table className="ts-table" style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
               <thead>
                 <tr style={{ background: G.card2 }}>
                   {['Driver', 'Truck', 'Period', 'Legs', 'Status', ''].map((h) => (
