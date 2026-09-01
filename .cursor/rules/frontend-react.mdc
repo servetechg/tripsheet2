@@ -1,0 +1,32 @@
+---
+description: Frontend React/Vite conventions
+globs: frontend/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Frontend conventions
+
+## Structure
+
+- Features: `frontend/src/features/<domain>/`
+- API client: `frontend/src/lib/api.ts`
+- Routes: `frontend/src/routes/AppRoutes.tsx`, paths in `lib/paths.ts`
+- Session/RBAC: `SessionContext`, permission checks via `can('permission.code')`
+
+## Patterns
+
+- Load data in feature tabs; use `apiEnabled` guard when API offline
+- Invite links: `${origin}/invite?invite=${encodeURIComponent(token)}` — never `/app/drivers?invite=`
+- Company settings tabs gated by permissions (`CompanySettingsTab.tsx`)
+- Reuse UI from `frontend/src/components/ui/` (Btn, Inp, Card, etc.)
+
+## Change checklist
+
+1. Add API helper in `api.ts` if new endpoint
+2. Gate UI by permission when mutating
+3. Manual smoke: one happy path in browser — don't document unless asked
+
+## Do not
+
+- Add new CSS frameworks; use existing inline `G.*` theme tokens
+- Fetch with raw fetch outside `api.ts` unless public/unauthenticated route

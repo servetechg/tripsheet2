@@ -51,14 +51,35 @@ export type AppUser = AuthUserDto & {
   fastCard?: string;
   notes?: string;
   sin?: string;
+  active?: boolean;
+  lifecycleStatus?: string;
+  driverType?: string;
+  employeeNumber?: string;
+  employmentStatus?: string;
+  hireDate?: string;
+  probationEndDate?: string;
+  seniorityDate?: string;
+  branchId?: string;
+  managerUserId?: string;
+  dispatcherUserId?: string;
+  preferredName?: string;
+  preferredLanguage?: string;
+  ownerOperatorProfile?: Record<string, unknown>;
+  qualifications?: any[];
+  availabilityStatus?: string;
 };
+
+export type RefreshScope = 'full' | 'driver';
 
 interface AppData {
   apiEnabled: boolean;
   apiError: string | null;
   servicesDown: string[];
   loading: boolean;
-  refreshAll: (companyId?: string | null) => Promise<void>;
+  refreshAll: (
+    companyId?: string | null,
+    scope?: RefreshScope,
+  ) => Promise<void>;
 
   companies: Company[];
   setCompanies: Dispatch<SetStateAction<Company[]>>;
@@ -116,7 +137,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [driverDocs, setDriverDocs] = useState<any[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
 
-  const refreshAll = useCallback(async (companyId?: string | null) => {
+  const refreshAll = useCallback(async (
+    companyId?: string | null,
+    scope: RefreshScope = 'full',
+  ) => {
     setLoading(true);
     const live = await pingApi();
     setApiEnabled(live);
@@ -153,16 +177,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       }
 
       if (companyId && companyId !== 'all') {
-        const [drv, docs, inv, ast, lds, man, carrier, sh] = await Promise.all([
+        const driverScope = scope === 'driver';
+        const [drv, docs, sh] = await Promise.all([
           driversApi.list(companyId).catch(() => []),
           documentsApi.list({ companyId }).catch(() => []),
-          invitesApi.list(companyId).catch(() => []),
-          assetsApi.list(companyId).catch(() => []),
-          loadsApi.list({ companyId }).catch(() => []),
-          manifestsApi.list(companyId).catch(() => []),
-          carrierProfilesApi.get(companyId).catch(() => null),
           tripSheetsApi.list({ companyId }).catch(() => []),
         ]);
+
+        let inv: Invite[] = [];
+        let ast: Asset[] = [];
+        let lds: Load[] = [];
+        let man: Manifest[] = [];
+        let carrier: CarrierProfile | null = null;
+
+        if (!driverScope) {
+          [inv, ast, lds, man, carrier] = await Promise.all([
+            invitesApi.list(companyId).catch(() => []),
+            assetsApi.list(companyId).catch(() => []),
+            loadsApi.list({ companyId }).catch(() => []),
+            manifestsApi.list(companyId).catch(() => []),
+            carrierProfilesApi.get(companyId).catch(() => null),
+          ]);
+        }
 
         const driverUsers: AppUser[] = (drv as any[]).map((d) => ({
           id: d.userId || d.id,
@@ -181,6 +217,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           fastCard: d.fastCard,
           notes: d.notes,
           sin: d.sin,
+          active: d.active !== false,
+          lifecycleStatus: d.lifecycleStatus || (d.active === false ? 'suspended' : 'active'),
+          driverType: d.driverType,
+          employeeNumber: d.employeeNumber,
+          employmentStatus: d.employmentStatus,
+          hireDate: d.hireDate,
+          probationEndDate: d.probationEndDate,
+          seniorityDate: d.seniorityDate,
+          branchId: d.branchId,
+          managerUserId: d.managerUserId,
+          dispatcherUserId: d.dispatcherUserId,
+          preferredName: d.preferredName,
+          preferredLanguage: d.preferredLanguage,
+          ownerOperatorProfile: d.ownerOperatorProfile,
+          qualifications: d.qualifications,
+          availabilityStatus: d.availabilityStatus || 'available',
         }));
 
         setUsers((prev) => {

@@ -8,7 +8,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { G, pageCentered } from '@/lib/theme';
-import { Btn, Icons } from '@/components/ui';
+import { Btn, Icons, Inp } from '@/components/ui';
 import { ToastHost } from '@/components/feedback/Toast';
 import { useAppData, type AppUser } from '@/context/AppDataContext';
 import { useSession } from '@/context/SessionContext';
@@ -115,25 +115,30 @@ function StaffOnboarding({
         {err ? (
           <div style={{ color: G.danger, fontSize: 13, marginBottom: 12 }}>{err}</div>
         ) : null}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <Inp
+            label="Full name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Full name"
-            style={{ padding: 10, borderRadius: 8 }}
+            style={{ marginBottom: 0 }}
           />
-          <input
+          <Inp
+            label="Email"
+            type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Email"
-            style={{ padding: 10, borderRadius: 8 }}
+            style={{ marginBottom: 0 }}
           />
-          <input
+          <Inp
+            label="Password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
-            style={{ padding: 10, borderRadius: 8 }}
+            hint={invite.passwordPolicy?.hint}
+            style={{ marginBottom: 0 }}
           />
           <Btn
             full
@@ -583,7 +588,7 @@ function DriverWorkspace() {
   }, [rawTab, navigate]);
 
   useEffect(() => {
-    if (user?.companyId) void data.refreshAll(user.companyId);
+    if (user?.companyId) void data.refreshAll(user.companyId, 'driver');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.companyId]);
 
@@ -651,7 +656,7 @@ function DriverWorkspace() {
       themeMode={themeMode}
       onToggleTheme={toggleTheme}
       apiEnabled={data.apiEnabled}
-      refreshAll={() => data.refreshAll(company.id)}
+      refreshAll={() => data.refreshAll(company.id, 'driver')}
       activeTab={tab}
       onTabChange={(id: string) => navigate(driverTabPath(id))}
     />

@@ -883,7 +883,97 @@ export const driversApi = {
     api(`/drivers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => api(`/drivers/${id}`, { method: 'DELETE' }),
   dispatchReady: (id: string) =>
-    api<{ ready: boolean; missing: string[] }>(`/drivers/${id}/dispatch-ready`),
+    api<{
+      ready: boolean;
+      missing: string[];
+      lifecycleOk?: boolean;
+      lifecycleStatus?: string;
+    }>(`/drivers/${id}/dispatch-ready`),
+  approve: (id: string) =>
+    api(`/drivers/${id}/approve`, { method: 'POST', body: '{}' }),
+  suspend: (id: string, reason?: string) =>
+    api(`/drivers/${id}/suspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  terminate: (id: string, reason?: string) =>
+    api(`/drivers/${id}/terminate`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  archive: (id: string) =>
+    api(`/drivers/${id}/archive`, { method: 'POST', body: '{}' }),
+  qualifications: (driverId: string) =>
+    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/qualifications`),
+  createQualification: (driverId: string, body: unknown) =>
+    api(`/drivers/${encodeURIComponent(driverId)}/qualifications`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateQualification: (id: string, body: unknown) =>
+    api(`/qualifications/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  removeQualification: (id: string) =>
+    api(`/qualifications/${id}`, { method: 'DELETE' }),
+  borderEligible: (id: string) =>
+    api<{
+      eligible: boolean;
+      missing: string[];
+      warnings: string[];
+    }>(`/drivers/${id}/border-eligible`),
+  performance: (id: string) =>
+    api<{
+      totalMiles: number;
+      deliveriesCompleted: number;
+      onTimePct: number | null;
+      revenue: number;
+      inTransit: number;
+      totalLoads: number;
+    }>(`/drivers/${id}/performance`),
+  equipmentAssignments: (driverId: string) =>
+    api<any[]>(
+      `/drivers/${encodeURIComponent(driverId)}/equipment-assignments`,
+    ),
+  assignEquipment: (driverId: string, body: unknown) =>
+    api(`/drivers/${encodeURIComponent(driverId)}/equipment-assignments`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  unassignEquipment: (assignmentId: string) =>
+    api(`/equipment-assignments/${assignmentId}/unassign`, {
+      method: 'PATCH',
+      body: '{}',
+    }),
+  safetyEvents: (driverId: string) =>
+    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/safety-events`),
+  createSafetyEvent: (driverId: string, body: unknown) =>
+    api(`/drivers/${encodeURIComponent(driverId)}/safety-events`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateSafetyEvent: (id: string, body: unknown) =>
+    api(`/safety-events/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  removeSafetyEvent: (id: string) =>
+    api(`/safety-events/${id}`, { method: 'DELETE' }),
+  trainingRecords: (driverId: string) =>
+    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/training-records`),
+  createTrainingRecord: (driverId: string, body: unknown) =>
+    api(`/drivers/${encodeURIComponent(driverId)}/training-records`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateTrainingRecord: (id: string, body: unknown) =>
+    api(`/training-records/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  removeTrainingRecord: (id: string) =>
+    api(`/training-records/${id}`, { method: 'DELETE' }),
 };
 
 export const documentsApi = {

@@ -77,6 +77,9 @@ export class LoadsService {
       trailerId: dto.trailerId,
     });
     this.assertCrossBorderReady(dto);
+    if (Boolean(dto.crossBorder)) {
+      await this.assertDriverBorderEligible(dto.driverId, dto.companyId);
+    }
 
     const status = dto.status ?? 'assigned';
     if (status !== 'assigned' && status !== 'in_transit') {
@@ -202,6 +205,15 @@ export class LoadsService {
           ? Boolean(dto.customsPars)
           : Boolean(existing.customsPars),
     });
+
+    const crossBorder =
+      dto.crossBorder !== undefined
+        ? Boolean(dto.crossBorder)
+        : Boolean(existing.crossBorder);
+    const driverId = dto.driverId ?? existing.driverId;
+    if (crossBorder && driverId) {
+      await this.assertDriverBorderEligible(driverId, existing.companyId);
+    }
 
     return this.prisma.load.update({
       where: { id },
@@ -376,42 +388,147 @@ export class LoadsService {
     const base =
       this.config.get<string>('DRIVER_SERVICE_URL') ||
       'http://localhost:3003';
+    const headers: Record<string, string> = {
+      'x-company-id': companyId,
+      ...(getTenantStore()?.userId
+        ? { 'x-user-id': getTenantStore()!.userId! }
+        : {}),
+    };
     try {
-      const res = await fetch(
+      const detailRes = await fetch(
         `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}`,
-        {
-          headers: {
-            'x-company-id': companyId,
-            ...(getTenantStore()?.userId
-              ? { 'x-user-id': getTenantStore()!.userId! }
-              : {}),
-          },
-        },
+        { headers },
       );
-      if (res.status === 404) {
-        // driverId may be auth user id — allow if driver-service has no match
+      if (detailRes.status === 404) {
         return;
       }
-      if (!res.ok) return;
-      const driver = (await res.json()) as {
+      if (!detailRes.ok) return;
+      const driver = (await detailRes.json()) as {
         active?: boolean;
+        lifecycleStatus?: string;
         name?: string;
-        companyId?: string;
       };
-      if (driver.active === false) {
+
+      const readyRes = await fetch(
+        `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}/dispatch-ready`,
+        { headers },
+      );
+      if (readyRes.ok) {
+        const ready = (await readyRes.json()) as {
+          ready?: boolean;
+          missing?: string[];
+          lifecycleOk?: boolean;
+          lifecycleStatus?: string;
+          availabilityOk?: boolean;
+          availabilityStatus?: string;
+        };
+        if (!ready.lifecycleOk) {
+          const reason = `Driver ${driver.name || driverId} is ${ready.lifecycleStatus || 'not active'} and cannot be assigned`;
+          await this.auditAssignmentDeny({
+            companyId,
+            entityType: 'driver',
+            entityId: driverId,
+            reason,
+            meta: {
+              lifecycleStatus: ready.lifecycleStatus,
+              action: 'compliance.dispatch_blocked',
+            },
+          });
+          throw new BadRequestException(reason);
+        }
+        if (ready.availabilityOk === false) {
+          const reason = `Driver ${driver.name || driverId} is ${ready.availabilityStatus || 'unavailable'} and cannot be assigned`;
+          await this.auditAssignmentDeny({
+            companyId,
+            entityType: 'driver',
+            entityId: driverId,
+            reason,
+            meta: {
+              availabilityStatus: ready.availabilityStatus,
+              action: 'compliance.dispatch_blocked',
+            },
+          });
+          throw new BadRequestException(reason);
+        }
+        if (!ready.ready) {
+          const missing = (ready.missing || []).join(', ');
+          const reason = `Driver ${driver.name || driverId} is not dispatch-ready (missing/expired: ${missing})`;
+          await this.auditAssignmentDeny({
+            companyId,
+            entityType: 'driver',
+            entityId: driverId,
+            reason,
+            meta: {
+              missing: ready.missing,
+              action: 'compliance.dispatch_blocked',
+            },
+          });
+          throw new BadRequestException(reason);
+        }
+        return;
+      }
+
+      if (driver.active === false || driver.lifecycleStatus === 'suspended') {
         const reason = `Driver ${driver.name || driverId} is inactive and cannot be assigned`;
         await this.auditAssignmentDeny({
           companyId,
           entityType: 'driver',
           entityId: driverId,
           reason,
-          meta: { active: false },
+          meta: { active: false, lifecycleStatus: driver.lifecycleStatus },
         });
         throw new BadRequestException(reason);
       }
     } catch (e) {
       if (e instanceof BadRequestException) throw e;
       this.logger.warn(`driver assignability check skipped: ${String(e)}`);
+    }
+  }
+
+  private async assertDriverBorderEligible(
+    driverId: string,
+    companyId: string,
+  ) {
+    const base =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    const headers: Record<string, string> = {
+      'x-company-id': companyId,
+      ...(getTenantStore()?.userId
+        ? { 'x-user-id': getTenantStore()!.userId! }
+        : {}),
+    };
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}/border-eligible`,
+        { headers },
+      );
+      if (res.status === 404) return;
+      if (!res.ok) return;
+      const border = (await res.json()) as {
+        eligible?: boolean;
+        missing?: string[];
+        warnings?: string[];
+      };
+      if (!border.eligible) {
+        const missing = (border.missing || []).join(', ');
+        const reason = `Driver is not border-eligible (missing: ${missing})`;
+        await this.auditAssignmentDeny({
+          companyId,
+          entityType: 'driver',
+          entityId: driverId,
+          reason,
+          meta: {
+            missing: border.missing,
+            warnings: border.warnings,
+            action: 'compliance.border_blocked',
+          },
+        });
+        throw new BadRequestException(reason);
+      }
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      this.logger.warn(`border eligibility check skipped: ${String(e)}`);
     }
   }
 

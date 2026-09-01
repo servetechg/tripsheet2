@@ -20,5 +20,6 @@ CREATE TABLE IF NOT EXISTS fleet."EquipmentType" (
   "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE ("companyId", "code")
 );
-CREATE INDEX IF NOT EXISTS "EquipmentType_companyId_idx"
-  ON fleet."EquipmentType"("companyId");
+ALTER TABLE fleet."EquipmentType"
+  ALTER COLUMN "createdAt" SET DEFAULT NOW(),
+  ALTER COLUMN "updatedAt" SET DEFAULT NOW();

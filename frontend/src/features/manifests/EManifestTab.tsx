@@ -171,6 +171,7 @@ export function EManifestTab({
           setEditingManifest(null);
           setSubTab('list');
         }}
+        apiEnabled={apiEnabled}
       />
     );
   if (subTab === 'new_ace')
@@ -191,6 +192,7 @@ export function EManifestTab({
           setEditingManifest(null);
           setSubTab('list');
         }}
+        apiEnabled={apiEnabled}
       />
     );
 

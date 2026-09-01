@@ -1,18 +1,34 @@
 import { useEffect, useState } from 'react';
 import { G, pagePlain } from '@/lib/theme';
-import { Card, Pill, SectionTitle, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { Btn, Card, Pill, SectionTitle, StatCard, StatsGrid, Sel, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
 import { DocViewer } from '@/features/documents/DocViewer';
 import { AdminWageModal } from '@/features/contracts/AdminWageModal';
-import { documentsApi, contractsApi } from '@/lib/api';
+import { documentsApi, contractsApi, driversApi } from '@/lib/api';
+import {
+  AVAILABILITY_LABELS,
+  DRIVER_AVAILABILITY_STATUSES,
+  DRIVER_LIFECYCLE_LABELS,
+  DRIVER_TYPE_LABELS,
+  QUALIFICATION_TYPE_LABELS,
+  lifecycleAllowsDispatch,
+} from '@/lib/driverLifecycle';
+import {
+  AvailabilityBadge,
+  DriverEquipmentPanel,
+  DriverPerformancePanel,
+  DriverSafetyPanel,
+  DriverTrainingPanel,
+} from './DriverProfileChapter6Panels';
 import {
   driverRecordIdOf,
   matchesDriverRef,
 } from '@/lib/driverIds';
 import { useCan } from '@/lib/permissions';
+import { useSession } from '@/context/SessionContext';
 
 export function DriverProfile({
   driver,
@@ -27,15 +43,32 @@ export function DriverProfile({
   refreshAll,
 }: any) {
   const { can } = useCan();
+  const { user } = useSession();
   const confirm = useConfirm();
   const [docTab, setDocTab] = useState('documents');
+  const [availabilityStatus, setAvailabilityStatus] = useState(
+    driver.availabilityStatus || 'available',
+  );
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
   const [showWage, setShowWage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [wageContract, setWageContract] = useState<any>(null);
+  const [qualifications, setQualifications] = useState<any[]>(
+    driver.qualifications || [],
+  );
 
   const recordId = driverRecordIdOf(driver);
+  const isSelf = Boolean(user?.id && driver.id && user.id === driver.id);
+  const canEditAvailability = can('drivers.edit') || isSelf;
+  const availabilityOptions = can('drivers.edit')
+    ? DRIVER_AVAILABILITY_STATUSES
+    : (['available', 'off_duty', 'vacation', 'unavailable'] as const);
+  const lifecycle =
+    driver.lifecycleStatus || (driver.active === false ? 'suspended' : 'active');
+  const lifecycleLabel =
+    DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] ||
+    lifecycle;
 
   // Wage/terms live in Contract table — never use __contract__ document stubs
   useEffect(() => {
@@ -58,6 +91,43 @@ export function DriverProfile({
       cancelled = true;
     };
   }, [apiEnabled, recordId, driver.id]);
+
+  useEffect(() => {
+    if (!apiEnabled || !recordId) {
+      setQualifications(driver.qualifications || []);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await driversApi.qualifications(recordId);
+        if (!cancelled) setQualifications(Array.isArray(list) ? list : []);
+      } catch {
+        if (!cancelled) setQualifications(driver.qualifications || []);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, recordId, driver.id, driver.qualifications]);
+
+  useEffect(() => {
+    setAvailabilityStatus(driver.availabilityStatus || 'available');
+  }, [driver.availabilityStatus, driver.id]);
+
+  const saveAvailability = async () => {
+    if (!apiEnabled || !recordId) return;
+    try {
+      setBusy(true);
+      await driversApi.update(recordId, { availabilityStatus });
+      await refreshAll?.();
+      notify('Availability updated');
+    } catch (e: any) {
+      notify(e?.message || 'Failed to update availability', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const myContract = wageContract;
 
@@ -277,7 +347,68 @@ export function DriverProfile({
             DRIVER PROFILE
           </span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {can('drivers.approve') && lifecycle === 'pending_review' && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!recordId) return;
+                try {
+                  await driversApi.approve(recordId);
+                  await refreshAll?.();
+                  notify(`${driver.name} approved`);
+                } catch (e: any) {
+                  notify(e?.message || 'Approve failed', 'error');
+                }
+              }}
+              style={{
+                background: G.success,
+                color: '#fff',
+                border: 'none',
+                borderRadius: 7,
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              APPROVE
+            </button>
+          )}
+          {can('drivers.suspend') && lifecycle === 'active' && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!recordId) return;
+                const ok = await confirm({
+                  title: 'Suspend driver',
+                  message: `Suspend ${driver.name}?`,
+                  confirmLabel: 'Suspend',
+                  variant: 'danger',
+                });
+                if (!ok) return;
+                try {
+                  await driversApi.suspend(recordId);
+                  await refreshAll?.();
+                  notify(`${driver.name} suspended`);
+                } catch (e: any) {
+                  notify(e?.message || 'Suspend failed', 'error');
+                }
+              }}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${G.warning}`,
+                color: G.warning,
+                borderRadius: 7,
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              SUSPEND
+            </button>
+          )}
           {can('drivers.wage.edit') && (
           <button
             type="button"
@@ -363,9 +494,33 @@ export function DriverProfile({
                   flexWrap: 'wrap',
                 }}
               >
-                <Pill color={active ? G.gold : G.success}>
-                  {active ? 'IN TRANSIT' : 'AVAILABLE'}
+                {active ? (
+                  <Pill color={G.gold}>IN TRANSIT</Pill>
+                ) : (
+                  <AvailabilityBadge status={driver.availabilityStatus} />
+                )}
+                <Pill
+                  color={
+                    lifecycle === 'active'
+                      ? G.success
+                      : lifecycle === 'pending_review'
+                        ? G.warning
+                        : lifecycle === 'suspended'
+                          ? G.danger
+                          : G.muted
+                  }
+                >
+                  {lifecycleLabel}
                 </Pill>
+                {!lifecycleAllowsDispatch(lifecycle) && (
+                  <Pill color={G.danger}>Not dispatch-eligible</Pill>
+                )}
+                {driver.driverType && driver.driverType !== 'company' && (
+                  <Pill color={G.info}>
+                    {DRIVER_TYPE_LABELS[driver.driverType as keyof typeof DRIVER_TYPE_LABELS] ||
+                      driver.driverType}
+                  </Pill>
+                )}
                 {driver.citizenship && (
                   <Pill color={G.info}>{driver.citizenship}</Pill>
                 )}
@@ -407,6 +562,78 @@ export function DriverProfile({
               </StatsGrid>
             </div>
           </div>
+        </Card>
+
+        <Card>
+          <SectionTitle>EMPLOYMENT</SectionTitle>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2,1fr)',
+              gap: 12,
+            }}
+          >
+            {(
+              [
+                ['Employee #', driver.employeeNumber || '—'],
+                ['Driver type', DRIVER_TYPE_LABELS[driver.driverType as keyof typeof DRIVER_TYPE_LABELS] || driver.driverType || 'Company Driver'],
+                ['Hire date', driver.hireDate || '—'],
+                ['Probation ends', driver.probationEndDate || '—'],
+                ['Seniority date', driver.seniorityDate || '—'],
+                ['Employment status', driver.employmentStatus || '—'],
+                ['Branch', driver.branchId || '—'],
+                ['Preferred language', driver.preferredLanguage || '—'],
+              ] as const
+            ).map(([k, v]) => (
+              <div
+                key={k}
+                style={{
+                  background: G.card2,
+                  borderRadius: 8,
+                  padding: '10px 12px',
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 9,
+                    letterSpacing: 2,
+                    color: G.muted,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {k}
+                </div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: G.text,
+                    marginTop: 3,
+                  }}
+                >
+                  {v}
+                </div>
+              </div>
+            ))}
+          </div>
+          {driver.ownerOperatorProfile &&
+            typeof driver.ownerOperatorProfile === 'object' && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: '10px 12px',
+                  background: G.card2,
+                  borderRadius: 8,
+                  fontSize: 12,
+                  color: G.muted,
+                }}
+              >
+                Owner-operator:{' '}
+                {(driver.ownerOperatorProfile as any).corporationName ||
+                  (driver.ownerOperatorProfile as any).gstHstNumber ||
+                  'See profile'}
+              </div>
+            )}
         </Card>
 
         <Card>
@@ -477,10 +704,43 @@ export function DriverProfile({
           )}
         </Card>
 
+        {canEditAvailability && (
+          <Card style={{ marginBottom: 14 }}>
+            <SectionTitle>AVAILABILITY</SectionTitle>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 200 }}>
+                <Sel
+                  label="Status"
+                  value={availabilityStatus}
+                  onChange={(e) => setAvailabilityStatus(e.target.value)}
+                >
+                  {availabilityOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {AVAILABILITY_LABELS[s as keyof typeof AVAILABILITY_LABELS] || s}
+                    </option>
+                  ))}
+                </Sel>
+              </div>
+              <Btn
+                size="sm"
+                disabled={busy || availabilityStatus === (driver.availabilityStatus || 'available')}
+                onClick={() => void saveAvailability()}
+              >
+                Save availability
+              </Btn>
+            </div>
+          </Card>
+        )}
+
         <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
           {(
             [
               ['documents', 'DOCUMENTS', Icons.docs],
+              ['qualifications', 'QUALIFICATIONS', Icons.completed],
+              ['equipment', 'EQUIPMENT', Icons.truck],
+              ['safety', 'SAFETY', Icons.alert],
+              ['training', 'TRAINING', Icons.completed],
+              ['performance', 'PERFORMANCE', Icons.chart],
               ['trips', 'TRIP SHEETS', Icons.sheets],
               ['loads', 'LOAD HISTORY', Icons.dispatch],
             ] as const
@@ -758,6 +1018,92 @@ export function DriverProfile({
               );
             })}
           </div>
+        )}
+
+        {docTab === 'qualifications' && (
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: 3,
+                color: G.muted,
+                marginBottom: 12,
+              }}
+            >
+              STRUCTURED QUALIFICATIONS ({qualifications.length})
+            </div>
+            {qualifications.length === 0 ? (
+              <Card style={{ textAlign: 'center', padding: 40 }}>
+                <div style={{ color: G.muted }}>
+                  No qualifications on file. Upload licence/medical docs or edit profile to sync.
+                </div>
+              </Card>
+            ) : (
+              qualifications.map((q: any) => (
+                <Card key={q.id} style={{ marginBottom: 8 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, color: G.text }}>
+                        {QUALIFICATION_TYPE_LABELS[q.type as keyof typeof QUALIFICATION_TYPE_LABELS] || q.type}
+                      </div>
+                      <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
+                        {q.number ? `# ${q.number}` : 'No number'}
+                        {q.expiryDate ? ` · Expires ${q.expiryDate}` : ''}
+                      </div>
+                    </div>
+                    <Pill
+                      color={
+                        q.status === 'valid'
+                          ? G.success
+                          : q.status === 'expiring_soon'
+                            ? G.warning
+                            : G.danger
+                      }
+                    >
+                      {(q.status || 'unknown').replace('_', ' ')}
+                    </Pill>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        )}
+
+        {docTab === 'equipment' && (
+          <DriverEquipmentPanel
+            recordId={recordId}
+            companyId={company.id}
+            apiEnabled={apiEnabled}
+            refreshAll={refreshAll}
+          />
+        )}
+
+        {docTab === 'safety' && (
+          <DriverSafetyPanel
+            recordId={recordId}
+            companyId={company.id}
+            apiEnabled={apiEnabled}
+          />
+        )}
+
+        {docTab === 'training' && (
+          <DriverTrainingPanel
+            recordId={recordId}
+            companyId={company.id}
+            apiEnabled={apiEnabled}
+          />
+        )}
+
+        {docTab === 'performance' && (
+          <DriverPerformancePanel recordId={recordId} apiEnabled={apiEnabled} />
         )}
 
         {docTab === 'trips' && (

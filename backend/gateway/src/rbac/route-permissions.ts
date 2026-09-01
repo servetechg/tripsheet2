@@ -139,8 +139,42 @@ function rule(
           'users.view',
         ],
       };
+    if (m === 'POST' && /\/approve$/.test(p)) {
+      return { codes: ['drivers.approve'] };
+    }
+    if (
+      m === 'POST' &&
+      /\/(suspend|terminate)$/.test(p)
+    ) {
+      return { codes: ['drivers.suspend'] };
+    }
+    if (m === 'POST' && /\/archive$/.test(p)) {
+      return { codes: ['drivers.archive'] };
+    }
     if (m === 'POST') return { codes: ['drivers.create'] };
     if (m === 'DELETE') return { codes: ['drivers.archive', 'drivers.suspend'] };
+    return { codes: ['drivers.edit'] };
+  }
+
+  if (p.startsWith('/api/qualifications')) {
+    if (m === 'GET') return { codes: ['drivers.docs.view', 'drivers.edit'] };
+    if (m === 'DELETE') return { codes: ['drivers.edit'] };
+    return { codes: ['drivers.edit'] };
+  }
+
+  if (p.startsWith('/api/equipment-assignments')) {
+    return { codes: ['drivers.edit', 'fleet.edit'] };
+  }
+
+  if (p.startsWith('/api/safety-events')) {
+    if (m === 'GET') return { codes: ['drivers.docs.view', 'drivers.edit'] };
+    if (m === 'DELETE') return { codes: ['drivers.edit'] };
+    return { codes: ['drivers.edit'] };
+  }
+
+  if (p.startsWith('/api/training-records')) {
+    if (m === 'GET') return { codes: ['drivers.docs.view', 'drivers.edit'] };
+    if (m === 'DELETE') return { codes: ['drivers.edit'] };
     return { codes: ['drivers.edit'] };
   }
 

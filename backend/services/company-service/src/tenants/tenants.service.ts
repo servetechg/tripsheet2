@@ -28,6 +28,14 @@ export class TenantsService {
     }
   }
 
+  /** Internal: companies whose driver data lives on fq_tenant_* (for public invite lookup). */
+  listTenantRoutedCompanyIds() {
+    return this.prisma.tenantDatabase.findMany({
+      where: { routingMode: 'tenant', status: 'active' },
+      select: { companyId: true },
+    });
+  }
+
   listRegistry() {
     return this.prisma.tenantDatabase.findMany({
       select: {

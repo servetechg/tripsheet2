@@ -214,9 +214,10 @@ export function MessagesTab({
         <SectionTitle>Customer / manual SMS</SectionTitle>
         <Inp
           label="To phone"
+          phone
           value={smsTo}
           onChange={(e: any) => setSmsTo(e.target.value)}
-          placeholder="+1..."
+          placeholder="(403) 555-0100"
         />
         <Inp
           label="Body"

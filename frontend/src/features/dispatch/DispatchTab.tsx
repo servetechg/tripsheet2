@@ -30,7 +30,8 @@ import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { loadsApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
-import { matchesDriverRef } from '@/lib/driverIds';
+import { lifecycleAllowsDispatch, availabilityAllowsDispatch, DRIVER_LIFECYCLE_LABELS, AVAILABILITY_LABELS } from '@/lib/driverLifecycle';
+import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
 import { canAssignAsset } from '@/lib/assetStatus';
 import { useCan } from '@/lib/permissions';
 
@@ -123,6 +124,7 @@ export function DispatchTab({
     stop2: '',
   };
   const [f, setF] = useState(emptyForm);
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
 
   useEffect(() => {
     if (!apiEnabled || !company?.id) return;
@@ -200,6 +202,47 @@ export function DispatchTab({
       return next;
     });
   };
+
+  useEffect(() => {
+    if (!apiEnabled || !f.driverId) return;
+    const driver = drivers.find((d: any) => d.id === f.driverId);
+    const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await driversApi.equipmentAssignments(recordId);
+        if (cancelled) return;
+        const truck = (rows as any[]).find(
+          (r) => r.assetType === 'truck' && r.role === 'primary' && !r.unassignedAt,
+        );
+        const trailer = (rows as any[]).find(
+          (r) => r.assetType === 'trailer' && r.role === 'primary' && !r.unassignedAt,
+        );
+        setF((prev) => ({
+          ...prev,
+          ...(truck?.assetId && !prev.truckId ? { truckId: truck.assetId } : {}),
+          ...(trailer?.assetId && !prev.trailerId
+            ? { trailerId: trailer.assetId }
+            : {}),
+        }));
+      } catch {
+        /* optional pre-fill */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, f.driverId, drivers]);
+
+  const visibleDrivers = showAllDrivers
+    ? drivers
+    : drivers.filter((d: any) => {
+        const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+        const avail = d.availabilityStatus || 'available';
+        return (
+          lifecycleAllowsDispatch(lifecycle) && availabilityAllowsDispatch(avail)
+        );
+      });
   const resetForm = () => {
     setF(emptyForm);
     setEditLoad(null);
@@ -693,16 +736,37 @@ export function DispatchTab({
                 {fieldErr.driverId}
               </div>
             )}
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 11,
+                color: G.muted,
+                marginBottom: 8,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showAllDrivers}
+                onChange={(e) => setShowAllDrivers(e.target.checked)}
+              />
+              Show all drivers (default: available + active only)
+            </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {drivers.length === 0 && (
+              {visibleDrivers.length === 0 && (
                 <div style={{ fontSize: 11, color: G.muted, padding: 10 }}>
-                  No drivers added yet.
+                  No drivers match filter. Enable &quot;Show all drivers&quot; to see everyone.
                 </div>
               )}
-              {drivers.map((d: any) => {
+              {visibleDrivers.map((d: any) => {
                 const missing = checkDriverDocs(d.id);
-                const driverActive = d.active !== false;
-                const canDispatch = missing.length === 0 && driverActive;
+                const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+                const avail = d.availabilityStatus || 'available';
+                const driverActive = lifecycleAllowsDispatch(lifecycle);
+                const availOk = availabilityAllowsDispatch(avail);
+                const canDispatch = missing.length === 0 && driverActive && availOk;
                 const onLoad = loads.find(
                   (l: any) =>
                     l.driverId === d.id &&
@@ -716,8 +780,12 @@ export function DispatchTab({
                       if (canDispatch && !onLoad) upd('driverId', d.id);
                     }}
                     title={
-                      !driverActive
-                        ? 'Driver is inactive and cannot be assigned'
+                      !canDispatch
+                        ? !driverActive
+                          ? `Driver is ${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle}`
+                          : !availOk
+                            ? `Driver is ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail}`
+                            : 'Missing required documents'
                         : undefined
                     }
                     style={{
@@ -766,8 +834,10 @@ export function DispatchTab({
                         >
                           {Icons.alert({ size: 12, color: G.danger })}
                           {!driverActive
-                            ? 'Inactive — cannot assign'
-                            : `Missing: ${missing
+                            ? `${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle} — cannot assign`
+                            : !availOk
+                              ? `${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail} — cannot assign`
+                              : `Missing: ${missing
                                 .map(
                                   (id: string) =>
                                     DRIVER_DOC_TYPES.find((x) => x.id === id)

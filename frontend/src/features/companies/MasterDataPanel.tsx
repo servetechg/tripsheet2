@@ -911,8 +911,10 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                 <>
                   <Inp
                     label="Phone"
+                    phone
                     value={form.phone}
                     onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    placeholder="(403) 555-0100"
                   />
                   {(kind === 'brokers' ||
                     kind === 'customers' ||

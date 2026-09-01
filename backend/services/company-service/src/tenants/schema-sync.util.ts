@@ -46,15 +46,63 @@ function prismaDbPush(
   extraArgs: string[],
   quiet?: boolean,
 ) {
-  execFileSync(
-    process.execPath,
-    [prismaCli(prismaDir), 'db', 'push', '--skip-generate', ...extraArgs],
-    {
-      cwd: prismaDir,
-      env: { ...process.env, DATABASE_URL: url },
-      stdio: quiet ? 'pipe' : 'inherit',
-    },
+  try {
+    execFileSync(
+      process.execPath,
+      [prismaCli(prismaDir), 'db', 'push', '--skip-generate', ...extraArgs],
+      {
+        cwd: prismaDir,
+        env: { ...process.env, DATABASE_URL: url },
+        stdio: quiet ? 'pipe' : 'inherit',
+      },
+    );
+  } catch (e) {
+    if (quiet && e instanceof Error && 'stderr' in e) {
+      const stderr = String((e as NodeJS.ErrnoException & { stderr?: Buffer }).stderr || '');
+      throw new Error(stderr || e.message);
+    }
+    throw e;
+  }
+}
+
+async function schemaHasRows(admin: Client, schema: string): Promise<boolean> {
+  const r = await admin.query<{ n: string }>(
+    `SELECT COALESCE(SUM(n_live_tup), 0)::text AS n
+     FROM pg_stat_user_tables
+     WHERE schemaname = $1`,
+    [schema],
   );
+  return Number(r.rows[0]?.n || 0) > 0;
+}
+
+const SCHEMA_PROBE_TABLE: Record<string, string> = {
+  driver: 'Driver',
+  fleet: 'Load',
+  manifest: 'EManifest',
+  tripsheet: 'TripSheet',
+  accounting: 'LedgerAccount',
+  notification: 'NotificationLog',
+};
+
+async function resetEmptyOpsSchema(
+  admin: Client,
+  schema: string,
+): Promise<boolean> {
+  const probe = SCHEMA_PROBE_TABLE[schema];
+  if (!probe) return false;
+  try {
+    const r = await admin.query<{ n: string }>(
+      `SELECT COUNT(*)::text AS n FROM ${quoteIdent(schema)}.${quoteIdent(probe)}`,
+    );
+    if (Number(r.rows[0]?.n || 0) !== 0) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  await admin.query(`DROP SCHEMA IF EXISTS ${quoteIdent(schema)} CASCADE`);
+  await admin.query(`CREATE SCHEMA ${quoteIdent(schema)}`);
+  return true;
 }
 
 /**
@@ -114,12 +162,27 @@ export async function pushTenantOpsSchemas(
         console.log(`  push schema ${schema}`);
       }
       await admin.query(`CREATE SCHEMA IF NOT EXISTS ${quoteIdent(schema)}`);
-      prismaDbPush(
-        prismaDir,
-        withSchema(tenantUrl, schema),
-        [],
-        opts?.quiet,
-      );
+      const reset = await resetEmptyOpsSchema(admin, schema);
+      try {
+        prismaDbPush(
+          prismaDir,
+          withSchema(tenantUrl, schema),
+          reset ? ['--accept-data-loss'] : [],
+          opts?.quiet,
+        );
+      } catch (firstErr) {
+        if (await schemaHasRows(admin, schema)) {
+          throw firstErr;
+        }
+        await admin.query(`DROP SCHEMA IF EXISTS ${quoteIdent(schema)} CASCADE`);
+        await admin.query(`CREATE SCHEMA ${quoteIdent(schema)}`);
+        prismaDbPush(
+          prismaDir,
+          withSchema(tenantUrl, schema),
+          ['--accept-data-loss'],
+          opts?.quiet,
+        );
+      }
     }
   } finally {
     await admin.end().catch(() => undefined);

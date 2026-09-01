@@ -146,6 +146,29 @@ COMPANY_URL=http://127.0.0.1:3002 ./deploy/scripts/migrate-all-tenants.sh
 
 Runbooks: `docs/runbooks/suspend-tenant.md`, `restore-tenant.md`, `offboard-tenant.md`.
 
+## Multi-tenant / RBAC / Drivers (Chapter 2–6)
+
+Compose now injects tenant env into gateway, company-service, and tenant-aware microservices (`COMPANY_SERVICE_URL`, `PLATFORM_SECRETS_KEY`, `TENANT_*`).
+
+**After first deploy with tenant env**, on the VPS add to `/opt/tripsheet/secrets/app.env` and `staging.app.env` if missing:
+
+```bash
+PLATFORM_SECRETS_KEY=<openssl rand -base64 48 — keep forever once tenants exist>
+TENANT_DEFAULT_ROUTING_MODE=shared   # or tenant after cutover
+TENANT_RUNTIME_MODE=enforce
+```
+
+If tenants were provisioned before `PLATFORM_SECRETS_KEY` existed, company-service used the dev fallback key — set `PLATFORM_SECRETS_KEY=tripsheet-platform-dev-key-change-me` until you re-provision, or generate a new key only on fresh environments.
+
+**Post-deploy tenant ops (Super Admin UI or API):**
+
+1. `POST /api/tenants/c1/provision` — create `fq_tenant_mkx` if pending
+2. `POST /api/tenants/schema-migrate-all` — org SQL + service schemas (CI runs this automatically)
+3. Optional cutover: `POST /api/tenants/c1/migrate` → `verify` → `cutover` (see MULTI-TENANT testing guide)
+4. Suspend/re-enable uses soft revoke + restore (no full re-provision)
+
+**Verify:** login owner → `/api/auth/me` has `permissions[]` and `tenantKey`; driver invite works incognito; `npm run test:tenancy` against staging URL if you expose gateway for ops.
+
 ## Rollback (production only)
 
 ```bash

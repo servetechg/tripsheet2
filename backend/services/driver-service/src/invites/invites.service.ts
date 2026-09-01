@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,20 +11,31 @@ import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { FilesService } from '../files/files.service';
+import { QualificationsService } from '../qualifications/qualifications.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { CompleteInviteDto } from './dto/complete-invite.dto';
-import { assertPermission } from '@tripsheet/tenant-runtime';
+import {
+  assertPermission,
+  getTenantStore,
+  tenantAls,
+  TenantConnectionCache,
+  TenantStore,
+} from '@tripsheet/tenant-runtime';
+import { Invite } from '@prisma/client';
 
 const MAX_INLINE_FILE_CHARS = 1_500_000; // ~1MB raw ≈ base64 data URL ceiling without Cloudinary
 
 @Injectable()
 export class InvitesService {
   private readonly logger = new Logger(InvitesService.name);
+  private tenantRoutingCache: { at: number; ids: string[] } | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly files: FilesService,
+    private readonly qualifications: QualificationsService,
+    private readonly tenants: TenantConnectionCache,
   ) {}
 
   findAll(companyId?: string) {
@@ -81,19 +93,35 @@ export class InvitesService {
   }
 
   async findByToken(token: string) {
-    const invite = await this.prisma.invite.findUnique({ where: { token } });
-    if (!invite) {
+    const located = await this.locateInvite(token);
+    if (!located) {
       throw new NotFoundException('Invite not found or no longer pending');
     }
-    const fresh = await this.refreshExpiry(invite);
-    if (fresh.status !== 'pending') {
-      throw new NotFoundException('Invite not found or no longer pending');
-    }
-    const passwordPolicy = await this.fetchPasswordPolicy(invite.companyId);
-    return { ...fresh, passwordPolicy };
+    return tenantAls.run(located.store, async () => {
+      const invite = await this.prisma.invite.findUnique({ where: { token } });
+      if (!invite) {
+        throw new NotFoundException('Invite not found or no longer pending');
+      }
+      const fresh = await this.refreshExpiry(invite);
+      if (fresh.status !== 'pending') {
+        throw new NotFoundException('Invite not found or no longer pending');
+      }
+      const passwordPolicy = await this.fetchPasswordPolicy(invite.companyId);
+      return { ...fresh, passwordPolicy };
+    });
   }
 
   async complete(token: string, dto: CompleteInviteDto) {
+    const located = await this.locateInvite(token);
+    if (!located) {
+      throw new NotFoundException(`Invite ${token} not found`);
+    }
+    return tenantAls.run(located.store, () =>
+      this.completeInContext(token, dto),
+    );
+  }
+
+  private async completeInContext(token: string, dto: CompleteInviteDto) {
     const invite = await this.prisma.invite.findUnique({ where: { token } });
     if (!invite) {
       throw new NotFoundException(`Invite ${token} not found`);
@@ -118,6 +146,8 @@ export class InvitesService {
 
     const email = dto.profile.email.toLowerCase().trim();
 
+    await this.ensureTenantDriverSchema(invite.companyId);
+
     let userId = dto.profile.userId;
     if (!userId && dto.profile.password) {
       userId = await this.tryCreateAuthUser({
@@ -126,6 +156,7 @@ export class InvitesService {
         name: dto.profile.name.trim(),
         companyId: invite.companyId,
         role: 'driver',
+        inviteCompletion: true,
       });
       if (!userId) {
         throw new BadRequestException(
@@ -174,7 +205,12 @@ export class InvitesService {
             fastCard: emptyToNull(dto.profile.fastCard),
             notes: emptyToNull(dto.profile.notes),
             sin: emptyToNull(dto.profile.sin),
-            active: true,
+            lifecycleStatus: 'pending_review',
+            active: false,
+            employmentStatus: 'active',
+            driverType: emptyToNull((dto.profile as any).driverType) ?? 'company',
+            employeeNumber: emptyToNull((dto.profile as any).employeeNumber),
+            hireDate: emptyToNull((dto.profile as any).hireDate),
           },
         });
 
@@ -269,7 +305,7 @@ export class InvitesService {
                 fileUrl: true,
                 status: true,
                 uploadedAt: true,
-                // omit fileData from response (can be huge)
+                expiryDate: true,
               },
             },
             contracts: true,
@@ -283,6 +319,31 @@ export class InvitesService {
         role: 'driver',
         kind: 'driver',
       });
+
+      if (result?.id && result.documents?.length) {
+        await this.qualifications.seedFromOnboarding(
+          result.id,
+          invite.companyId,
+          result.documents.map((d) => ({
+            id: d.id,
+            type: d.type,
+            expiryDate: d.expiryDate,
+          })),
+        );
+        await this.qualifications.syncLicenseFromProfile({
+          driverId: result.id,
+          companyId: invite.companyId,
+          licenseNo: dto.profile.licenseNo,
+        });
+        if (dto.profile.fastCard) {
+          await this.qualifications.syncFastFromProfile({
+            driverId: result.id,
+            companyId: invite.companyId,
+            fastCard: dto.profile.fastCard,
+          });
+        }
+      }
+
       return { driver: result };
     } catch (err) {
       if (
@@ -297,6 +358,11 @@ export class InvitesService {
         if (err.code === 'P2002') {
           throw new ConflictException(
             'Driver or document already exists for this email. Use a new invite and unique email.',
+          );
+        }
+        if (err.code === 'P2022') {
+          throw new BadRequestException(
+            'Driver database schema is updating. Wait a moment and submit again.',
           );
         }
         throw new BadRequestException(`Database error: ${err.message}`);
@@ -412,12 +478,14 @@ export class InvitesService {
     if (invite.email && invite.email !== email) {
       throw new BadRequestException('Use the email this invite was sent to');
     }
+
     const userId = await this.tryCreateAuthUser({
       email,
       password: dto.profile.password,
       name: dto.profile.name.trim(),
       companyId: invite.companyId,
       role: invite.role || 'dispatcher',
+      inviteCompletion: true,
     });
     if (!userId) {
       throw new BadRequestException(
@@ -485,6 +553,79 @@ export class InvitesService {
       email: existing.email || undefined,
       name: existing.name || undefined,
     });
+  }
+
+  private async locateInvite(
+    token: string,
+  ): Promise<{ invite: Invite; store: TenantStore } | null> {
+    const current = getTenantStore();
+    if (current?.useTenantDb) {
+      const invite = await this.prisma.invite.findUnique({ where: { token } });
+      return invite ? { invite, store: current } : null;
+    }
+
+    const sharedInvite = await this.prisma.invite.findUnique({
+      where: { token },
+    });
+    if (sharedInvite) {
+      const store: TenantStore = {
+        companyId: sharedInvite.companyId,
+        routingMode: 'shared',
+        useTenantDb: false,
+      };
+      return { invite: sharedInvite, store };
+    }
+
+    for (const companyId of await this.tenantRoutedCompanyIds()) {
+      const conn = await this.tenants.resolve(companyId);
+      if (!conn?.connectionUrl || conn.routingMode !== 'tenant') continue;
+      const store: TenantStore = {
+        companyId,
+        tenantKey: conn.tenantKey,
+        dbName: conn.dbName,
+        tenantStatus: conn.status,
+        routingMode: 'tenant',
+        connectionUrl: conn.connectionUrl,
+        useTenantDb: true,
+      };
+      const invite = await tenantAls.run(store, () =>
+        this.prisma.invite.findUnique({ where: { token } }),
+      );
+      if (invite) return { invite, store };
+    }
+    return null;
+  }
+
+  private async tenantRoutedCompanyIds(): Promise<string[]> {
+    const ttlMs = 60_000;
+    if (
+      this.tenantRoutingCache &&
+      Date.now() - this.tenantRoutingCache.at < ttlMs
+    ) {
+      return this.tenantRoutingCache.ids;
+    }
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/internal/tenants/routing-tenant`,
+        { headers: { 'x-internal-api-key': key } },
+      );
+      if (!res.ok) {
+        this.logger.warn(`tenant routing list failed: HTTP ${res.status}`);
+        return [];
+      }
+      const rows = (await res.json()) as Array<{ companyId?: string }>;
+      const ids = rows.map((r) => String(r.companyId)).filter(Boolean);
+      this.tenantRoutingCache = { at: Date.now(), ids };
+      return ids;
+    } catch (e) {
+      this.logger.warn(`tenant routing list error: ${String(e)}`);
+      return [];
+    }
   }
 
   private async refreshExpiry<
@@ -614,18 +755,49 @@ export class InvitesService {
     }
   }
 
+  /** Apply Chapter 6 driver columns on tenant DB before onboarding writes. */
+  private async ensureTenantDriverSchema(companyId: string) {
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/internal/tenants/${encodeURIComponent(companyId)}/ensure-driver-schema`,
+        {
+          method: 'POST',
+          headers: { 'x-internal-api-key': key },
+        },
+      );
+      if (!res.ok) {
+        const detail = await res.text().catch(() => '');
+        this.logger.warn(
+          `ensure-driver-schema failed for ${companyId}: HTTP ${res.status} ${detail.slice(0, 200)}`,
+        );
+        if (res.status < 500) {
+          throw new BadRequestException(
+            'Driver database schema is updating. Wait a moment and submit again.',
+          );
+        }
+        return;
+      }
+    } catch (e) {
+      if (e instanceof BadRequestException) throw e;
+      this.logger.warn(`ensure-driver-schema error: ${String(e)}`);
+    }
+  }
+
   private async tryCreateAuthUser(input: {
     email: string;
     password: string;
     name: string;
     companyId: string;
     role?: string;
+    inviteCompletion?: boolean;
   }): Promise<string | undefined> {
-    const baseUrl = this.config.get<string>('AUTH_SERVICE_URL');
-    if (!baseUrl) {
-      this.logger.error('AUTH_SERVICE_URL not set');
-      return undefined;
-    }
+    const baseUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
 
     const apiKey =
       this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
@@ -643,6 +815,7 @@ export class InvitesService {
           name: input.name,
           role: input.role || 'driver',
           companyId: input.companyId,
+          inviteCompletion: input.inviteCompletion ?? true,
         }),
       });
       if (!res.ok) {
@@ -661,15 +834,29 @@ export class InvitesService {
         if (res.status === 400) {
           throw new BadRequestException(message);
         }
-        return undefined;
+        if (res.status === 401) {
+          throw new BadRequestException(
+            'Could not create login account. INTERNAL_API_KEY mismatch between driver-service and auth-service.',
+          );
+        }
+        throw new BadRequestException(
+          res.status >= 500
+            ? 'Auth service is unavailable. Ensure auth-service is running on port 3001.'
+            : message,
+        );
       }
       const body = (await res.json()) as { id?: string };
       return body.id;
     } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       this.logger.warn(
         `auth-service unreachable while completing invite: ${String(err)}`,
       );
-      return undefined;
+      throw new BadRequestException(
+        'Auth service is unreachable. Start the backend (npm run start:dev) and try again.',
+      );
     }
   }
 }

@@ -1,0 +1,39 @@
+---
+description: Token-efficient agent behavior for TripSheet
+alwaysApply: true
+---
+
+# Agent efficiency
+
+## Before coding
+
+- Use **Ask mode** for questions; **Agent mode** only for implementation.
+- Prefer **@file** / **@folder** in the user prompt over "search the whole repo."
+- Read `AGENTS.md` once per task — do not re-derive repo structure from scratch.
+
+## During coding
+
+- **Grep** for symbols; **Read** only files you will edit or that define the API you call.
+- Never read `node_modules/`, `dist/`, or lockfiles unless debugging install issues.
+- Parallel tool calls for independent reads; avoid sequential exploration loops.
+- One concern per turn: fix → test → report; don't re-explain the entire architecture.
+- Match existing style in the **same directory**; don't refactor unrelated code.
+
+## Verification (pick ONE)
+
+| Change type | Command |
+|-------------|---------|
+| RBAC / gateway routes | `cd backend && npm run test:rbac` |
+| Auth / invites | `npm run test:auth:live --prefix backend/gateway` |
+| Tenant / isolation | `npm run test:tenancy --prefix backend/gateway` |
+| MDM | `cd backend && npm run test:mdm` |
+| Drivers | `cd backend && npm run test:drivers` |
+| Single service unit test | `npm test --prefix backend/services/<name>-service` |
+
+## Avoid (wastes tokens)
+
+- Reading every `*-COMPLETE.md` when one chapter applies
+- Launching broad **Task/explore** subagents for a single known file
+- Generating long markdown docs the user didn't request
+- Re-running full `start:dev` when only one service changed
+- Duplicating troubleshooting the user already resolved in the same thread

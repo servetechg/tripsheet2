@@ -1,0 +1,28 @@
+---
+description: Testing and docs conventions for TripSheet
+globs: docs/**/*.md,backend/**/scripts/**/*.ts,backend/**/*.spec.ts
+alwaysApply: false
+---
+
+# Testing & docs
+
+## Automated tests live here
+
+| Type | Location |
+|------|----------|
+| Gateway live acceptance | `backend/gateway/scripts/**/*.test.ts` |
+| In-process RBAC gates | `backend/gateway/src/rbac/check-rbac.ts` |
+| Chapter acceptance | `backend/services/*/src/**/check-chapter*-acceptance.ts` |
+| Jest unit | `backend/services/*/**/*.spec.ts` |
+
+## When user asks to test a chapter
+
+1. Open `docs/TESTING-GUIDES-INDEX.md` — run listed npm script only
+2. Do not rewrite the testing guide unless asked to update docs
+3. Prefer `npm run test:*` over manual curl unless debugging one endpoint
+
+## Doc rules
+
+- ADRs: `docs/*-COMPLETE.md` — do not duplicate in new files
+- New testing guides: follow structure of `docs/DRIVER-CHAPTER-6-TESTING-GUIDE.md`
+- Link related guides; keep under ~400 lines with tables not prose walls

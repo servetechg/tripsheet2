@@ -14,7 +14,7 @@ import {
 
 export function BillingPanel({
   company,
-  loads,
+  loads = [],
   adminUser,
   apiEnabled,
 }: any) {
