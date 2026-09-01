@@ -1307,22 +1307,31 @@ export class AuthService {
       if (dto.password?.length) {
         const companyId =
           dto.companyId !== undefined ? dto.companyId : existing.companyId;
-        const passwordHash = await this.hashPasswordForUser(dto.password, {
-          ...existing,
+        const identity = {
           name: dto.name || existing.name,
           email,
-          companyId,
-        });
-        await this.applyPasswordChange(existing, passwordHash, {
-          bumpTokenVersion: true,
-          clearLockout: true,
-        });
+        };
+        const matchesCurrent = await bcrypt.compare(
+          dto.password,
+          existing.passwordHash,
+        );
+        if (!(dto.inviteCompletion && matchesCurrent)) {
+          const passwordHash = dto.inviteCompletion
+            ? await this.hashNewPassword(dto.password, companyId, identity)
+            : await this.hashPasswordForUser(dto.password, {
+                ...existing,
+                ...identity,
+                companyId,
+              });
+          await this.applyPasswordChange(existing, passwordHash, {
+            bumpTokenVersion: true,
+            clearLockout: true,
+          });
+        }
         const refreshed = await this.prisma.user.findUniqueOrThrow({
           where: { id: existing.id },
         });
-        // Continue with other field updates on refreshed row
         Object.assign(existing, refreshed);
-        // role/name/company updates below still apply via data
       }
       if (dto.name && dto.name !== existing.name) data.name = dto.name;
       if (dto.companyId !== undefined && dto.companyId !== existing.companyId) {

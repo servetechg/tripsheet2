@@ -161,6 +161,21 @@ export class TenantsController {
     });
   }
 
+  @Get('internal/tenants/routing-tenant')
+  internalRoutingTenants(@Headers('x-internal-api-key') key?: string) {
+    this.tenants.assertInternalKey(key);
+    return this.tenants.listTenantRoutedCompanyIds();
+  }
+
+  @Post('internal/tenants/:companyId/ensure-driver-schema')
+  async internalEnsureDriverSchema(
+    @Param('companyId') companyId: string,
+    @Headers('x-internal-api-key') key?: string,
+  ) {
+    this.tenants.assertInternalKey(key);
+    return this.ops.ensureCompanySchemas(companyId);
+  }
+
   @Get('internal/tenants/:companyId/connection')
   internalConnection(
     @Param('companyId') companyId: string,

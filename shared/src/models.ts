@@ -206,6 +206,10 @@ export interface SettlementLine {
   label: string;
   amount: number;
   source?: string;
+  /** Structured link to trip sheet (Phase 4) */
+  tripSheetId?: string;
+  loadId?: string;
+  kind?: 'expense' | 'wage_info' | 'deduction' | 'load_summary';
 }
 
 export interface Settlement {

@@ -11,6 +11,10 @@ import { ManifestsProxyController } from './manifests.proxy.controller';
 import { TripSheetsProxyController } from './trip-sheets.proxy.controller';
 import { InvitesProxyController } from './invites.proxy.controller';
 import { DocumentsProxyController } from './documents.proxy.controller';
+import { QualificationsProxyController } from './qualifications.proxy.controller';
+import { EquipmentAssignmentsProxyController } from './equipment-assignments.proxy.controller';
+import { SafetyEventsProxyController } from './safety-events.proxy.controller';
+import { TrainingRecordsProxyController } from './training-records.proxy.controller';
 import { ContractsProxyController } from './contracts.proxy.controller';
 import { CarrierProfilesProxyController } from './carrier-profiles.proxy.controller';
 import { SettlementsProxyController } from './settlements.proxy.controller';
@@ -54,6 +58,10 @@ import {
     TripSheetsProxyController,
     InvitesProxyController,
     DocumentsProxyController,
+    QualificationsProxyController,
+    EquipmentAssignmentsProxyController,
+    SafetyEventsProxyController,
+    TrainingRecordsProxyController,
     ContractsProxyController,
     CarrierProfilesProxyController,
     SettlementsProxyController,

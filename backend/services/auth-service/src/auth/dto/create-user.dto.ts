@@ -32,4 +32,8 @@ export class CreateUserDto {
   @ValidateIf((_, v) => v !== null)
   @IsString()
   companyId?: string | null;
+
+  /** Internal invite onboarding — skip password history / allow idempotent retry. */
+  @IsOptional()
+  inviteCompletion?: boolean;
 }

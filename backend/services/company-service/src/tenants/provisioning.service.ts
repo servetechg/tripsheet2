@@ -243,6 +243,18 @@ export class ProvisioningService {
       } catch (e) {
         this.logger.warn(`MDM ops Phase 6 SQL skipped: ${String(e)}`);
       }
+      try {
+        const driverCh6 = this.loadSqlFile('015_driver_chapter6.sql');
+        await tenantClient.query(driverCh6);
+      } catch (e) {
+        this.logger.warn(`Driver Chapter 6 SQL skipped: ${String(e)}`);
+      }
+      try {
+        const driverCh6b = this.loadSqlFile('016_driver_chapter6_phase4567.sql');
+        await tenantClient.query(driverCh6b);
+      } catch (e) {
+        this.logger.warn(`Driver Chapter 6 phase 4-7 SQL skipped: ${String(e)}`);
+      }
       await this.seedDefaults(tenantClient, companyId, company.name);
       await this.seedEquipmentTypes(tenantClient, companyId);
       await this.seedCommodities(tenantClient, companyId);
@@ -627,6 +639,85 @@ export class ProvisioningService {
       dbName: row.dbName,
       status: 'suspended',
       dropped: Boolean(opts?.dropDatabase),
+    };
+  }
+
+  /**
+   * Restore soft-suspended tenant: re-grant CONNECT and mark active.
+   * Does not re-run bootstrap — use provisionCompany when the DB was dropped.
+   */
+  async restoreSuspendedCompany(
+    companyId: string,
+    opts?: { actorName?: string },
+  ) {
+    const row = await this.prisma.tenantDatabase.findUnique({
+      where: { companyId },
+      include: { company: true },
+    });
+    if (!row) {
+      return this.provisionCompany(companyId, { actorName: opts?.actorName });
+    }
+
+    const admin = parseAdminUrl(this.config);
+    const dbName = row.dbName || tenantDbName(row.company.slug);
+
+    const adminClient = await this.adminClient();
+    try {
+      const exists = await adminClient.query(
+        `SELECT 1 FROM pg_database WHERE datname = $1`,
+        [dbName],
+      );
+      if (exists.rowCount === 0) {
+        return this.provisionCompany(companyId, {
+          force: true,
+          actorName: opts?.actorName,
+        });
+      }
+      await adminClient.query(
+        `GRANT CONNECT ON DATABASE ${quoteIdent(dbName)} TO PUBLIC`,
+      );
+      await adminClient.query(
+        `GRANT ALL PRIVILEGES ON DATABASE ${quoteIdent(dbName)} TO ${quoteIdent(admin.user)}`,
+      );
+    } finally {
+      await adminClient.end().catch(() => undefined);
+    }
+
+    let ciphertext = row.connectionCiphertext;
+    if (!ciphertext) {
+      ciphertext = encryptSecret(buildTenantUrl(admin, dbName));
+    }
+
+    await this.prisma.tenantDatabase.update({
+      where: { companyId },
+      data: {
+        status: 'active',
+        connectionCiphertext: ciphertext,
+        lastError: '',
+        dbName,
+        host: admin.host,
+        port: admin.port,
+      },
+    });
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: { status: 'active', active: true },
+    });
+    await this.prisma.tenantLifecycleEvent.create({
+      data: {
+        companyId,
+        action: 'tenant.restore.completed',
+        actorName: opts?.actorName || 'system',
+        detail: { dbName, phase: 2 },
+      },
+    });
+
+    this.logger.log(`Restored suspended tenant ${dbName} for company ${companyId}`);
+    return {
+      companyId,
+      dbName,
+      status: 'active',
+      message: 'Tenant database restored',
     };
   }
 

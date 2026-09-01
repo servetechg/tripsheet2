@@ -19,7 +19,7 @@
  *   --existing: RBAC_OWNER_EMAIL / RBAC_OWNER_PASSWORD
  *     or ADMIN_<SLUG>_EMAIL / _PASSWORD (mkx defaults to admin@mkx.ca / mkx123)
  */
-import { Harness, randTag, sleep } from '../multi-tenant/harness';
+import { Harness, randTag, resolveCompanyOwner, sleep } from '../multi-tenant/harness';
 
 type TenantRow = {
   companyId: string;
@@ -44,10 +44,6 @@ const KEEP = args.has('--keep') || process.env.KEEP_FIXTURES === '1';
 
 const SUPER_EMAIL = process.env.SUPERADMIN_EMAIL || 'admin@tripsheet.io';
 const SUPER_PASS = process.env.SUPERADMIN_PASSWORD || 'admin123';
-
-const KNOWN_ADMINS: Record<string, { email: string; password: string }> = {
-  mkx: { email: 'admin@mkx.ca', password: 'mkx123' },
-};
 
 function perms(user: { permissions?: string[] } | undefined) {
   return user?.permissions || [];
@@ -100,7 +96,7 @@ async function main() {
     h.suite('2. Company fixture');
     await h.check('bind company + owner', async () => {
       company = USE_EXISTING
-        ? await pickExisting(h, superToken)
+        ? await resolveCompanyOwner(h, superToken)
         : await createEphemeral(h, superToken, tag, pw);
       h.truthy(company.id, 'companyId');
       h.truthy(company.token, 'owner token');
@@ -438,6 +434,8 @@ async function main() {
     const fleetEmail = `fleet-${tag}@rbac-test.local`;
     const lockEmail = `lock-${tag}@rbac-test.local`;
     const sessEmail = `sess-${tag}@rbac-test.local`;
+    const lockPw = 'Zynp9!AbcdXyzq';
+    const sessPw = 'Qwrp9!AbcdXyzq';
     let gmToken = '';
     let fleetToken = '';
     let sessToken = '';
@@ -543,7 +541,7 @@ async function main() {
         {
           name: 'Lockout User',
           email: lockEmail,
-          password: `Lock${tag}9!abcd`,
+          password: lockPw,
           role: 'dispatcher',
           companyId: co().id,
         },
@@ -559,7 +557,7 @@ async function main() {
       }
       const locked = await h.post('/api/auth/login', {
         email: lockEmail,
-        password: `Lock${tag}9!abcd`,
+        password: lockPw,
       });
       h.eq(locked.status, 401, 'correct password still locked');
       h.truthy(/locked/i.test(locked.raw), 'body mentions locked');
@@ -589,14 +587,14 @@ async function main() {
         {
           name: 'Session User',
           email: sessEmail,
-          password: `Sess${tag}9!abcd`,
+          password: sessPw,
           role: 'accountant',
           companyId: co().id,
         },
         co().token,
       );
       h.okStatus(created.status, 'create session user');
-      const first = await h.login(sessEmail, `Sess${tag}9!abcd`);
+      const first = await h.login(sessEmail, sessPw);
       sessToken = first.token;
       const out = await h.post('/api/auth/logout-all', {}, sessToken);
       h.okStatus(out.status, 'logout-all');
@@ -605,11 +603,11 @@ async function main() {
       h.truthy(/revoked|sign in/i.test(me.raw), 'revoked message');
     });
     await h.check('change-password issues a new token', async () => {
-      const again = await h.login(sessEmail, `Sess${tag}9!abcd`);
-      const next = `Next${tag}9!abcd`;
+      const again = await h.login(sessEmail, sessPw);
+      const next = 'Vypx9!AbcdXyzq';
       const changed = await h.post<{ accessToken?: string }>(
         '/api/auth/change-password',
-        { currentPassword: `Sess${tag}9!abcd`, newPassword: next },
+        { currentPassword: sessPw, newPassword: next },
         again.token,
       );
       h.okStatus(changed.status, 'change-password');
@@ -646,48 +644,6 @@ async function main() {
   }
 
   process.exit(h.failed ? 1 : 0);
-}
-
-async function pickExisting(h: Harness, superToken: string): Promise<CompanyFix> {
-  const envEmail = process.env.RBAC_OWNER_EMAIL;
-  const envPass = process.env.RBAC_OWNER_PASSWORD;
-  if (envEmail && envPass) {
-    const { token, user } = await h.login(envEmail, envPass);
-    if (!user.companyId) throw new Error('RBAC_OWNER has no companyId');
-    return {
-      id: user.companyId,
-      slug: 'existing',
-      email: envEmail,
-      password: envPass,
-      token,
-      ephemeral: false,
-    };
-  }
-  const r = await h.get<TenantRow[]>('/api/tenants', superToken);
-  const active = (Array.isArray(r.body) ? r.body : []).filter(
-    (t) => t.status === 'active' && t.company?.slug,
-  );
-  if (!active[0]) throw new Error('no active tenant for --existing');
-  const slug = active[0].company!.slug!;
-  const known = KNOWN_ADMINS[slug];
-  const email =
-    process.env[`ADMIN_${slug.toUpperCase()}_EMAIL`] || known?.email;
-  const password =
-    process.env[`ADMIN_${slug.toUpperCase()}_PASSWORD`] || known?.password;
-  if (!email || !password) {
-    throw new Error(
-      `set RBAC_OWNER_EMAIL/PASSWORD or ADMIN_${slug.toUpperCase()}_EMAIL/PASSWORD`,
-    );
-  }
-  const { token, user } = await h.login(email, password);
-  return {
-    id: user.companyId || active[0].companyId,
-    slug,
-    email,
-    password,
-    token,
-    ephemeral: false,
-  };
 }
 
 async function createEphemeral(

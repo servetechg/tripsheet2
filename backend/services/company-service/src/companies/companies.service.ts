@@ -177,20 +177,14 @@ export class CompaniesService {
       await this.provisioning.deprovisionCompany(id, {
         actorName: 'superadmin',
       });
-    } else {
-      // Re-enable: re-grant by re-running provision (idempotent if DB exists)
       await this.prisma.company.update({
         where: { id },
-        data: { active: true, status: 'provisioning' },
+        data: { active: false, status: 'suspended' },
       });
-      try {
-        await this.provisioning.provisionCompany(id, {
-          force: true,
-          actorName: 'superadmin',
-        });
-      } catch {
-        /* findOne reflects failed state */
-      }
+    } else {
+      await this.provisioning.restoreSuspendedCompany(id, {
+        actorName: 'superadmin',
+      });
     }
     return this.findOne(id);
   }

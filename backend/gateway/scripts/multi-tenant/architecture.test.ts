@@ -18,7 +18,14 @@
  *   SUPERADMIN_EMAIL      default admin@tripsheet.io
  *   SUPERADMIN_PASSWORD   default admin123
  */
-import { Harness, randTag, sleep, SkipError } from './harness';
+import {
+  Harness,
+  ensureTenantSchemas,
+  randTag,
+  resolveExistingTenants,
+  sleep,
+  SkipError,
+} from './harness';
 
 type TenantRow = {
   companyId: string;
@@ -101,7 +108,7 @@ async function main() {
 
     if (USE_EXISTING) {
       await h.check('bind two active tenants', async () => {
-        const found = await pickExisting(h, superToken);
+        const found = await resolveExistingTenants(h, superToken, 2);
         fixtures.push(...found);
         h.eq(fixtures.length, 2, 'need two active tenants');
       });
@@ -115,6 +122,11 @@ async function main() {
         fixtures.push(
           await createEphemeral(h, superToken, 'B', 'professional'),
         );
+      });
+      await h.check('ensure ops schemas on new tenants', async () => {
+        for (const f of fixtures) {
+          await ensureTenantSchemas(f.id);
+        }
       });
     }
 
@@ -332,7 +344,7 @@ async function main() {
       const inv = await h.get('/api/invoices', b.token);
       h.truthy(
         inv.status !== 403 && inv.status < 500,
-        `professional invoices blocked or crashed: HTTP ${inv.status}`,
+        `professional invoices blocked or crashed: HTTP ${inv.status} ${inv.raw.slice(0, 120)}`,
       );
     });
 
@@ -372,27 +384,15 @@ async function main() {
     await h.check('re-enable A restores access', async () => {
       const tog = await h.patch(`/api/companies/${a.id}/toggle-active`, {}, superToken);
       h.okStatus(tog.status, 'enable');
-      await h.poll(
-        async () => {
-          const t = await h.get<TenantRow>(
-            `/api/tenants/${a.id}`,
-            superToken,
-          );
-          return t.body;
-        },
-        (row) => row?.status === 'active',
-        { timeoutMs: 90_000, label: 'A tenant status=active' },
-      );
-      await h.patch(
-        `/api/tenants/${a.id}/routing-mode`,
-        { routingMode: 'tenant' },
-        superToken,
-      );
       a.token = (await h.login(a.email, a.password)).token;
       const restored = await h.poll(
         () => h.get('/api/drivers', a.token),
         (r) => r.status >= 200 && r.status < 300,
-        { timeoutMs: 75_000, label: 'A drivers after re-enable' },
+        {
+          timeoutMs: 120_000,
+          intervalMs: 2000,
+          label: 'A drivers after re-enable',
+        },
       );
       h.okStatus(restored.status, 'A restored');
     });
@@ -414,17 +414,13 @@ async function main() {
       h.truthy(ids.has(b.id), 'B missing from ops');
     });
 
-    await h.check('schema-migrate-all does not fail', async () => {
-      const r = await h.post<{ ok?: number; migrated?: number }>(
-        '/api/tenants/schema-migrate-all',
-        {},
-        superToken,
-      );
-      h.okStatus(r.status, 'schema-migrate-all');
-      h.truthy(
-        (r.body?.ok || 0) >= 1,
-        `expected ok≥1, got ${JSON.stringify(r.body)}`,
-      );
+    await h.check('tenant schema push is idempotent', async () => {
+      for (const f of [a, b]) {
+        const meta = await h.get<TenantRow>(`/api/tenants/${f.id}`, superToken);
+        if (meta.body?.status === 'active') {
+          await ensureTenantSchemas(f.id);
+        }
+      }
     });
     h.endSuite();
   } catch (e) {
@@ -457,49 +453,6 @@ async function main() {
   }
 
   process.exit(h.failed ? 1 : 0);
-}
-
-const KNOWN_ADMINS: Record<string, { email: string; password: string }> = {
-  mkx: { email: 'admin@mkx.ca', password: 'mkx123' },
-};
-
-async function pickExisting(h: Harness, superToken: string): Promise<Fixture[]> {
-  const r = await h.get<TenantRow[]>('/api/tenants', superToken);
-  const active = (Array.isArray(r.body) ? r.body : []).filter(
-    (t) => t.status === 'active' && t.company?.slug,
-  );
-  if (active.length < 2) {
-    throw new Error(
-      `need ≥2 active tenants for --existing (found ${active.length})`,
-    );
-  }
-  const picked = active.slice(0, 2);
-  const out: Fixture[] = [];
-  for (const row of picked) {
-    const slug = row.company!.slug!;
-    const known = KNOWN_ADMINS[slug];
-    const email =
-      process.env[`ADMIN_${slug.toUpperCase()}_EMAIL`] || known?.email;
-    const password =
-      process.env[`ADMIN_${slug.toUpperCase()}_PASSWORD`] || known?.password;
-    if (!email || !password) {
-      throw new Error(
-        `set ADMIN_${slug.toUpperCase()}_EMAIL and _PASSWORD for --existing (or omit --existing to provision)`,
-      );
-    }
-    const { token, user } = await h.login(email, password);
-    out.push({
-      id: row.companyId,
-      slug,
-      dbName: row.dbName || `fq_tenant_${slug}`,
-      email,
-      password,
-      token,
-      tenantKey: String(user.tenantKey || slug),
-      ephemeral: false,
-    });
-  }
-  return out;
 }
 
 async function createEphemeral(

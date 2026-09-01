@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Skeleton } from '@/components/ui';
+import { Skeleton, Card, SectionTitle } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { ServiceHealthBanner } from '@/components/feedback/ServiceHealthBanner';
 import { AppShell } from '@/components/layout/AppShell';
@@ -268,16 +268,24 @@ export function CompanyAdminPanel({
           {tab === 'reports' && (
             <ReportsTab company={company} apiEnabled={apiEnabled} />
           )}
-          {tab === 'accounting' && entitlements?.features?.accounting !== false && (
-            <AccountingTab
-              company={company}
-              drivers={myDrivers}
-              sheets={mySheets}
-              loads={myLoads}
-              adminUser={adminUser}
-              apiEnabled={apiEnabled}
-            />
-          )}
+          {tab === 'accounting' &&
+            (entitlements?.features?.accounting === false ? (
+              <Card>
+                <SectionTitle>Accounting</SectionTitle>
+                <div style={{ color: G.muted, fontSize: 13 }}>
+                  Accounting is not enabled for this company plan.
+                </div>
+              </Card>
+            ) : (
+              <AccountingTab
+                company={company}
+                drivers={myDrivers}
+                sheets={mySheets}
+                loads={myLoads}
+                adminUser={adminUser}
+                apiEnabled={apiEnabled}
+              />
+            ))}
           {tab === 'users' && (
             <CompanySettingsTab
               company={company}

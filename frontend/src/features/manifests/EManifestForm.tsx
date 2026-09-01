@@ -1,12 +1,17 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
+import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
-import { companiesApi } from '@/lib/api';
+import { companiesApi, driversApi } from '@/lib/api';
+import {
+  availabilityAllowsDispatch,
+  lifecycleAllowsDispatch,
+} from '@/lib/driverLifecycle';
+import { driverRecordIdOf } from '@/lib/driverIds';
 
-export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack }: any) {
+export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack, apiEnabled }: any) {
   const isACI = type === "ACI";
   const PORTS_FALLBACK = isACI ? CA_PORTS : US_PORTS;
   const carrierCode = isACI ? (carrier.cbsaCarrierCode||"XXXX") : (carrier.scacCode||"XXXX");
@@ -121,12 +126,63 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
   const selectedDriver  = drivers.find(d=>d.id===f.driverId);
 
   const [formErr, setFormErr] = useState("");
-  const save = (status="draft") => {
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
+  const [borderCheck, setBorderCheck] = useState<{ eligible: boolean; missing: string[]; warnings: string[] } | null>(null);
+
+  const eligibleDrivers = useMemo(() => {
+    const base = showAllDrivers
+      ? drivers
+      : drivers.filter((d: any) => {
+          const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+          const avail = d.availabilityStatus || 'available';
+          return lifecycleAllowsDispatch(lifecycle) && availabilityAllowsDispatch(avail);
+        });
+    return base;
+  }, [drivers, showAllDrivers]);
+
+  useEffect(() => {
+    if (!apiEnabled || !f.driverId) {
+      setBorderCheck(null);
+      return;
+    }
+    const driver = drivers.find((d: any) => d.id === f.driverId);
+    const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
+    let cancelled = false;
+    driversApi
+      .borderEligible(recordId)
+      .then((res) => {
+        if (!cancelled) setBorderCheck(res);
+      })
+      .catch(() => {
+        if (!cancelled) setBorderCheck(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, f.driverId, drivers]);
+
+  const save = async (status="draft") => {
     if (status==="submitted") {
       if (blank(f.driverId)) { setFormErr("Please select a driver."); return; }
       if (blank(f.truckId))  { setFormErr("Please select a truck."); return; }
       if (blank(f.eta))      { setFormErr("ETA date is required before submitting."); return; }
       if (f.shipments.some(s=>blank(s.ccn)||blank(s.shipperName)||blank(s.consigneeName))) { setFormErr("All shipments must have CCN, shipper and consignee."); return; }
+      if (apiEnabled && f.driverId) {
+        const driver = drivers.find((d: any) => d.id === f.driverId);
+        const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
+        try {
+          const check = borderCheck || (await driversApi.borderEligible(recordId));
+          if (!check.eligible) {
+            setFormErr(
+              `Driver is not border-eligible: ${check.missing.join(', ') || 'missing credentials'}`,
+            );
+            return;
+          }
+        } catch (e: any) {
+          setFormErr(e?.message || 'Border eligibility check failed');
+          return;
+        }
+      }
     }
     setFormErr("");
     onSave({
@@ -189,7 +245,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         </div>
         <div style={{ display:"flex", gap:8 }}>
           <Btn variant="outline" onClick={()=>save("draft")} style={{ fontSize:11, padding:"8px 14px" }}>SAVE DRAFT</Btn>
-          <Btn onClick={()=>save("submitted")} style={{ fontSize:11, padding:"8px 18px", background: isACI?G.info:G.purple }}>SUBMIT →</Btn>
+          <Btn onClick={()=>void save("submitted")} style={{ fontSize:11, padding:"8px 18px", background: isACI?G.info:G.purple }}>SUBMIT →</Btn>
         </div>
       </div>
 
@@ -272,10 +328,55 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         {/* Section 2: Crew */}
         <div style={{ background:G.card, border:`1px solid ${G.border}`, borderRadius:12, padding:16, marginBottom:14 }}>
           <div style={{ fontSize:10, letterSpacing:3, color: isACI?G.info:G.purple, marginBottom:14, fontWeight:700 }}>2 · CREW MEMBERS</div>
-          <Sel label="Driver *" value={f.driverId} onChange={e=>upd("driverId",e.target.value)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 10, color: G.muted }}>
+              Showing {eligibleDrivers.length} of {drivers.length} drivers (active + available + border-ready)
+            </div>
+            <label style={{ fontSize: 10, color: G.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showAllDrivers}
+                onChange={(e) => setShowAllDrivers(e.target.checked)}
+              />
+              Show all drivers
+            </label>
+          </div>
+          <Sel label="Driver *" value={f.driverId} onChange={e=>{
+            const id = e.target.value;
+            upd("driverId", id);
+            const d = drivers.find((x: any) => x.id === id);
+            if (d) {
+              setF((x) => ({
+                ...x,
+                driverId: id,
+                driverDOB: d.dob || x.driverDOB,
+                driverCitizenship: d.citizenship || x.driverCitizenship,
+                driverPassport: d.passportNo || x.driverPassport,
+                driverFAST: d.fastCard || x.driverFAST,
+              }));
+            }
+          }}>
             <option value="">— Select driver —</option>
-            {drivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+            {eligibleDrivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
           </Sel>
+          {borderCheck && f.driverId && (
+            <div
+              style={{
+                marginTop: 8,
+                marginBottom: 8,
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                background: borderCheck.eligible ? G.successTint : G.errTint,
+                color: borderCheck.eligible ? G.success : G.errText,
+                border: `1px solid ${borderCheck.eligible ? G.success + '44' : G.danger + '44'}`,
+              }}
+            >
+              {borderCheck.eligible
+                ? `Border eligible${borderCheck.warnings?.length ? ` · ${borderCheck.warnings.join('; ')}` : ''}`
+                : `Not border-eligible: ${borderCheck.missing.join(', ')}`}
+            </div>
+          )}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
             <Inp label="Date of Birth" value={f.driverDOB} onChange={e=>upd("driverDOB",e.target.value)} placeholder="YYYY-MM-DD" type="date" />
             <Sel label="Citizenship" value={f.driverCitizenship} onChange={e=>upd("driverCitizenship",e.target.value)}>
@@ -285,7 +386,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
           </div>
           <Sel label="Co-Driver (optional)" value={f.coDriverId} onChange={e=>upd("coDriverId",e.target.value)}>
             <option value="">— None —</option>
-            {drivers.filter(d=>d.id!==f.driverId).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+            {eligibleDrivers.filter(d=>d.id!==f.driverId).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
           </Sel>
         </div>
 

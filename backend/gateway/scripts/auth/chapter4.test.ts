@@ -6,6 +6,7 @@
  *   2. Login — valid password → session + LoginEvent + security event
  *   3. Password reset — reset → prior access JWT rejected
  *   4. Suspended — login denied and attempt logged
+ *   5. Driver invite — complete onboarding → auth login; suspend blocks login
  *
  * Prerequisites: gateway :3000 + auth, company, driver (+ notification optional).
  *
@@ -16,7 +17,7 @@
  *
  * Env: GATEWAY_URL, SUPERADMIN_EMAIL/PASSWORD, AUTH_OWNER_* or RBAC_OWNER_*
  */
-import { Harness, randTag, sleep } from '../multi-tenant/harness';
+import { Harness, randTag, resolveCompanyOwner, sleep } from '../multi-tenant/harness';
 
 type TenantRow = {
   companyId: string;
@@ -41,10 +42,6 @@ const KEEP = args.has('--keep') || process.env.KEEP_FIXTURES === '1';
 
 const SUPER_EMAIL = process.env.SUPERADMIN_EMAIL || 'admin@tripsheet.io';
 const SUPER_PASS = process.env.SUPERADMIN_PASSWORD || 'admin123';
-
-const KNOWN_ADMINS: Record<string, { email: string; password: string }> = {
-  mkx: { email: 'admin@mkx.ca', password: 'mkx123' },
-};
 
 async function main() {
   const h = new Harness();
@@ -79,7 +76,7 @@ async function main() {
     });
     await h.check('bind company + owner', async () => {
       company = USE_EXISTING
-        ? await pickExisting(h, superToken)
+        ? await resolveCompanyOwner(h, superToken)
         : await createEphemeral(h, superToken, tag, pw);
       h.truthy(company.id, 'companyId');
       h.truthy(company.token, 'owner token');
@@ -365,6 +362,81 @@ async function main() {
       h.truthy(hit, 'failed LoginEvent for suspended');
     });
     h.endSuite();
+
+    const drvEmail = `drv-inv-${tag}@auth-test.local`;
+    const drvPw = `Drv${tag}9!Xyzq`;
+    let drvInviteToken = '';
+    let drvId = '';
+
+    h.suite('6. Driver invite × auth (Phase 7 integration)');
+    await h.check('owner creates driver invite', async () => {
+      const r = await h.post<{ token?: string; id?: string }>(
+        '/api/invites',
+        { companyId: co().id },
+        co().token,
+      );
+      h.okStatus(r.status, 'create driver invite');
+      h.truthy(r.body?.token, 'invite token');
+      drvInviteToken = r.body!.token!;
+    });
+    await h.check('public by-token resolves invite (tenant-safe)', async () => {
+      const r = await h.get<{ token?: string; companyId?: string; kind?: string }>(
+        `/api/invites/by-token/${encodeURIComponent(drvInviteToken)}`,
+      );
+      h.okStatus(r.status, 'by-token');
+      h.eq(r.body?.companyId, co().id, 'companyId');
+      h.eq(r.body?.kind || 'driver', 'driver', 'kind');
+    });
+    await h.check('complete onboarding creates driver + auth login', async () => {
+      let lastRaw = '';
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const r = await h.post<{
+          driver?: { id?: string; email?: string; userId?: string };
+        }>(
+          `/api/invites/${encodeURIComponent(drvInviteToken)}/complete`,
+          {
+            profile: {
+              name: `Driver ${tag}`,
+              email: drvEmail,
+              password: drvPw,
+              licenseNo: `LIC-${tag}`,
+            },
+          },
+        );
+        lastRaw = r.raw;
+        if (r.status >= 200 && r.status < 300 && r.body?.driver?.id) {
+          drvId = r.body.driver.id;
+          h.eq(r.body.driver.email, drvEmail, 'driver email');
+          return;
+        }
+        if (!/schema is updating/i.test(r.raw)) break;
+        await sleep(1200);
+      }
+      throw new Error(`complete ${lastRaw.slice(0, 280)}`);
+    });
+    await h.check('invited driver can sign in', async () => {
+      h.truthy(drvId, 'driver created before login');
+      const { token, user } = await h.login(drvEmail, drvPw);
+      h.truthy(token, 'access token');
+      h.eq(user.role, 'driver', 'role');
+    });
+    await h.check('suspend driver blocks login (auth sync)', async () => {
+      h.truthy(drvId, 'driver id for suspend');
+      const sus = await h.post(
+        `/api/drivers/${drvId}/suspend`,
+        { reason: 'auth-live-test' },
+        co().token,
+      );
+      h.okStatus(sus.status, 'suspend driver');
+      await sleep(300);
+      const login = await h.post('/api/auth/login', {
+        email: drvEmail,
+        password: drvPw,
+      });
+      h.eq(login.status, 401, '401');
+      h.truthy(/suspend/i.test(login.raw), 'suspended message');
+    });
+    h.endSuite();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     h.failed += 1;
@@ -391,50 +463,6 @@ async function main() {
   }
 
   process.exit(h.failed ? 1 : 0);
-}
-
-async function pickExisting(h: Harness, superToken: string): Promise<CompanyFix> {
-  const envEmail =
-    process.env.AUTH_OWNER_EMAIL || process.env.RBAC_OWNER_EMAIL;
-  const envPass =
-    process.env.AUTH_OWNER_PASSWORD || process.env.RBAC_OWNER_PASSWORD;
-  if (envEmail && envPass) {
-    const { token, user } = await h.login(envEmail, envPass);
-    if (!user.companyId) throw new Error('owner has no companyId');
-    return {
-      id: user.companyId,
-      slug: 'existing',
-      email: envEmail,
-      password: envPass,
-      token,
-      ephemeral: false,
-    };
-  }
-  const r = await h.get<TenantRow[]>('/api/tenants', superToken);
-  const active = (Array.isArray(r.body) ? r.body : []).filter(
-    (t) => t.status === 'active' && t.company?.slug,
-  );
-  if (!active[0]) throw new Error('no active tenant for --existing');
-  const slug = active[0].company!.slug!;
-  const known = KNOWN_ADMINS[slug];
-  const email =
-    process.env[`ADMIN_${slug.toUpperCase()}_EMAIL`] || known?.email;
-  const password =
-    process.env[`ADMIN_${slug.toUpperCase()}_PASSWORD`] || known?.password;
-  if (!email || !password) {
-    throw new Error(
-      `set AUTH_OWNER_EMAIL/PASSWORD or ADMIN_${slug.toUpperCase()}_EMAIL/PASSWORD`,
-    );
-  }
-  const { token, user } = await h.login(email, password);
-  return {
-    id: user.companyId || active[0].companyId,
-    slug,
-    email,
-    password,
-    token,
-    ephemeral: false,
-  };
 }
 
 async function createEphemeral(
@@ -493,6 +521,13 @@ async function createEphemeral(
       `provision ${slug}: ${tenant.body?.status} ${tenant.body?.lastError || ''}`,
     );
   }
+
+  await sleep(300);
+  await h.patch(
+    `/api/tenants/${id}/routing-mode`,
+    { routingMode: 'tenant' },
+    superToken,
+  );
 
   const { token } = await h.login(email, password);
   return {

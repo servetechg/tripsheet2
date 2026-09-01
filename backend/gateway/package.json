@@ -18,6 +18,11 @@
     "test:auth:live": "ts-node --transpile-only scripts/auth/chapter4.test.ts",
     "test:auth:live:keep": "ts-node --transpile-only scripts/auth/chapter4.test.ts --keep",
     "test:auth:live:existing": "ts-node --transpile-only scripts/auth/chapter4.test.ts --existing",
+    "test:drivers:live": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --existing",
+    "test:drivers:live:keep": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --keep",
+    "test:drivers:live:existing": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --existing",
+    "test:mdm:live": "ts-node --transpile-only scripts/mdm/chapter5.test.ts --existing",
+    "test:mdm:live:existing": "ts-node --transpile-only scripts/mdm/chapter5.test.ts --existing",
     "test:load": "ts-node --transpile-only scripts/multi-tenant/load.test.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },

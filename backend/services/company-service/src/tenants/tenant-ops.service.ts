@@ -156,6 +156,53 @@ export class TenantOpsService {
   }
 
   /**
+   * Apply org SQL + Prisma ops push for one active tenant (idempotent).
+   */
+  async ensureCompanySchemas(companyId: string) {
+    const row = await this.prisma.tenantDatabase.findUnique({
+      where: { companyId },
+    });
+    if (!row || row.status !== 'active') {
+      throw new Error(`Tenant ${companyId} is not active`);
+    }
+
+    await this.tenantLocal.ensureAllTenantOrgSchemas(companyId);
+    try {
+      await this.tenantLocal.getSecurityPolicy(companyId);
+    } catch (e) {
+      this.logger.warn(
+        `getSecurityPolicy skip ${companyId}: ${
+          e instanceof Error ? e.message : e
+        }`,
+      );
+    }
+
+    let pushOk: boolean | 'skipped' = 'skipped';
+    let pushError: string | undefined;
+    if (row.connectionCiphertext) {
+      try {
+        const url = decryptSecret(row.connectionCiphertext);
+        const pushed = await pushTenantOpsSchemas(url, { quiet: true });
+        pushOk = pushed ? true : 'skipped';
+        if (pushed) {
+          await this.prisma.tenantDatabase.update({
+            where: { id: row.id },
+            data: { schemaVersion: '6', lastError: '' },
+          });
+        }
+      } catch (pushErr) {
+        const msg =
+          pushErr instanceof Error ? pushErr.message : String(pushErr);
+        this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
+        pushOk = false;
+        pushError = msg.slice(0, 500);
+      }
+    }
+
+    return { ok: true, companyId, orgOk: true, pushOk, pushError };
+  }
+
+  /**
    * Phase 6 migrate-all: apply org SQL + non-destructive Prisma push (when sibling
    * service trees exist on disk). Safe for CI after deploy.
    */
@@ -181,19 +228,7 @@ export class TenantOpsService {
         pushOk: 'skipped',
       };
       try {
-        await this.tenantLocal.ensurePhase5Schema(row.companyId);
-        await this.tenantLocal.ensureCustomRolesSchema(row.companyId);
-        await this.tenantLocal.ensureAuthHardeningSchema(row.companyId);
-        await this.tenantLocal.ensureStaffInviteSchema(row.companyId);
-        await this.tenantLocal.ensureInviteLifecycleSchema(row.companyId);
-        await this.tenantLocal.ensurePasswordPolicySchema(row.companyId);
-        await this.tenantLocal.ensureSecurityNotificationsSchema(row.companyId);
-        await this.tenantLocal.ensureMdmFleetSchema(row.companyId);
-        await this.tenantLocal.ensureMdmPartiesSchema(row.companyId);
-        await this.tenantLocal.ensureMdmCarriersSchema(row.companyId);
-        await this.tenantLocal.ensureMdmCatalogsSchema(row.companyId);
-        await this.tenantLocal.ensureMdmBorderSchema(row.companyId);
-        await this.tenantLocal.ensureMdmOpsSchema(row.companyId);
+        await this.tenantLocal.ensureAllTenantOrgSchemas(row.companyId);
         await this.tenantLocal.getSecurityPolicy(row.companyId);
         entry.orgOk = true;
 

@@ -166,8 +166,8 @@ export class TenantLocalService {
       for (const t of types) {
         await client.query(
           `INSERT INTO fleet."EquipmentType"
-            ("id","companyId","code","name","system","status")
-           VALUES ($1,$2,$3,$4,true,'active')
+            ("id","companyId","code","name","system","status","createdAt","updatedAt")
+           VALUES ($1,$2,$3,$4,true,'active',NOW(),NOW())
            ON CONFLICT ("companyId","code") DO NOTHING`,
           [`eqt_${companyId}_${t.code}`, companyId, t.code, t.name],
         );
@@ -323,9 +323,63 @@ export class TenantLocalService {
     }
   }
 
+  /** Chapter 6 Driver Management Phases 1–3. */
+  async ensureDriverChapter6Schema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('015_driver_chapter6.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Chapter 6 Driver Management Phases 4–7. */
+  async ensureDriverChapter6Phase4567Schema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('016_driver_chapter6_phase4567.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** MDM Phase 8: invoice broker columns + accounting Prisma parity. */
+  async ensureMdmPhase8InvoiceBrokerSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('017_mdm_phase8_invoice_broker.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
+  /** Apply all org-side tenant SQL migrations (idempotent). */
+  async ensureAllTenantOrgSchemas(companyId: string) {
+    await this.ensurePhase5Schema(companyId);
+    await this.ensureCustomRolesSchema(companyId);
+    await this.ensureAuthHardeningSchema(companyId);
+    await this.ensureStaffInviteSchema(companyId);
+    await this.ensureInviteLifecycleSchema(companyId);
+    await this.ensurePasswordPolicySchema(companyId);
+    await this.ensureSecurityNotificationsSchema(companyId);
+    await this.ensureMdmFleetSchema(companyId);
+    await this.ensureMdmPartiesSchema(companyId);
+    await this.ensureMdmCarriersSchema(companyId);
+    await this.ensureMdmCatalogsSchema(companyId);
+    await this.ensureMdmBorderSchema(companyId);
+    await this.ensureMdmOpsSchema(companyId);
+    await this.ensureMdmPhase8InvoiceBrokerSchema(companyId);
+    await this.ensureDriverChapter6Schema(companyId);
+    await this.ensureDriverChapter6Phase4567Schema(companyId);
+  }
+
   private loadSql(name: string): string {
     const candidates = [
       join(__dirname, '..', 'tenants', 'sql', name),
+      join(__dirname, '..', '..', 'tenants', 'sql', name),
       join(process.cwd(), 'src', 'tenants', 'sql', name),
       join(process.cwd(), 'dist', 'tenants', 'sql', name),
     ];

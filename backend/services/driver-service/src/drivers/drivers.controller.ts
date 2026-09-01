@@ -29,6 +29,36 @@ export class DriversController {
     return this.driversService.dispatchReady(id);
   }
 
+  @Get(':id/border-eligible')
+  borderEligible(@Param('id') id: string) {
+    return this.driversService.borderEligible(id);
+  }
+
+  @Get(':id/performance')
+  performance(@Param('id') id: string) {
+    return this.driversService.performance(id);
+  }
+
+  @Post(':id/approve')
+  approve(@Param('id') id: string) {
+    return this.driversService.approve(id);
+  }
+
+  @Post(':id/suspend')
+  suspend(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.driversService.suspend(id, body?.reason);
+  }
+
+  @Post(':id/terminate')
+  terminate(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.driversService.terminate(id, body?.reason);
+  }
+
+  @Post(':id/archive')
+  archive(@Param('id') id: string) {
+    return this.driversService.archive(id);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.driversService.findOne(id);
