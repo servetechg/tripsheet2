@@ -10,7 +10,7 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "seed": "ts-node prisma/seed.ts",
+    "seed": "node prisma/seed.prod.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -45,6 +45,6 @@
     "typescript": "^5.7.2"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/seed.prod.js"
   }
 }
