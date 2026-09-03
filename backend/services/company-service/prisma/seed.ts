@@ -76,63 +76,7 @@ async function main() {
       create: { ...p, active: true },
     });
   }
-
-  const starter = await prisma.plan.findUniqueOrThrow({
-    where: { code: 'starter' },
-  });
-
-  await prisma.company.upsert({
-    where: { id: 'c1' },
-    update: {
-      name: 'MKX Transport',
-      shortName: 'MKX',
-      slug: 'mkx',
-      tagline: 'MORE EFFICIENT',
-      address: '9 Red Sky Rd NE, Calgary, AB T3N 1P8',
-      active: true,
-      status: 'active',
-      planId: starter.id,
-    },
-    create: {
-      id: 'c1',
-      name: 'MKX Transport',
-      shortName: 'MKX',
-      slug: 'mkx',
-      tagline: 'MORE EFFICIENT',
-      address: '9 Red Sky Rd NE, Calgary, AB T3N 1P8',
-      active: true,
-      status: 'active',
-      planId: starter.id,
-    },
-  });
-
-  await prisma.subscription.upsert({
-    where: { companyId: 'c1' },
-    update: { planId: starter.id, status: 'active' },
-    create: {
-      companyId: 'c1',
-      planId: starter.id,
-      status: 'active',
-    },
-  });
-
-  await prisma.tenantDatabase.upsert({
-    where: { companyId: 'c1' },
-    update: {
-      dbName: 'fq_tenant_mkx',
-      status: 'pending_provision',
-    },
-    create: {
-      companyId: 'c1',
-      dbName: 'fq_tenant_mkx',
-      host: 'localhost',
-      port: 5432,
-      status: 'pending_provision',
-      schemaVersion: '1',
-    },
-  });
-
-  console.log('Seeded platform plans + company MKX (c1) with pending tenant DB');
+  console.log('Seeded platform plans (no demo companies)');
 }
 
 main()
