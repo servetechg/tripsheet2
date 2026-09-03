@@ -42,35 +42,35 @@ jobs:
       matrix:
         include:
           - name: gateway
-            context: backend/gateway
+            context: .
             file: backend/gateway/Dockerfile
           - name: frontend
             context: .
             file: frontend/Dockerfile
             build_args: VITE_API_URL=/api
           - name: auth-service
-            context: backend/services/auth-service
+            context: .
             file: backend/services/auth-service/Dockerfile
           - name: company-service
-            context: backend/services/company-service
+            context: .
             file: backend/services/company-service/Dockerfile
           - name: driver-service
-            context: backend/services/driver-service
+            context: .
             file: backend/services/driver-service/Dockerfile
           - name: fleet-service
-            context: backend/services/fleet-service
+            context: .
             file: backend/services/fleet-service/Dockerfile
           - name: manifest-service
-            context: backend/services/manifest-service
+            context: .
             file: backend/services/manifest-service/Dockerfile
           - name: tripsheet-service
-            context: backend/services/tripsheet-service
+            context: .
             file: backend/services/tripsheet-service/Dockerfile
           - name: accounting-service
-            context: backend/services/accounting-service
+            context: .
             file: backend/services/accounting-service/Dockerfile
           - name: notification-service
-            context: backend/services/notification-service
+            context: .
             file: backend/services/notification-service/Dockerfile
     steps:
       - uses: actions/checkout@v4

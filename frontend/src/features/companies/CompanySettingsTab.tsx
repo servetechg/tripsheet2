@@ -135,7 +135,8 @@ type Sub =
   | 'notifications'
   | 'plan'
   | 'users'
-  | 'roles';
+  | 'roles'
+  | 'masterdata';
 
 export function CompanySettingsTab({
   company,

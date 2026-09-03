@@ -978,7 +978,7 @@ export function DispatchTab({
                   ))}
                 </Sel>
                 {fieldErr.portOfEntryId && (
-                  <Err>{fieldErr.portOfEntryId}</Err>
+                  <Err msg={fieldErr.portOfEntryId} />
                 )}
               </div>
             )}
@@ -1015,7 +1015,7 @@ export function DispatchTab({
                   {f.customsAci && <option value="ACI">ACI (Canada)</option>}
                 </Sel>
                 {fieldErr.customsProgram && (
-                  <Err>{fieldErr.customsProgram}</Err>
+                  <Err msg={fieldErr.customsProgram} />
                 )}
               </div>
             </>

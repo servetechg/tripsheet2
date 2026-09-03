@@ -174,7 +174,7 @@ export function LoginScreen({
         }}
       >
         <BrandLogo />
-        <h1 style={{ ...TYPE.h2, margin: '20px 0 8px' }}>
+        <h1 style={{ ...TYPE.sectionTitle, margin: '20px 0 8px' }}>
           {step.kind === 'password'
             ? 'Sign in'
             : step.kind === 'mfa'
