@@ -123,7 +123,7 @@ jobs:
           COLOR="${REQUESTED_COLOR:-}"
           if [[ -z "${COLOR}" ]]; then
             COLOR=$(ssh -i key -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
-              'grep -E "^ACTIVE_COLOR=" /opt/tripsheet/secrets/edge.env | cut -d= -f2 || echo blue')
+              'grep -E "^ACTIVE_COLOR=" /opt/tripsheet/secrets/edge.env 2>/dev/null | cut -d= -f2 || echo blue')
             if [[ "${COLOR}" == "blue" ]]; then COLOR=green; else COLOR=blue; fi
           fi
           ssh -i key -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
@@ -132,18 +132,9 @@ jobs:
           git fetch --all
           git checkout --force ${GITHUB_SHA}
           chmod +x deploy/scripts/*.sh
-          touch /opt/tripsheet/secrets/app.env
-          grep -q '^IMAGE_REGISTRY=' /opt/tripsheet/secrets/app.env \
-            && sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${IMAGE_REGISTRY}|' /opt/tripsheet/secrets/app.env \
-            || echo "IMAGE_REGISTRY=${IMAGE_REGISTRY}" >> /opt/tripsheet/secrets/app.env
-          grep -q '^IMAGE_TAG=' /opt/tripsheet/secrets/app.env \
-            && sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/app.env \
-            || echo "IMAGE_TAG=${IMAGE_TAG}" >> /opt/tripsheet/secrets/app.env
+          export CI_COMMIT_SHA=${GITHUB_SHA}
+          export IMAGE_REGISTRY=${IMAGE_REGISTRY}
+          export IMAGE_TAG=${IMAGE_TAG}
           echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
-          ./deploy/scripts/deploy.sh ${COLOR} ${IMAGE_TAG}
-          # Phase 6: tenant schema sync on the stack that is now active
-          sleep 10
-          ACTIVE=$(grep -E '^ACTIVE_COLOR=' /opt/tripsheet/secrets/edge.env | cut -d= -f2 || echo "${COLOR}")
-          echo "==> schema-migrate-all via ${ACTIVE}-company-service"
-          docker exec "${ACTIVE}-company-service" node -e "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{console.log(await r.text()); if(!r.ok) process.exit(1)})"
+          ./deploy/scripts/ci-production-deploy.sh '${COLOR}' '${IMAGE_TAG}'
           EOF
