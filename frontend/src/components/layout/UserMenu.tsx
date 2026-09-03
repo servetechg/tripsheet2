@@ -2,6 +2,12 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import type { ThemeMode } from '@/lib/theme';
 import { Icons } from '@/components/ui/Icons';
+import { Btn, Inp, Modal } from '@/components/ui';
+import { authApi, setTokens, ApiError } from '@/lib/api';
+import { useConfirm } from '@/context/ConfirmContext';
+import { useSession } from '@/context/SessionContext';
+import { SessionsDevicesPanel } from '@/features/auth/SessionsDevicesPanel';
+import { MfaSettingsPanel } from '@/features/auth/MfaSettingsPanel';
 
 type UserMenuProps = {
   name?: string;
@@ -31,6 +37,15 @@ export function UserMenu({
   onLogout,
 }: UserMenuProps) {
   const [open, setOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [pwErr, setPwErr] = useState('');
+  const [pwBusy, setPwBusy] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const { logout } = useSession();
+  const confirm = useConfirm();
   const rootRef = useRef<HTMLDivElement>(null);
   const displayName = name || companyLabel || 'Admin';
   const initials = initialsFrom(name, companyLabel || 'A');
@@ -199,6 +214,94 @@ export function UserMenu({
             )}
           </div>
 
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              setMfaOpen(true);
+            }}
+          >
+            <span>Authenticator (MFA)</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              setSessionsOpen(true);
+            }}
+          >
+            <span>Sessions & devices</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              setPwErr('');
+              setCurrentPassword('');
+              setNewPassword('');
+              setPwOpen(true);
+            }}
+          >
+            <span>Change password</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            style={itemStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = G.card2;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            onClick={() => {
+              setOpen(false);
+              void (async () => {
+                const ok = await confirm({
+                  title: 'Sign out all sessions',
+                  message:
+                    'Sign out this account on all devices? You will need to log in again.',
+                  confirmLabel: 'Sign out all',
+                  variant: 'danger',
+                });
+                if (!ok) return;
+                void authApi
+                  .logoutAll()
+                  .catch(() => undefined)
+                  .finally(() => {
+                    logout();
+                    onLogout?.();
+                  });
+              })();
+            }}
+          >
+            <span>Sign out all sessions</span>
+          </button>
+
           {onToggleTheme && (
             <button
               type="button"
@@ -248,6 +351,75 @@ export function UserMenu({
           )}
         </div>
       )}
+
+      {pwOpen ? (
+        <Modal
+          open
+          title="Change password"
+          onClose={() => !pwBusy && setPwOpen(false)}
+          maxWidth={400}
+          closeOnBackdrop={!pwBusy}
+          showClose={false}
+          footer={
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <Btn variant="outline" disabled={pwBusy} onClick={() => setPwOpen(false)}>
+                Cancel
+              </Btn>
+              <Btn
+                disabled={pwBusy}
+                onClick={() => {
+                  setPwErr('');
+                  setPwBusy(true);
+                  void authApi
+                    .changePassword({ currentPassword, newPassword })
+                    .then((res) => {
+                      setTokens(res.accessToken, res.refreshToken || null);
+                      setPwOpen(false);
+                    })
+                    .catch((e) => {
+                      setPwErr(
+                        e instanceof ApiError
+                          ? e.message
+                          : 'Could not change password',
+                      );
+                    })
+                    .finally(() => setPwBusy(false));
+                }}
+              >
+                {pwBusy ? 'Saving…' : 'Save'}
+              </Btn>
+            </div>
+          }
+        >
+          <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
+            This signs out other sessions. Existing weak passwords can still
+            log in until you change them here.
+          </div>
+          {pwErr ? (
+            <div style={{ color: G.danger, fontSize: 12, marginBottom: 8 }}>
+              {pwErr}
+            </div>
+          ) : null}
+          <Inp
+            type="password"
+            placeholder="Current password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+          />
+          <Inp
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            style={{ marginBottom: 0 }}
+          />
+        </Modal>
+      ) : null}
+
+      {sessionsOpen && (
+        <SessionsDevicesPanel onClose={() => setSessionsOpen(false)} />
+      )}
+      {mfaOpen && <MfaSettingsPanel onClose={() => setMfaOpen(false)} />}
 
       <style>{`
         @media (min-width: 640px) {

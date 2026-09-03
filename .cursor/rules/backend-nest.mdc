@@ -1,0 +1,34 @@
+---
+description: Backend NestJS microservice conventions
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Backend conventions
+
+## Structure
+
+- Each service: `src/<module>/*.controller.ts`, `*.service.ts`, `dto/`, `*.module.ts`
+- Gateway proxies: `backend/gateway/src/proxy/*.proxy.controller.ts`
+- RBAC route map: `backend/gateway/src/rbac/route-permissions.ts`
+- Tenant headers: `@tripsheet/tenant-runtime` — services trust gateway-injected headers, not client `companyId` alone
+
+## Patterns
+
+- Prisma in services uses `createTenantPrismaProxy` when multi-tenant (driver, fleet, company org data)
+- Public paths exempt in `tenant-resolver.middleware.ts` and `tenant-context.middleware.ts`
+- Internal service calls: `INTERNAL_API_KEY` header to `*/internal/*` routes
+- Permissions in services: `assertPermission('module.action')` from tenant-runtime
+
+## Change checklist
+
+1. Gateway proxy route + RBAC permission if new public API
+2. DTO validation on controller inputs
+3. Tenant-aware Prisma queries use `requireCompanyId()` / store from ALS
+4. Run the **chapter test** for that domain (see `AGENTS.md`)
+
+## Do not
+
+- Add a new microservice without explicit request
+- Put business logic in gateway (proxy only)
+- Hard-delete tenant or user rows with history

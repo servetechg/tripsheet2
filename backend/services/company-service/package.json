@@ -4,13 +4,19 @@
   "description": "TripSheet Company Service",
   "private": true,
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && node scripts/copy-sql-assets.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
+    "provision:pending": "ts-node --transpile-only scripts/provision-pending-tenants.ts",
+    "sync:tenant-schemas": "ts-node --transpile-only scripts/sync-tenant-schemas.ts",
+    "migrate:tenants": "ts-node --transpile-only scripts/migrate-all-tenants.ts",
+    "schema:migrate-all": "ts-node --transpile-only scripts/schema-migrate-all.ts",
+    "test:rbac": "ts-node --transpile-only src/org/check-custom-roles.ts && ts-node --transpile-only src/mdm/check-party-status.ts && ts-node --transpile-only src/mdm/check-merge.ts && ts-node --transpile-only src/mdm/check-catalog.ts && ts-node --transpile-only src/mdm/check-border.ts && ts-node --transpile-only src/mdm/check-ops-ref.ts && ts-node --transpile-only src/mdm/check-csv.ts && ts-node --transpile-only src/mdm/check-chapter5-acceptance.ts",
+    "test:mdm:acceptance": "ts-node --transpile-only src/mdm/check-chapter5-acceptance.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {
@@ -21,6 +27,7 @@
     "@prisma/client": "^6.1.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "pg": "^8.13.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -29,11 +36,12 @@
     "@nestjs/schematics": "^11.0.0",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.10",
     "prisma": "^6.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node prisma/seed.prod.js"
   }
 }

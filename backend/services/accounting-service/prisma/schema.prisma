@@ -17,7 +17,7 @@ model Settlement {
   status      String   @default("draft") // draft | approved | paid
   currency    String   @default("CAD")
   totalAmount Float    @default(0)
-  lines       Json     @default("[]") // [{label, amount, source?}]
+  lines       Json     @default("[]")
   notes       String   @default("")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -25,4 +25,86 @@ model Settlement {
   @@index([companyId])
   @@index([driverId])
   @@index([status])
+}
+
+model LedgerAccount {
+  id        String   @id @default(cuid())
+  companyId String
+  code      String
+  name      String
+  type      String // asset | liability | equity | revenue | expense
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+}
+
+model Invoice {
+  id            String   @id @default(cuid())
+  companyId     String
+  customerName  String
+  customerId    String?
+  brokerName    String   @default("")
+  brokerId      String?
+  loadId        String?
+  tripNo        String   @default("")
+  status        String   @default("draft") // draft | sent | partial | paid | void
+  issueDate     String
+  dueDate       String
+  currency      String   @default("CAD")
+  subtotal      Float    @default(0)
+  tax           Float    @default(0)
+  total         Float    @default(0)
+  amountPaid    Float    @default(0)
+  lines         Json     @default("[]") // [{description, amount}]
+  notes         String   @default("")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+  @@index([loadId])
+  @@index([customerId])
+  @@index([brokerId])
+}
+
+model Bill {
+  id          String   @id @default(cuid())
+  companyId   String
+  vendorName  String
+  status      String   @default("open") // open | partial | paid | void
+  issueDate   String
+  dueDate     String
+  currency    String   @default("CAD")
+  total       Float    @default(0)
+  amountPaid  Float    @default(0)
+  lines       Json     @default("[]")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([status])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  companyId   String
+  direction   String // customer | vendor
+  partyName   String
+  invoiceId   String?
+  billId      String?
+  amount      Float
+  method      String   @default("ach") // ach | wire | cheque | card | cash
+  paidAt      String
+  reference   String   @default("")
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([invoiceId])
+  @@index([billId])
 }

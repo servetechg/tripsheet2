@@ -1,0 +1,46 @@
+name: tenant-migrate
+
+# Phase 6: schema-migrate-all across tenants on demand.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  migrate-all-tenants:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    steps:
+      - name: Schema-migrate-all over SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          install -m 600 /dev/null key
+          printf '%s\n' "$SSH_KEY" > key
+          ssh -i key -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" \
+            "TARGET_ENV='${TARGET_ENV}' bash -s" <<'EOF'
+          set -euo pipefail
+          cd /opt/tripsheet/repo
+          chmod +x deploy/scripts/*.sh
+          if [[ "${TARGET_ENV}" == "staging" ]]; then
+            CTR=staging-company-service
+          else
+            ACTIVE=$(grep -E '^ACTIVE_COLOR=' /opt/tripsheet/secrets/edge.env | cut -d= -f2 || echo blue)
+            CTR="${ACTIVE}-company-service"
+          fi
+          echo "==> schema-migrate-all via ${CTR}"
+          docker exec "${CTR}" node -e "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{console.log(await r.text()); if(!r.ok) process.exit(1)})"
+          echo "==> done (${TARGET_ENV})"
+          EOF

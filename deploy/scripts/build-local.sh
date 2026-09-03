@@ -9,12 +9,12 @@ REGISTRY="${IMAGE_REGISTRY:-tripsheet}"
 
 echo "==> Building images as ${REGISTRY}/*:${TAG}"
 
-docker build -t "${REGISTRY}/gateway:${TAG}" -f "${ROOT_DIR}/backend/gateway/Dockerfile" "${ROOT_DIR}/backend/gateway"
+docker build -t "${REGISTRY}/gateway:${TAG}" -f "${ROOT_DIR}/backend/gateway/Dockerfile" "${ROOT_DIR}"
 
 for svc in auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service; do
   docker build -t "${REGISTRY}/${svc}:${TAG}" \
     -f "${ROOT_DIR}/backend/services/${svc}/Dockerfile" \
-    "${ROOT_DIR}/backend/services/${svc}"
+    "${ROOT_DIR}"
 done
 
 docker build \

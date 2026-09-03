@@ -10,7 +10,7 @@ datasource db {
 model Driver {
   id             String           @id @default(cuid())
   companyId      String
-  userId         String? // auth-service user id when linked
+  userId         String?
   name           String
   email          String
   phone          String?
@@ -24,12 +24,114 @@ model Driver {
   notes          String?
   sin            String?
   active         Boolean          @default(true)
+  branchId       String?
+
+  lifecycleStatus   String          @default("active")
+  availabilityStatus String         @default("available")
+  driverType        String           @default("company")
+
+  employeeNumber     String?
+  employmentStatus String?
+  hireDate           String?
+  probationEndDate   String?
+  seniorityDate      String?
+  managerUserId      String?
+  dispatcherUserId   String?
+  preferredName      String?
+  preferredLanguage  String?
+  ownerOperatorProfile Json?
+
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
   documents      DriverDocument[]
   contracts      Contract[]
+  qualifications DriverQualification[]
+  equipmentAssignments DriverEquipmentAssignment[]
+  safetyEvents   DriverSafetyEvent[]
+  trainingRecords DriverTrainingRecord[]
 
   @@unique([companyId, email])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([lifecycleStatus])
+  @@index([availabilityStatus])
+  @@index([driverType])
+}
+
+model DriverQualification {
+  id               String   @id @default(cuid())
+  companyId        String
+  driverId         String
+  type             String
+  number           String?
+  class            String?
+  endorsements     Json?
+  issueDate        String?
+  expiryDate       String?
+  issuingAuthority String?
+  documentId       String?
+  status           String   @default("missing")
+  ocrData          Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  driver           Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([companyId])
+  @@index([type])
+}
+
+model DriverEquipmentAssignment {
+  id               String    @id @default(cuid())
+  companyId        String
+  driverId         String
+  assetId          String
+  assetType        String
+  role             String    @default("primary")
+  unitNo           String?
+  assignedAt       DateTime  @default(now())
+  unassignedAt     DateTime?
+  assignedByUserId String?
+  notes            String?
+  driver           Driver    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([companyId])
+  @@index([assetId])
+}
+
+model DriverSafetyEvent {
+  id          String   @id @default(cuid())
+  companyId   String
+  driverId    String
+  type        String
+  occurredAt  String
+  description String
+  preventable Boolean?
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  driver      Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([companyId])
+}
+
+model DriverTrainingRecord {
+  id                    String   @id @default(cuid())
+  companyId             String
+  driverId              String
+  courseCode            String
+  courseName            String?
+  completedAt           String
+  expiryDate            String?
+  instructor            String?
+  certificateDocumentId String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  driver                Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
   @@index([companyId])
 }
 
@@ -37,14 +139,12 @@ model DriverDocument {
   id                 String   @id @default(cuid())
   driverId           String
   companyId          String
-  type               String // license, abstract, medical, __contract__, etc.
+  type               String
   fileName           String
   fileSize           Int?
   fileType           String?
-  /// Cloudinary (or CDN) HTTPS URL — preferred Phase 2 storage
   fileUrl            String?
   cloudinaryPublicId String?
-  /// Legacy Phase 1 inline base64 data URL (only used when Cloudinary is off)
   fileData           String?
   uploadedAt         String
   expiryDate         String?
@@ -81,7 +181,7 @@ model Contract {
   signedAt        String?
   driverSignature String?
   adminSignature  String?
-  payload         Json? // full form snapshot
+  payload         Json?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   driver          Driver   @relation(fields: [driverId], references: [id], onDelete: Cascade)
@@ -93,11 +193,17 @@ model Invite {
   id          String   @id @default(cuid())
   token       String   @unique
   companyId   String
-  status      String   @default("pending") // pending|completed|expired
+  status      String   @default("pending")
+  kind        String   @default("driver")
+  role        String   @default("driver")
+  email       String?
+  name        String?
   driverId    String?
+  expiresAt   String?
   createdAt   String
   completedAt String?
   updatedAt   DateTime @updatedAt
 
   @@index([companyId])
+  @@index([status])
 }

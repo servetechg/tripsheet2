@@ -17,13 +17,46 @@ export class DriversController {
   constructor(private readonly driversService: DriversService) {}
 
   @Get()
-  findAll(@Query('companyId') companyId?: string) {
-    return this.driversService.findAll(companyId);
+  findAll(
+    @Query('companyId') companyId?: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.driversService.findAll(companyId, userId);
   }
 
   @Get(':id/dispatch-ready')
   dispatchReady(@Param('id') id: string) {
     return this.driversService.dispatchReady(id);
+  }
+
+  @Get(':id/border-eligible')
+  borderEligible(@Param('id') id: string) {
+    return this.driversService.borderEligible(id);
+  }
+
+  @Get(':id/performance')
+  performance(@Param('id') id: string) {
+    return this.driversService.performance(id);
+  }
+
+  @Post(':id/approve')
+  approve(@Param('id') id: string) {
+    return this.driversService.approve(id);
+  }
+
+  @Post(':id/suspend')
+  suspend(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.driversService.suspend(id, body?.reason);
+  }
+
+  @Post(':id/terminate')
+  terminate(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.driversService.terminate(id, body?.reason);
+  }
+
+  @Post(':id/archive')
+  archive(@Param('id') id: string) {
+    return this.driversService.archive(id);
   }
 
   @Get(':id')

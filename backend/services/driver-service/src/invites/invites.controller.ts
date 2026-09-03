@@ -26,4 +26,14 @@ export class InvitesController {
   complete(@Param('token') token: string, @Body() dto: CompleteInviteDto) {
     return this.invitesService.complete(token, dto);
   }
+
+  @Post(':id/revoke')
+  revoke(@Param('id') id: string) {
+    return this.invitesService.revoke(id);
+  }
+
+  @Post(':id/regenerate')
+  regenerate(@Param('id') id: string) {
+    return this.invitesService.regenerate(id);
+  }
 }

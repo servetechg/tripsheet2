@@ -1,3 +1,4 @@
+import { Transform } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
@@ -7,6 +8,7 @@ import {
   ValidateIf,
 } from 'class-validator';
 import { Role } from '@prisma/client';
+import { normalizeRoleCode } from '../../rbac/rbac.catalog';
 
 export class CreateUserDto {
   @IsEmail()
@@ -20,6 +22,9 @@ export class CreateUserDto {
   @MinLength(1)
   name!: string;
 
+  @Transform(({ value }) =>
+    typeof value === 'string' ? normalizeRoleCode(value) : value,
+  )
   @IsEnum(Role)
   role!: Role;
 
@@ -27,4 +32,8 @@ export class CreateUserDto {
   @ValidateIf((_, v) => v !== null)
   @IsString()
   companyId?: string | null;
+
+  /** Internal invite onboarding — skip password history / allow idempotent retry. */
+  @IsOptional()
+  inviteCompletion?: boolean;
 }

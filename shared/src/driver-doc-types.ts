@@ -10,6 +10,11 @@ export const DRIVER_DOC_TYPES = [
   { id: 'criminal', label: 'Criminal Background Chk', required: false },
   { id: 'sin_ssn', label: 'SIN / SSN', required: true },
   { id: 'void_cheque', label: 'Void Cheque / Banking', required: false },
+  { id: 'bol', label: 'Bill of Lading (BOL)', required: false },
+  { id: 'pod', label: 'Proof of Delivery (POD)', required: false },
+  { id: 'rate_con', label: 'Rate Confirmation', required: false },
+  { id: 'permit', label: 'Permit', required: false },
+  { id: 'border_doc', label: 'Border / Customs Doc', required: false },
   { id: 'other', label: 'Other Document', required: false },
 ] as const;
 

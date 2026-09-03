@@ -7,12 +7,14 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -23,14 +25,65 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const token = header.slice(7);
+    let payload: { sub?: string; tv?: number };
     try {
-      const payload = await this.jwt.verifyAsync(token, {
+      payload = await this.jwt.verifyAsync(token, {
         secret: this.config.get<string>('JWT_SECRET', 'change-me-in-production'),
       });
-      (request as Request & { user?: unknown }).user = payload;
-      return true;
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+
+    if (!payload?.sub) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    const row = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { tokenVersion: true, lockedUntil: true, status: true },
+    });
+    if (!row) {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+    if (row.status !== 'active') {
+      throw new UnauthorizedException(
+        row.status === 'suspended'
+          ? 'Account suspended'
+          : row.status === 'archived'
+            ? 'Account archived'
+            : row.status === 'locked'
+              ? 'Account locked'
+              : 'Account not allowed to sign in',
+      );
+    }
+    if (row.lockedUntil && row.lockedUntil.getTime() > Date.now()) {
+      throw new UnauthorizedException('Account locked. Try again later.');
+    }
+    const tv = Number(payload.tv ?? 0);
+    if (row.tokenVersion !== tv) {
+      throw new UnauthorizedException('Token revoked. Sign in again.');
+    }
+
+    const sid =
+      typeof (payload as { sid?: string }).sid === 'string'
+        ? (payload as { sid: string }).sid
+        : undefined;
+    if (sid) {
+      const sess = await this.prisma.session.findUnique({
+        where: { id: sid },
+        select: { userId: true, revokedAt: true, expiresAt: true },
+      });
+      if (
+        !sess ||
+        sess.userId !== payload.sub ||
+        sess.revokedAt ||
+        sess.expiresAt.getTime() <= Date.now()
+      ) {
+        throw new UnauthorizedException('Session revoked. Sign in again.');
+      }
+    }
+
+    (request as Request & { user?: unknown }).user = payload;
+    return true;
   }
 }

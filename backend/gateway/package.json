@@ -8,6 +8,22 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
+    "test:tenancy": "ts-node --transpile-only scripts/multi-tenant/architecture.test.ts",
+    "test:tenancy:keep": "ts-node --transpile-only scripts/multi-tenant/architecture.test.ts --keep",
+    "test:tenancy:existing": "ts-node --transpile-only scripts/multi-tenant/architecture.test.ts --existing",
+    "test:rbac": "ts-node --transpile-only src/rbac/check-rbac.ts",
+    "test:rbac:live": "ts-node --transpile-only scripts/rbac/personas.test.ts",
+    "test:rbac:live:keep": "ts-node --transpile-only scripts/rbac/personas.test.ts --keep",
+    "test:rbac:live:existing": "ts-node --transpile-only scripts/rbac/personas.test.ts --existing",
+    "test:auth:live": "ts-node --transpile-only scripts/auth/chapter4.test.ts",
+    "test:auth:live:keep": "ts-node --transpile-only scripts/auth/chapter4.test.ts --keep",
+    "test:auth:live:existing": "ts-node --transpile-only scripts/auth/chapter4.test.ts --existing",
+    "test:drivers:live": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --existing",
+    "test:drivers:live:keep": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --keep",
+    "test:drivers:live:existing": "ts-node --transpile-only scripts/drivers/chapter6.test.ts --existing",
+    "test:mdm:live": "ts-node --transpile-only scripts/mdm/chapter5.test.ts --existing",
+    "test:mdm:live:existing": "ts-node --transpile-only scripts/mdm/chapter5.test.ts --existing",
+    "test:load": "ts-node --transpile-only scripts/multi-tenant/load.test.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix"
   },
   "dependencies": {
@@ -16,7 +32,9 @@
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
+    "@tripsheet/tenant-runtime": "file:../shared/tenant-runtime",
     "axios": "^1.7.9",
+    "jsonwebtoken": "^9.0.2",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1"
   },
@@ -24,7 +42,9 @@
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
     "@types/express": "^5.0.0",
+    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2"
   }
 }

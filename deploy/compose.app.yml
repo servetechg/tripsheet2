@@ -23,8 +23,13 @@ services:
     environment:
       PORT: 3000
       CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
-      AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
       COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      TENANT_RUNTIME_MODE: ${TENANT_RUNTIME_MODE:-enforce}
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+      AUTH_SESSION_CACHE_TTL_MS: ${AUTH_SESSION_CACHE_TTL_MS:-60000}
+      AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
       DRIVER_SERVICE_URL: http://${COLOR}-driver-service:3003
       FLEET_SERVICE_URL: http://${COLOR}-fleet-service:3004
       MANIFEST_SERVICE_URL: http://${COLOR}-manifest-service:3005
@@ -63,6 +68,13 @@ services:
     environment:
       PORT: 3002
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/company_db?schema=public
+      PLATFORM_SECRETS_KEY: ${PLATFORM_SECRETS_KEY:?PLATFORM_SECRETS_KEY is required}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_PROVISION_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      TENANT_DB_HOST: postgres
+      TENANT_DB_PORT: 5432
+      SHARED_DB_BASE: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      TENANT_DEFAULT_ROUTING_MODE: ${TENANT_DEFAULT_ROUTING_MODE:-shared}
     networks:
       - tripsheet-net
 
@@ -73,8 +85,11 @@ services:
     environment:
       PORT: 3003
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/driver_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
       AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: driver
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
@@ -89,6 +104,10 @@ services:
     environment:
       PORT: 3004
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/fleet_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: fleet
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
     networks:
       - tripsheet-net
 
@@ -99,6 +118,10 @@ services:
     environment:
       PORT: 3005
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/manifest_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: manifest
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
     networks:
       - tripsheet-net
 
@@ -109,6 +132,10 @@ services:
     environment:
       PORT: 3006
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/tripsheet_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: tripsheet
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
     networks:
       - tripsheet-net
 
@@ -119,6 +146,10 @@ services:
     environment:
       PORT: 3007
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/accounting_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: accounting
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
       FLEET_SERVICE_URL: http://${COLOR}-fleet-service:3004
       TRIPSHEET_SERVICE_URL: http://${COLOR}-tripsheet-service:3006
       DRIVER_SERVICE_URL: http://${COLOR}-driver-service:3003
@@ -132,6 +163,10 @@ services:
     environment:
       PORT: 3008
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db?schema=public
+      COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: notification
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}

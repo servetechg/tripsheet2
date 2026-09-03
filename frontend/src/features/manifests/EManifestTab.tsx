@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { G } from '@/lib/theme';
 import { StatCard, StatsGrid, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { manifestsApi, carrierProfilesApi } from '@/lib/api';
 import { CarrierProfileForm } from './CarrierProfileForm';
 import { EManifestForm } from './EManifestForm';
@@ -28,6 +29,7 @@ export function EManifestTab({
 
   const [pending, setPending] = useState<any>({});
   const [actionError, setActionError] = useState<any>(null);
+  const confirm = useConfirm();
 
   const runGatewayAction = (
     id: string,
@@ -169,6 +171,7 @@ export function EManifestTab({
           setEditingManifest(null);
           setSubTab('list');
         }}
+        apiEnabled={apiEnabled}
       />
     );
   if (subTab === 'new_ace')
@@ -189,6 +192,7 @@ export function EManifestTab({
           setEditingManifest(null);
           setSubTab('list');
         }}
+        apiEnabled={apiEnabled}
       />
     );
 
@@ -280,9 +284,14 @@ export function EManifestTab({
       { successMsg: 'eManifest marked rejected.' },
     );
 
-  const cancelManifest = (id: string) => {
-    if (!window.confirm('Cancel this eManifest? This cannot be undone.'))
-      return;
+  const cancelManifest = async (id: string) => {
+    const ok = await confirm({
+      title: 'Cancel eManifest',
+      message: 'Cancel this eManifest? This cannot be undone.',
+      confirmLabel: 'Cancel manifest',
+      variant: 'danger',
+    });
+    if (!ok) return;
     runGatewayAction(
       id,
       'Cancellation',
@@ -305,7 +314,13 @@ export function EManifestTab({
   };
 
   const deleteManifest = async (id: string) => {
-    if (!window.confirm('Delete this draft eManifest permanently?')) return;
+    const ok = await confirm({
+      title: 'Delete eManifest',
+      message: 'Delete this draft eManifest permanently?',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       if (apiEnabled) {
         await manifestsApi.remove(id);

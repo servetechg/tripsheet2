@@ -3,8 +3,12 @@ import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, Divider } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
-import { settlementsApi } from '@/lib/api';
+import { settlementsApi, contractsApi } from '@/lib/api';
 import { blank } from '@/lib/format';
+import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
+import { PAY_TYPES } from '@/lib/docTypes';
+import type { SettlementLine } from '@tripsheet/shared';
+import { BillingPanel } from './BillingPanel';
 
 function statusColor(status: string) {
   if (status === 'paid') return G.success;
@@ -16,17 +20,22 @@ export function AccountingTab({
   company,
   drivers,
   sheets,
+  loads = [],
+  adminUser,
   apiEnabled,
 }: {
   company: { id: string };
   drivers: any[];
   sheets: any[];
+  loads?: any[];
+  adminUser?: any;
   apiEnabled?: boolean;
 }) {
   const [list, setList] = useState<any[]>([]);
   const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [wageContract, setWageContract] = useState<any>(null);
   const [f, setF] = useState({
     driverId: '',
     periodStart: '',
@@ -34,6 +43,11 @@ export function AccountingTab({
     currency: 'CAD',
     notes: '',
   });
+
+  const selectedDriver = drivers.find((d) => d.id === f.driverId);
+  const driverRecordId = selectedDriver
+    ? driverRecordIdOf(selectedDriver)
+    : f.driverId;
 
   const load = async () => {
     if (!apiEnabled) return;
@@ -50,16 +64,44 @@ export function AccountingTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.id, apiEnabled]);
 
-  const expensePreview = useMemo(() => {
-    if (!f.driverId || !f.periodStart || !f.periodEnd) return [];
-    const start = new Date(f.periodStart).getTime();
-    const end = new Date(f.periodEnd).getTime();
-    const lines: { label: string; amount: number; source: string }[] = [];
-    for (const sheet of sheets.filter((s) => s.driverId === f.driverId)) {
-      const created = sheet.createdAt ? new Date(sheet.createdAt).getTime() : NaN;
-      if (Number.isFinite(created) && (created < start || created > end + 86400000)) {
-        continue;
+  useEffect(() => {
+    if (!apiEnabled || !driverRecordId) {
+      setWageContract(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await contractsApi.list(driverRecordId);
+        if (!cancelled) setWageContract(Array.isArray(rows) && rows.length ? rows[0] : null);
+      } catch {
+        if (!cancelled) setWageContract(null);
       }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, driverRecordId]);
+
+  const settlementPreview = useMemo(() => {
+    if (!f.driverId || !f.periodStart || !f.periodEnd) return [] as SettlementLine[];
+    const start = new Date(f.periodStart).getTime();
+    const end = new Date(f.periodEnd).getTime() + 86400000;
+    const lines: SettlementLine[] = [];
+
+    if (wageContract?.payType) {
+      const pt = PAY_TYPES.find((p) => p.id === wageContract.payType);
+      lines.push({
+        label: `Wage terms: ${pt?.label || wageContract.payType} @ ${wageContract.payRate || '—'} ${wageContract.payUnit || pt?.unit || ''} (informational — auto-pay deferred)`,
+        amount: 0,
+        kind: 'wage_info',
+        source: `contract:${wageContract.id || 'active'}`,
+      });
+    }
+
+    for (const sheet of sheets.filter((s) => matchesDriverRef(s.driverId, { id: f.driverId, driverRecordId }))) {
+      const created = sheet.createdAt ? new Date(sheet.createdAt).getTime() : NaN;
+      if (Number.isFinite(created) && (created < start || created > end)) continue;
       const expenses = Array.isArray(sheet.expenses) ? sheet.expenses : [];
       for (const ex of expenses) {
         const amount = Number(ex.amount);
@@ -67,12 +109,34 @@ export function AccountingTab({
         lines.push({
           label: `${ex.category || 'Expense'}: ${ex.description || ex.receiptNo || 'item'}`,
           amount,
+          kind: 'expense',
+          tripSheetId: sheet.id,
           source: `sheet:${sheet.id}`,
         });
       }
     }
+
+    for (const load of loads.filter((l) => matchesDriverRef(l.driverId, { id: f.driverId, driverRecordId }))) {
+      const ts = load.pickupTime || load.createdAt;
+      const t = ts ? new Date(ts).getTime() : NaN;
+      if (!Number.isFinite(t) || t < start || t > end) continue;
+      if (load.status !== 'delivered') continue;
+      const miles = Number(load.miles) || 0;
+      lines.push({
+        label: `Load ${load.tripNo || load.id.slice(0, 8)} · ${load.origin || '?'} → ${load.destination || '?'} (${miles} mi)`,
+        amount: 0,
+        kind: 'load_summary',
+        loadId: load.id,
+        source: `load:${load.id}`,
+      });
+    }
+
     return lines;
-  }, [f.driverId, f.periodStart, f.periodEnd, sheets]);
+  }, [f.driverId, f.periodStart, f.periodEnd, sheets, loads, wageContract, driverRecordId]);
+
+  const expenseTotal = settlementPreview
+    .filter((l) => l.kind === 'expense')
+    .reduce((s, l) => s + l.amount, 0);
 
   const create = async () => {
     setErr('');
@@ -80,22 +144,28 @@ export function AccountingTab({
       setErr('Driver and period dates are required.');
       return;
     }
-    if (expensePreview.length === 0) {
-      setErr('No trip-sheet expenses found for this driver/period. Add expenses on sheets first, or widen the period.');
+    const payableLines = settlementPreview.filter((l) => l.kind === 'expense');
+    if (payableLines.length === 0 && !wageContract?.payType) {
+      setErr(
+        'No trip-sheet expenses or wage contract found for this driver/period. Add expenses on sheets, set wage on driver profile, or widen the period.',
+      );
       return;
     }
-    const driver = drivers.find((d) => d.id === f.driverId);
+    const linesToSave =
+      payableLines.length > 0
+        ? settlementPreview
+        : settlementPreview.filter((l) => l.kind === 'wage_info');
     try {
       setBusy(true);
       await settlementsApi.create({
         companyId: company.id,
         driverId: f.driverId,
-        driverName: driver?.name || '',
+        driverName: selectedDriver?.name || '',
         periodStart: f.periodStart,
         periodEnd: f.periodEnd,
         currency: f.currency,
         notes: f.notes.trim(),
-        lines: expensePreview,
+        lines: linesToSave,
       });
       setShow(false);
       setF({
@@ -105,6 +175,7 @@ export function AccountingTab({
         currency: 'CAD',
         notes: '',
       });
+      setWageContract(null);
       notify('Settlement draft created');
       await load();
     } catch (e: any) {
@@ -154,8 +225,6 @@ export function AccountingTab({
       </Card>
     );
   }
-
-  const totalPreview = expensePreview.reduce((s, l) => s + l.amount, 0);
 
   return (
     <div>
@@ -226,14 +295,41 @@ export function AccountingTab({
             onChange={(e) => setF((x) => ({ ...x, notes: e.target.value }))}
             placeholder="Optional"
           />
+          {wageContract?.payType && (
+            <div
+              style={{
+                background: G.infoTint,
+                border: `1px solid ${G.info}44`,
+                borderRadius: 10,
+                padding: 12,
+                marginBottom: 12,
+                fontSize: 12,
+                color: G.text,
+              }}
+            >
+              <strong>Contract wage (read-only preview)</strong>
+              <div style={{ marginTop: 6, color: G.muted }}>
+                {PAY_TYPES.find((p) => p.id === wageContract.payType)?.label ||
+                  wageContract.payType}{' '}
+                · {wageContract.payRate} {wageContract.payUnit || ''}
+                {wageContract.detentionRate
+                  ? ` · Detention ${wageContract.detentionRate}`
+                  : ''}
+              </div>
+              <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
+                Full rate engine / auto-pay is deferred — expenses below are
+                what settle today.
+              </div>
+            </div>
+          )}
           <Divider />
           <div style={{ fontSize: 12, color: G.muted, marginBottom: 8 }}>
-            Lines from trip-sheet expenses in period ({expensePreview.length}) · total{' '}
+            Preview ({settlementPreview.length} lines) · expense total{' '}
             <strong style={{ color: G.text }}>
-              {f.currency} {totalPreview.toFixed(2)}
+              {f.currency} {expenseTotal.toFixed(2)}
             </strong>
           </div>
-          {expensePreview.slice(0, 8).map((l, i) => (
+          {settlementPreview.slice(0, 10).map((l, i) => (
             <div
               key={`${l.source}-${i}`}
               style={{
@@ -241,18 +337,32 @@ export function AccountingTab({
                 justifyContent: 'space-between',
                 fontSize: 12,
                 padding: '4px 0',
-                color: G.text,
+                color: l.kind === 'wage_info' ? G.info : G.text,
               }}
             >
-              <span>{l.label}</span>
               <span>
-                {f.currency} {l.amount.toFixed(2)}
+                {l.label}
+                {l.tripSheetId && (
+                  <span style={{ color: G.muted, fontSize: 10 }}>
+                    {' '}
+                    · sheet {l.tripSheetId.slice(0, 8)}
+                  </span>
+                )}
+                {l.loadId && (
+                  <span style={{ color: G.muted, fontSize: 10 }}>
+                    {' '}
+                    · load {l.loadId.slice(0, 8)}
+                  </span>
+                )}
+              </span>
+              <span>
+                {l.amount === 0 ? '—' : `${f.currency} ${l.amount.toFixed(2)}`}
               </span>
             </div>
           ))}
-          {expensePreview.length > 8 && (
+          {settlementPreview.length > 10 && (
             <div style={{ fontSize: 11, color: G.muted }}>
-              +{expensePreview.length - 8} more
+              +{settlementPreview.length - 10} more
             </div>
           )}
           <Btn
@@ -268,7 +378,8 @@ export function AccountingTab({
 
       {list.length === 0 ? (
         <div style={{ color: G.muted, fontSize: 13 }}>
-          No settlements yet. Create one from driver trip-sheet expenses.
+          No settlements yet. Create one from driver trip-sheet expenses and
+          contract wage preview.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -328,6 +439,15 @@ export function AccountingTab({
           ))}
         </div>
       )}
+
+      <div style={{ marginTop: 24 }}>
+        <BillingPanel
+          company={company}
+          loads={loads}
+          adminUser={adminUser}
+          apiEnabled={apiEnabled}
+        />
+      </div>
     </div>
   );
 }

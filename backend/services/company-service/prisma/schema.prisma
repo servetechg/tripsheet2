@@ -7,13 +7,133 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Platform control-plane: subscription tiers (Chapter 3.10)
+model Plan {
+  id          String   @id @default(cuid())
+  code        String   @unique // starter | professional | enterprise
+  name        String
+  description String   @default("")
+  maxDrivers  Int      @default(10) // -1 = unlimited
+  features    Json     @default("{}")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  subscriptions Subscription[]
+  companies     Company[]
+}
+
+/// Platform company registry (Chapter 3.3 / 3.4 registry fields)
 model Company {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   name      String
   shortName String
+  /// URL-safe tenant key → database name fq_tenant_{slug}
+  slug      String  @unique
   tagline   String?
   address   String?
-  active    Boolean  @default(true)
+  active    Boolean @default(true)
+  /// active | suspended | provisioning | failed
+  status    String  @default("active")
+  planId    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  plan             Plan?              @relation(fields: [planId], references: [id])
+  subscription     Subscription?
+  tenantDatabase   TenantDatabase?
+  lifecycleEvents  TenantLifecycleEvent[]
+
+  @@index([status])
+  @@index([planId])
+}
+
+model Subscription {
+  id        String    @id @default(cuid())
+  companyId String    @unique
+  planId    String
+  /// active | past_due | cancelled | trial
+  status    String    @default("active")
+  startedAt DateTime  @default(now())
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan    Plan    @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+  @@index([status])
+}
+
+/// Dedicated DB registry — connection filled in Phase 2 provisioning
+model TenantDatabase {
+  id                   String    @id @default(cuid())
+  companyId            String    @unique
+  /// e.g. fq_tenant_mkx
+  dbName               String    @unique
+  host                 String    @default("localhost")
+  port                 Int       @default(5432)
+  /// pending_provision | provisioning | active | suspended | failed
+  status               String    @default("pending_provision")
+  /// AES-256-GCM payload (base64); empty until provisioned
+  connectionCiphertext String    @default("")
+  lastError            String    @default("")
+  schemaVersion        String    @default("1")
+  /// Phase 3: shared = ops on microservice DB; tenant = ops on fq_tenant_*
+  routingMode          String    @default("shared")
+  /// Phase 4 ETL: pending | syncing | copying | verifying | verified | failed | cutover | archived
+  etlStatus            String    @default("pending")
+  etlReport            Json?
+  etlVerifiedAt        DateTime?
+  writeFreeze          Boolean   @default(false)
+  cutoverAt            DateTime?
+  archivedAt           DateTime?
+  provisionedAt        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([routingMode])
+  @@index([etlStatus])
+}
+
+model TenantLifecycleEvent {
+  id        String   @id @default(cuid())
+  companyId String?
+  action    String
+  actorId   String?
+  actorName String   @default("")
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  companyId  String?
+  actorId    String?
+  actorName  String   @default("")
+  action     String
+  entityType String   @default("")
+  entityId   String   @default("")
+  meta       Json?
+  /// Phase 5 richer audit
+  ip         String   @default("")
+  userAgent  String   @default("")
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@index([entityType, entityId])
 }

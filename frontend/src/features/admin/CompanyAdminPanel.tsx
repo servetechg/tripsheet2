@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Skeleton } from '@/components/ui';
+import { Skeleton, Card, SectionTitle } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
+import { ServiceHealthBanner } from '@/components/feedback/ServiceHealthBanner';
 import { AppShell } from '@/components/layout/AppShell';
 import { DispatchTab } from '@/features/dispatch/DispatchTab';
 import { TrackTab } from '@/features/tracking/TrackTab';
@@ -13,6 +14,14 @@ import { PrintPreview } from '@/features/trip-sheets/PrintPreview';
 import { ReportsTab } from '@/features/reports/ReportsTab';
 import { AccountingTab } from '@/features/accounting/AccountingTab';
 import { DashboardTab } from '@/features/dashboard/DashboardTab';
+import { FleetOpsTab } from '@/features/fleet/FleetOpsTab';
+import { MessagesTab } from '@/features/comms/MessagesTab';
+import { ComplianceTab } from '@/features/compliance/ComplianceTab';
+import { CompanySettingsTab } from '@/features/companies/CompanySettingsTab';
+import { companiesApi } from '@/lib/api';
+import { useCan } from '@/lib/permissions';
+import { ROLE_LABELS } from '@tripsheet/shared';
+import type { Role } from '@tripsheet/shared';
 
 export function CompanyAdminPanel({
   company,
@@ -40,9 +49,11 @@ export function CompanyAdminPanel({
   activeTab,
   onTabChange,
 }: any) {
+  const { canTab, can, role } = useCan();
   const tab = activeTab || 'dashboard';
   const setTab = onTabChange || (() => {});
   const [adminPreview, setAdminPreview] = useState<any>(null);
+  const [entitlements, setEntitlements] = useState<any>(null);
   const sn = company.shortName;
 
   const myDrivers = users.filter(
@@ -74,10 +85,28 @@ export function CompanyAdminPanel({
     { id: 'emanifest', icon: 'emanifest', label: 'eManifest' },
     { id: 'drivers', icon: 'drivers', label: 'Drivers' },
     { id: 'assets', icon: 'assets', label: 'Assets' },
+    { id: 'fleet', icon: 'status', label: 'Fleet Ops' },
     { id: 'sheets', icon: 'sheets', label: 'Sheets' },
+    { id: 'messages', icon: 'bell', label: 'Messages' },
+    { id: 'compliance', icon: 'docs', label: 'Compliance' },
     { id: 'reports', icon: 'reports', label: 'Reports' },
-    { id: 'accounting', icon: 'accounting', label: 'Accounting' },
-  ];
+    ...(entitlements?.features?.accounting !== false
+      ? [{ id: 'accounting', icon: 'accounting', label: 'Accounting' }]
+      : []),
+    { id: 'users', icon: 'companies', label: 'Users' },
+    { id: 'company', icon: 'companies', label: 'Company' },
+  ].filter((t) => {
+    if (t.id === 'accounting' && !can('accounting.view')) return false;
+    return canTab(t.id);
+  });
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) return;
+    void companiesApi
+      .entitlements(company.id)
+      .then(setEntitlements)
+      .catch(() => setEntitlements(null));
+  }, [apiEnabled, company?.id]);
 
   const STATUS_COLOR = {
     assigned: G.info,
@@ -106,7 +135,9 @@ export function CompanyAdminPanel({
   return (
     <AppShell
       logo={sn}
-      subtitle="Admin"
+      subtitle={
+        ROLE_LABELS[role as Role] || 'Staff'
+      }
       tabs={TABS}
       activeTab={tab}
       onTabChange={setTab}
@@ -116,6 +147,7 @@ export function CompanyAdminPanel({
       onToggleTheme={onToggleTheme}
       onLogout={onLogout}
     >
+      <ServiceHealthBanner />
       {tabLoading ? (
         <Skeleton rows={4} />
       ) : (
@@ -196,6 +228,15 @@ export function CompanyAdminPanel({
               {...apiProps}
             />
           )}
+          {tab === 'fleet' && (
+            <FleetOpsTab
+              company={company}
+              assets={assets.filter((a: any) => a.companyId === company.id)}
+              drivers={myDrivers}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+            />
+          )}
           {tab === 'sheets' && (
             <AdminSheetsTab
               sheets={mySheets}
@@ -204,15 +245,62 @@ export function CompanyAdminPanel({
               onViewPdf={setAdminPreview}
             />
           )}
+          {tab === 'messages' && (
+            <MessagesTab
+              company={company}
+              drivers={myDrivers}
+              loads={myLoads}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+            />
+          )}
+          {tab === 'compliance' && (
+            <ComplianceTab
+              company={company}
+              drivers={myDrivers}
+              driverDocs={driverDocs}
+              assets={assets.filter((a: any) => a.companyId === company.id)}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+              onGoDrivers={() => setTab('drivers')}
+            />
+          )}
           {tab === 'reports' && (
             <ReportsTab company={company} apiEnabled={apiEnabled} />
           )}
-          {tab === 'accounting' && (
-            <AccountingTab
+          {tab === 'accounting' &&
+            (entitlements?.features?.accounting === false ? (
+              <Card>
+                <SectionTitle>Accounting</SectionTitle>
+                <div style={{ color: G.muted, fontSize: 13 }}>
+                  Accounting is not enabled for this company plan.
+                </div>
+              </Card>
+            ) : (
+              <AccountingTab
+                company={company}
+                drivers={myDrivers}
+                sheets={mySheets}
+                loads={myLoads}
+                adminUser={adminUser}
+                apiEnabled={apiEnabled}
+              />
+            ))}
+          {tab === 'users' && (
+            <CompanySettingsTab
               company={company}
-              drivers={myDrivers}
-              sheets={mySheets}
+              adminUser={adminUser}
               apiEnabled={apiEnabled}
+              refreshAll={refreshAll}
+              initialSub="users"
+            />
+          )}
+          {tab === 'company' && (
+            <CompanySettingsTab
+              company={company}
+              adminUser={adminUser}
+              apiEnabled={apiEnabled}
+              refreshAll={refreshAll}
             />
           )}
         </>

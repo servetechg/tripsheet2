@@ -24,6 +24,11 @@ export class NotificationsController {
     return this.smsService.send(dto);
   }
 
+  @Post('log')
+  createLog(@Body() body: Record<string, unknown>) {
+    return this.notificationsService.log(body);
+  }
+
   @Get('health/detail')
   healthDetail() {
     return this.notificationsService.getHealthDetail();

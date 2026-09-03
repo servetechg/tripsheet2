@@ -10,4 +10,9 @@ export class ReportsController {
   getSummary(@Query() query: SummaryQueryDto) {
     return this.reportsService.getSummary(query.companyId);
   }
+
+  @Get('analytics')
+  getAnalytics(@Query() query: SummaryQueryDto) {
+    return this.reportsService.getAnalytics(query.companyId);
+  }
 }

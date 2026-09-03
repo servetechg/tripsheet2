@@ -12,13 +12,21 @@ import { applyTheme } from '@/lib/theme';
 import {
   authApi,
   getToken,
-  setToken,
+  clearTokens,
+  getRefreshToken,
   ApiError,
 } from '@/lib/api';
 import type { AppUser } from '@/context/AppDataContext';
 
 const THEME_KEY = 'ts_theme';
 export const AUTH_EXPIRED_EVENT = 'ts:auth-expired';
+const IDLE_KEY = 'ts_idle_minutes';
+
+function rememberIdle(minutes?: number) {
+  const n = Number(minutes || 0);
+  if (n > 0) sessionStorage.setItem(IDLE_KEY, String(n));
+  else sessionStorage.removeItem(IDLE_KEY);
+}
 
 type SessionContextValue = {
   user: AppUser | null;
@@ -47,6 +55,10 @@ function toAppUser(u: {
   name: string;
   role: string;
   companyId: string | null;
+  tenantKey?: string | null;
+  permissions?: string[];
+  customRoleId?: string | null;
+  customRoleName?: string | null;
 }): AppUser {
   return {
     id: u.id,
@@ -54,6 +66,10 @@ function toAppUser(u: {
     name: u.name,
     role: u.role,
     companyId: u.companyId,
+    tenantKey: u.tenantKey ?? null,
+    permissions: u.permissions ?? [],
+    customRoleId: u.customRoleId ?? null,
+    customRoleName: u.customRoleName ?? null,
   };
 }
 
@@ -66,25 +82,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return mode;
   });
 
-  const logout = useCallback(() => {
-    setToken(null);
-    setUser(null);
-  }, []);
-
   const login = useCallback((next: AppUser) => {
     setUser(toAppUser(next));
+  }, []);
+
+  const logout = useCallback(() => {
+    const refresh = getRefreshToken();
+    if (getToken()) {
+      void authApi.logout(refresh || undefined).catch(() => undefined);
+    }
+    clearTokens();
+    setUser(null);
+    sessionStorage.removeItem(IDLE_KEY);
   }, []);
 
   const toggleTheme = useCallback(() => {
     setThemeMode((m) => {
       const next: ThemeMode = m === 'dark' ? 'light' : 'dark';
-      // Apply before re-render so inline styles reading `G` pick up new tokens
       commitTheme(next);
       return next;
     });
   }, []);
 
-  // Restore session from JWT on first load / refresh
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -95,12 +114,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await authApi.me();
-        if (!cancelled) setUser(toAppUser(me));
+        if (!cancelled) {
+          setUser(toAppUser(me));
+          rememberIdle(me.session?.idleTimeoutMinutes);
+        }
       } catch (e) {
-        setToken(null);
+        clearTokens();
         if (!cancelled) setUser(null);
         if (!(e instanceof ApiError && e.status === 401)) {
-          // keep bootstrapping false; login will show API errors from AppData
+          // swallow non-401 during bootstrap
         }
       } finally {
         if (!cancelled) setBootstrapping(false);
@@ -111,12 +133,39 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Global 401 from api() → force logout
   useEffect(() => {
-    const onExpired = () => logout();
+    const onExpired = () => {
+      clearTokens();
+      setUser(null);
+      sessionStorage.removeItem(IDLE_KEY);
+    };
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
-  }, [logout]);
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const mins = Number(sessionStorage.getItem(IDLE_KEY) || 0);
+    if (mins <= 0) return;
+    let last = Date.now();
+    const bump = () => {
+      last = Date.now();
+    };
+    const evts: Array<keyof WindowEventMap> = [
+      'mousedown',
+      'keydown',
+      'scroll',
+      'touchstart',
+    ];
+    for (const e of evts) window.addEventListener(e, bump, { passive: true });
+    const timer = window.setInterval(() => {
+      if (Date.now() - last > mins * 60_000) logout();
+    }, 15_000);
+    return () => {
+      window.clearInterval(timer);
+      for (const e of evts) window.removeEventListener(e, bump);
+    };
+  }, [user, logout]);
 
   const value = useMemo(
     () => ({

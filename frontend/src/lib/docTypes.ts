@@ -14,6 +14,11 @@ const DOC_ICONS: Record<DriverDocTypeId, string> = {
   criminal: 'completed',
   sin_ssn: 'docs',
   void_cheque: 'expenses',
+  bol: 'sheets',
+  pod: 'completed',
+  rate_con: 'contract',
+  permit: 'docs',
+  border_doc: 'emanifest',
   other: 'docs',
 };
 
