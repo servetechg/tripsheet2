@@ -34,5 +34,5 @@ awk -v c="${target}" '
 mv "${tmp}" "${EDGE_ENV}"
 echo "ACTIVE_COLOR=${target}" > "${DEPLOY_DIR}/caddy/active.env"
 
-docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d
+docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d --force-recreate caddy
 echo "==> Traffic now on ${target}"

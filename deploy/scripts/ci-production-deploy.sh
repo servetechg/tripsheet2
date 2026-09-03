@@ -39,4 +39,33 @@ echo "==> schema-migrate-all via ${ACTIVE}-company-service"
 docker exec "${ACTIVE}-company-service" node -e \
   "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{console.log(await r.text()); if(!r.ok) process.exit(1)})"
 
+# shellcheck disable=SC1090
+source "${SECRETS_DIR}/edge.env"
+echo "==> Verifying public production UI (${DOMAIN})"
+for _ in $(seq 1 15); do
+  html="$(curl -fsS "https://${DOMAIN}/login" 2>/dev/null || curl -fsS "http://${DOMAIN}/login" 2>/dev/null || true)"
+  if [[ -n "${html}" ]]; then
+    break
+  fi
+  sleep 2
+done
+if [[ -z "${html}" ]]; then
+  echo "WARN: could not fetch ${DOMAIN}/login for UI verification"
+elif grep -q 'Welcome back' <<<"${html}"; then
+  echo "ERROR: ${DOMAIN} still serves old login UI (Caddy may be routing to stale color)"
+  echo "    edge ACTIVE_COLOR=${ACTIVE}"
+  docker inspect "${ACTIVE}-frontend" --format '    ${ACTIVE}-frontend image: {{.Config.Image}}' 2>/dev/null || true
+  other=$([[ "${ACTIVE}" == "blue" ]] && echo green || echo blue)
+  docker inspect "${other}-frontend" --format "    ${other}-frontend image: {{.Config.Image}}" 2>/dev/null || true
+  docker compose -f "${ROOT_DIR}/deploy/compose.edge.yml" --env-file "${SECRETS_DIR}/edge.env" up -d --force-recreate caddy
+  sleep 5
+  html="$(curl -fsS "https://${DOMAIN}/login" 2>/dev/null || curl -fsS "http://${DOMAIN}/login" 2>/dev/null || true)"
+  if grep -q 'Welcome back' <<<"${html}"; then
+    exit 1
+  fi
+  echo "    recovered after caddy recreate"
+else
+  echo "    public login UI OK"
+fi
+
 echo "==> Production deploy complete (${ACTIVE}, ${IMAGE_TAG})"

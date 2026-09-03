@@ -53,10 +53,16 @@ if ! docker pull "${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}" >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Pulling images for ${PROJECT} (tag ${IMAGE_TAG})"
 COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" \
   --env-file "${APP_ENV}" \
-  up -d --pull missing
+  pull
+
+COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+  docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" \
+  --env-file "${APP_ENV}" \
+  up -d --force-recreate
 
 echo "==> Waiting for containers to start"
 sleep 8
@@ -118,7 +124,12 @@ awk -v c="${COLOR}" '
 mv "${tmp}" "${EDGE_ENV}"
 echo "ACTIVE_COLOR=${COLOR}" > "${DEPLOY_DIR}/caddy/active.env"
 
-docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d
+# Caddy resolves {$ACTIVE_COLOR} at container start — must recreate after color switch.
+docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d --force-recreate caddy
+
+echo "==> Edge routing"
+echo "    ACTIVE_COLOR=${COLOR}"
+docker inspect "${COLOR}-frontend" --format '    frontend image: {{.Config.Image}}' 2>/dev/null || true
 
 echo "==> Public smoke checks"
 for _ in $(seq 1 30); do
