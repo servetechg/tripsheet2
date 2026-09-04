@@ -362,6 +362,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
                 label="Phone"
                 phone
                 value={profile.phone}
+                type="tel"
                 onChange={(e) => upd('phone', e.target.value)}
                 placeholder="(403) 555-0100"
               />
@@ -376,6 +377,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               <Inp
                 label="Driver's License No."
                 value={profile.licenseNo}
+                type="text"
                 onChange={(e) => upd('licenseNo', e.target.value)}
                 placeholder="e.g. AB-123456"
               />
@@ -394,14 +396,16 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             <Inp
               label="Home Address"
               value={profile.address}
+              type="text"
               onChange={(e) => upd('address', e.target.value)}
-              placeholder="Full address"
+              placeholder="e.g. 123 Main St, Calgary, AB T2P 1J9"
             />
             <Inp
               label="FAST Card # (if you have one)"
               value={profile.fastCard}
+              type="text"
               onChange={(e) => upd('fastCard', e.target.value)}
-              placeholder="Optional"
+              placeholder="Optional — NEXUS/FAST number"
             />
 
             <div
@@ -420,13 +424,15 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               <Inp
                 label="Emergency Contact Name"
                 value={profile.emergencyName}
+                type="text"
                 onChange={(e) => upd('emergencyName', e.target.value)}
-                placeholder="Full name"
+                placeholder="Full name of contact person"
               />
               <Inp
                 label="Emergency Phone"
                 phone
                 value={profile.emergencyPhone}
+                type="tel"
                 onChange={(e) => upd('emergencyPhone', e.target.value)}
                 placeholder="(403) 555-0100"
               />

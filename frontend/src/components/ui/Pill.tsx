@@ -11,18 +11,28 @@ export function Pill({ color = G.muted, children, small }: PillProps) {
   return (
     <span
       style={{
-        background: color + '14',
-        color,
-        border: `1px solid ${color}28`,
-        borderRadius: 999,
-        padding: small ? '3px 9px' : '4px 11px',
-        fontSize: small ? 10 : 11,
-        fontWeight: 600,
-        letterSpacing: 0.3,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        background: color + '10',
+        color: color,
+        border: `1px solid ${color}20`,
+        borderRadius: 4,
+        padding: small ? '2px 6px' : '4px 8px',
+        fontSize: small ? 11 : 12,
+        fontWeight: 500,
+        letterSpacing: -0.1,
         whiteSpace: 'nowrap',
-        display: 'inline-block',
       }}
     >
+      <span
+        style={{
+          width: small ? 6 : 8,
+          height: small ? 6 : 8,
+          borderRadius: '50%',
+          background: color,
+        }}
+      />
       {children}
     </span>
   );

@@ -664,8 +664,8 @@ export function DriversTab({
                   label="SMS invite to phone"
                   phone
                   value={invitePhone}
+                  type="tel"
                   onChange={(e) => setInvitePhone(e.target.value)}
-                  placeholder="(403) 555-0100"
                 />
               </div>
               <Btn
@@ -894,14 +894,16 @@ export function DriversTab({
             <Inp
               label="Full Name *"
               value={f.name}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, name: e.target.value }))
               }
-              placeholder="Driver full name"
+              placeholder="Driver full legal name"
             />
             <Inp
               label="Email *"
               value={f.email}
+              type="email"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, email: e.target.value }))
               }
@@ -924,6 +926,7 @@ export function DriversTab({
               label="Phone"
               phone
               value={f.phone}
+              type="tel"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, phone: e.target.value }))
               }
@@ -968,6 +971,7 @@ export function DriversTab({
             <Inp
               label="License No."
               value={f.licenseNo}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, licenseNo: e.target.value }))
               }
@@ -976,19 +980,21 @@ export function DriversTab({
             <Inp
               label="FAST Card #"
               value={f.fastCard}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, fastCard: e.target.value }))
               }
-              placeholder="Optional"
+              placeholder="Optional — NEXUS/FAST number"
             />
           </G2>
           <Inp
             label="Home Address"
             value={f.address}
+            type="text"
             onChange={(e: any) =>
               setF((x) => ({ ...x, address: e.target.value }))
             }
-            placeholder="Full address"
+            placeholder="e.g. 123 Main St, Calgary, AB T2P 1J9"
           />
           <div
             style={{
@@ -1006,15 +1012,17 @@ export function DriversTab({
             <Inp
               label="Emergency Contact Name"
               value={f.emergencyName}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, emergencyName: e.target.value }))
               }
-              placeholder="Full name"
+              placeholder="Full name of contact person"
             />
             <Inp
               label="Emergency Contact Phone"
               phone
               value={f.emergencyPhone}
+              type="tel"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, emergencyPhone: e.target.value }))
               }
@@ -1024,10 +1032,11 @@ export function DriversTab({
           <Inp
             label="Notes"
             value={f.notes}
+            type="text"
             onChange={(e: any) =>
               setF((x) => ({ ...x, notes: e.target.value }))
             }
-            placeholder="Any additional notes..."
+            placeholder="Any additional notes about this driver..."
           />
           <div
             style={{

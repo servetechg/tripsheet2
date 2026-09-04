@@ -1,4 +1,5 @@
 import {
+  useId,
   useState,
   type ChangeEvent,
   type CSSProperties,
@@ -7,6 +8,10 @@ import {
 } from 'react';
 import { G, inputBase, labelBase } from '@/lib/theme';
 import { formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/lib/phoneFormat';
+import {
+  resolveInputPlaceholder,
+  resolveInputType,
+} from '@/lib/inputPlaceholders';
 import { Icons } from './Icons';
 
 export interface InpProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -20,6 +25,26 @@ export interface InpProps extends InputHTMLAttributes<HTMLInputElement> {
   passwordToggle?: boolean;
 }
 
+const passwordToggleBtnStyle: CSSProperties = {
+  position: 'absolute',
+  right: 4,
+  top: '50%',
+  transform: 'translateY(-50%)',
+  width: 32,
+  height: 32,
+  background: 'none',
+  border: 'none',
+  padding: 0,
+  margin: 0,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  zIndex: 2,
+  lineHeight: 0,
+};
+
 export function Inp({
   label,
   hint,
@@ -27,16 +52,26 @@ export function Inp({
   inputStyle,
   phone,
   passwordToggle,
-  type = 'text',
+  type,
+  id,
   onChange,
   maxLength,
+  placeholder,
   ...p
 }: InpProps) {
+  const autoId = useId();
+  const inputId = id ?? autoId;
   const [showPassword, setShowPassword] = useState(false);
-  const isPassword = type === 'password';
+  const resolvedInputType = resolveInputType(type, label, phone);
+  const isPassword = resolvedInputType === 'password';
   const showToggle = isPassword && passwordToggle !== false;
   const resolvedType =
-    isPassword && showToggle && showPassword ? 'text' : type;
+    isPassword && showToggle && showPassword ? 'text' : resolvedInputType;
+
+  const resolvedPlaceholder = resolveInputPlaceholder(placeholder, label, {
+    phone,
+    isPassword,
+  });
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (phone) {
@@ -57,7 +92,9 @@ export function Inp({
 
   const inputProps: InputHTMLAttributes<HTMLInputElement> = {
     ...p,
+    id: inputId,
     type: resolvedType,
+    placeholder: resolvedPlaceholder,
     onChange: handleChange,
     maxLength: phone ? PHONE_INPUT_MAX_LENGTH : maxLength,
     ...(phone
@@ -67,9 +104,10 @@ export function Inp({
 
   const inputEl = (
     <input
+      className="ts-input"
       style={{
         ...inputBase(),
-        ...(showToggle ? { paddingRight: 40 } : {}),
+        ...(showToggle ? { paddingRight: 44 } : {}),
         ...inputStyle,
       }}
       {...inputProps}
@@ -78,7 +116,11 @@ export function Inp({
 
   return (
     <div style={{ marginBottom: 12, ...sx }}>
-      {label && <label style={labelBase()}>{label}</label>}
+      {label ? (
+        <label htmlFor={inputId} style={labelBase()}>
+          {label}
+        </label>
+      ) : null}
       {showToggle ? (
         <div style={{ position: 'relative' }}>
           {inputEl}
@@ -86,23 +128,11 @@ export function Inp({
             type="button"
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             onClick={() => setShowPassword((v) => !v)}
-            style={{
-              position: 'absolute',
-              right: 8,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border: 'none',
-              padding: 4,
-              cursor: 'pointer',
-              color: G.muted,
-              display: 'flex',
-              alignItems: 'center',
-            }}
+            style={{ ...passwordToggleBtnStyle, color: G.muted }}
           >
             {showPassword
-              ? Icons.eyeOff({ size: 20, color: G.muted })
-              : Icons.eye({ size: 20, color: G.muted })}
+              ? Icons.eyeOff({ size: 18, color: G.muted })
+              : Icons.eye({ size: 18, color: G.muted })}
           </button>
         </div>
       ) : (

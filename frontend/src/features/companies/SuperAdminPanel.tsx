@@ -238,11 +238,15 @@ export function SuperAdminPanel({
             <Inp
               label="Tagline"
               value={f.tagline}
+              type="text"
+              placeholder="e.g. Moving freight, building trust"
               onChange={(e) => upd('tagline', e.target.value)}
             />
             <Inp
               label="Address"
               value={f.address}
+              type="text"
+              placeholder="e.g. 100 Carrier Blvd, Toronto, ON"
               onChange={(e) => upd('address', e.target.value)}
             />
           </G2>
@@ -282,18 +286,23 @@ export function SuperAdminPanel({
             <Inp
               label="Admin Full Name *"
               value={f.adminName}
+              type="text"
+              placeholder="e.g. John Smith"
               onChange={(e) => upd('adminName', e.target.value)}
             />
             <Inp
               label="Admin Email *"
               value={f.adminEmail}
+              type="email"
+              placeholder="e.g. admin@company.com"
               onChange={(e) => upd('adminEmail', e.target.value)}
             />
             <Inp
               label="Password *"
               value={f.adminPassword}
-              onChange={(e) => upd('adminPassword', e.target.value)}
               type="password"
+              placeholder="Min. 6 characters"
+              onChange={(e) => upd('adminPassword', e.target.value)}
             />
           </G2>
           <div style={{ display: 'flex', gap: 10 }}>

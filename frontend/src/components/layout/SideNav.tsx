@@ -67,22 +67,21 @@ export function SideNav({ tabs, active, onChange, logo, subtitle }: any) {
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 12,
-                padding: '11px 12px',
+                gap: 10,
+                padding: '8px 12px',
                 background: on ? G.goldBg : 'transparent',
                 border: on ? `1px solid ${G.gold}33` : '1px solid transparent',
                 borderRadius: RADIUS.md,
                 cursor: 'pointer',
-                marginBottom: 4,
+                marginBottom: 2,
                 textAlign: 'left',
-                transition:
-                  'background .15s ease, border-color .15s ease, color .15s ease',
+                transition: 'background .15s ease, color .15s ease, border-color .15s ease',
               }}
             >
               <span
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 18,
+                  height: 18,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -90,14 +89,14 @@ export function SideNav({ tabs, active, onChange, logo, subtitle }: any) {
                   flexShrink: 0,
                 }}
               >
-                <NavIcon id={t.icon || t.id} size={20} color={color} />
+                <NavIcon id={t.icon || t.id} size={18} color={color} />
               </span>
               <span
                 style={{
                   fontSize: 13,
                   color: on ? G.gold : G.muted2,
                   fontWeight: on ? 600 : 500,
-                  letterSpacing: 0.1,
+                  letterSpacing: -0.1,
                 }}
               >
                 {t.label}

@@ -1,4 +1,5 @@
 import type { CSSProperties, ImgHTMLAttributes } from 'react';
+import { G } from '@/lib/theme';
 
 export const BRAND = {
   name: 'Fleetquix',
@@ -32,6 +33,7 @@ export function BrandLogo({
         width: 'auto',
         display: 'block',
         objectFit: 'contain',
+        filter: G.mode === 'dark' ? 'brightness(0) invert(1)' : 'none',
         ...style,
       }}
       {...rest}

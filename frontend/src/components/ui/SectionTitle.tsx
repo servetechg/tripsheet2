@@ -25,7 +25,7 @@ export function SectionTitle({ children, color, large }: SectionTitleProps) {
     <div
       style={{
         fontSize: 12,
-        letterSpacing: 0.6,
+        letterSpacing: 0.2,
         color: color || G.muted,
         marginBottom: 14,
         fontWeight: 600,

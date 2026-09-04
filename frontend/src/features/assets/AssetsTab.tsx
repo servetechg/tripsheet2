@@ -265,6 +265,7 @@ export function AssetsTab({
             <Inp
               label="Unit No. *"
               value={f.unitNo}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, unitNo: e.target.value }))
               }
@@ -273,6 +274,7 @@ export function AssetsTab({
             <Inp
               label="Year"
               value={f.year}
+              type="number"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, year: e.target.value }))
               }
@@ -283,6 +285,7 @@ export function AssetsTab({
             <Inp
               label="Make"
               value={f.make}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, make: e.target.value }))
               }
@@ -290,6 +293,7 @@ export function AssetsTab({
             <Inp
               label="Model"
               value={f.model}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, model: e.target.value }))
               }
@@ -299,13 +303,16 @@ export function AssetsTab({
             <Inp
               label="VIN"
               value={f.vin}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, vin: e.target.value }))
               }
+              placeholder="17-character vehicle ID number"
             />
             <Inp
               label="Plate No."
               value={f.plate}
+              type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, plate: e.target.value }))
               }
@@ -362,10 +369,11 @@ export function AssetsTab({
           <Inp
             label="Notes"
             value={f.notes}
+            type="text"
             onChange={(e: any) =>
               setF((x) => ({ ...x, notes: e.target.value }))
             }
-            placeholder="Optional notes"
+            placeholder="Optional notes about this asset"
           />
           <div style={{ display: 'flex', gap: 10 }}>
             <Btn onClick={add} style={{ opacity: busy ? 0.6 : 1 }}>

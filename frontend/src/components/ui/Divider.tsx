@@ -10,8 +10,8 @@ export function Divider({ label }: DividerProps) {
       {label && (
         <span
           style={{
-            fontSize: 10,
-            letterSpacing: 2,
+            fontSize: 11,
+            letterSpacing: 0.5,
             color: G.muted,
             whiteSpace: 'nowrap',
             textTransform: 'uppercase',
