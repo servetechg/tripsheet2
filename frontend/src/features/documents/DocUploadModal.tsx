@@ -41,6 +41,20 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
     onUpload(docType.id, { ...fileInfo, expiry, notes });
   };
 
+  const dropZoneBackground = dragging
+    ? G.goldBg
+    : fileInfo
+      ? G.successBg
+      : G.mode === 'dark'
+        ? G.goldTint
+        : G.inset;
+
+  const dropZoneBorder = dragging
+    ? G.gold
+    : fileInfo
+      ? G.success
+      : G.border;
+
   return (
     <div style={{ position:"fixed",inset:0,background:G.overlay,zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div style={{ background:G.card,border:`1px solid ${G.border}`,borderRadius:16,padding:24,width:"100%",maxWidth:460,maxHeight:"92vh",overflow:"auto" }}>
@@ -70,7 +84,21 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
           onDragOver={e=>{ e.preventDefault(); setDragging(true); }}
           onDragLeave={()=>setDragging(false)}
           onDrop={e=>{ e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
-          style={{ border:`2px dashed ${dragging?G.gold:fileInfo?G.success:G.border2}`,borderRadius:12,padding:"20px 16px",textAlign:"center",marginBottom:14,background:dragging?`${G.gold}11`:fileInfo?`${G.success}08`:"#0a0a0a",minHeight:140,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:8 }}
+          style={{
+            border: `2px dashed ${dropZoneBorder}`,
+            borderRadius: RADIUS.lg,
+            padding: '20px 16px',
+            textAlign: 'center',
+            marginBottom: 14,
+            background: dropZoneBackground,
+            minHeight: 140,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            transition: 'background .15s ease, border-color .15s ease',
+          }}
         >
           {fileInfo ? (
             <>

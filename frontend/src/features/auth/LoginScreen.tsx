@@ -66,7 +66,6 @@ export function LoginScreen({
   const [step, setStep] = useState<Step>({ kind: 'password' });
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const isDark = themeMode !== 'light';
 
   const goPassword = async () => {
     setErr('');
@@ -154,9 +153,7 @@ export function LoginScreen({
         justifyContent: 'center',
         padding: '32px 20px',
         overflow: 'hidden',
-        background: isDark
-          ? `radial-gradient(1200px 600px at 10% -10%, ${G.gold}22, transparent), ${G.bg}`
-          : G.bg,
+        background: G.bg,
       }}
     >
       <div style={{ position: 'absolute', top: 16, right: 16 }}>

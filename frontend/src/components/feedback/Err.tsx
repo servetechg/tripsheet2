@@ -12,9 +12,9 @@ export function Err({ msg }: ErrProps) {
       style={{
         background: G.dangerBg,
         border: `1px solid ${G.danger}33`,
-        borderRadius: 9,
+        borderRadius: 8,
         padding: '11px 14px',
-        fontSize: 12,
+        fontSize: 13,
         color: G.danger,
         marginBottom: 14,
         display: 'flex',

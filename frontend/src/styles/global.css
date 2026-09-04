@@ -15,6 +15,8 @@ body,
 
 body {
   font-family: var(--font-ui);
+  background: var(--color-bg);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -26,30 +28,69 @@ textarea {
   font-family: inherit;
 }
 
+::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+
+/* Minimal scrollbars — all scrollable areas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 @keyframes ts-shimmer {
   0% { background-position: -300px 0; }
   100% { background-position: 300px 0; }
 }
 
 @keyframes ts-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .ts-stat-card:hover,
 .ts-card-clickable:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+  border-color: var(--color-border);
+  transform: translateY(-1px);
 }
 
 .ts-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  opacity: 0.96;
+  opacity: 0.94;
+}
+
+.ts-btn-primary:hover:not(:disabled) {
+  background: var(--color-primary-hover) !important;
 }
 
 .ts-btn:active:not(:disabled) {
   transform: translateY(0);
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
 .ts-btn:disabled {
@@ -58,39 +99,77 @@ textarea {
   box-shadow: none;
 }
 
-.ts-icon-btn:hover {
-  transform: translateY(-1px);
-  border-color: #2563EB55 !important;
+.ts-input:focus,
+.ts-input:focus-visible,
+select.ts-input:focus,
+textarea.ts-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(61, 140, 255, 0.18);
+  outline: none;
 }
 
-.ts-nav-item:hover {
-  background: rgba(37, 99, 235, 0.06) !important;
+select.ts-input,
+select.ts-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A94AD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+[data-theme='light'] select.ts-input,
+[data-theme='light'] select.ts-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* Sel component renders its own icon; avoid double chevrons */
+select.ts-select {
+  background-image: none;
+}
+
+.ts-icon-btn:hover {
+  border-color: rgba(61, 140, 255, 0.45) !important;
+  color: var(--color-text) !important;
+}
+
+.ts-nav-item:hover:not(.ts-nav-item-active) {
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+[data-theme='dark'] .ts-nav-item:hover:not(.ts-nav-item-active) {
+  background: rgba(61, 140, 255, 0.06) !important;
+}
+
+.ts-nav-item-active:hover {
+  opacity: 0.92;
 }
 
 .ts-table-row:hover {
-  background: rgba(37, 99, 235, 0.05) !important;
+  background: rgba(61, 140, 255, 0.04) !important;
 }
 
 .ts-bar {
   transform-origin: bottom;
 }
 
-.ts-modal-body {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+.ts-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.ts-modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.ts-modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ts-modal-body::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.45);
-  border-radius: 4px;
+[data-theme='dark'] .ts-brand-logo {
+  filter: brightness(0) invert(1);
 }
 
 @media (prefers-reduced-motion: reduce) {

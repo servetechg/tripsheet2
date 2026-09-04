@@ -59,7 +59,7 @@ export function ToastHost() {
         display: 'flex',
         flexDirection: 'column',
         gap: SPACE.sm,
-        maxWidth: 340,
+        maxWidth: 360,
       }}
     >
       {toasts.map((t) => {
@@ -69,12 +69,13 @@ export function ToastHost() {
           <div
             key={t.id}
             style={{
-              background: G.card,
-              border: `1px solid ${c}55`,
-              boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
+              background: G.card2,
+              border: `1px solid ${G.border}`,
+              borderLeft: `3px solid ${c}`,
+              boxShadow: G.shadowHover,
               borderRadius: RADIUS.md,
               padding: '12px 14px',
-              fontSize: 12,
+              fontSize: 13,
               fontFamily: FONT_UI,
               color: G.text,
               display: 'flex',
@@ -83,7 +84,7 @@ export function ToastHost() {
             }}
           >
             <span style={{ flexShrink: 0, marginTop: 1 }}>{toastIcon(t.type, c)}</span>
-            <span style={{ flex: 1 }}>{t.msg}</span>
+            <span style={{ flex: 1, lineHeight: 1.45 }}>{t.msg}</span>
           </div>
         );
       })}
