@@ -59,6 +59,11 @@ COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   --env-file "${APP_ENV}" \
   pull
 
+echo "==> Running Prisma migrations (one-off containers, before app start)"
+COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+  "${ROOT_DIR}/deploy/scripts/run-prisma-migrations.sh" \
+  "${PROJECT}" "${DEPLOY_DIR}/compose.app.yml" "${APP_ENV}"
+
 COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" \
   --env-file "${APP_ENV}" \
@@ -66,15 +71,6 @@ COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
 
 echo "==> Waiting for containers to start"
 sleep 8
-
-echo "==> Running Prisma migrations"
-SERVICES=(auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service)
-for svc in "${SERVICES[@]}"; do
-  echo "  migrate: ${svc}"
-  COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
-    docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" --env-file "${APP_ENV}" \
-    exec -T "${svc}" npx prisma migrate deploy
-done
 
 echo "==> Waiting for health endpoints"
 PORTS=(

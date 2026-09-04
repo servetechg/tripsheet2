@@ -99,27 +99,23 @@ migrate_and_seed() {
   local compose_file="$2"
   local env_file="$3"
   local prefix="$4"
+  local root="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
   echo "==> migrate + seed via ${project}"
-  SERVICES=(auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service)
-  for svc in "${SERVICES[@]}"; do
-    echo "  migrate ${svc}"
-    docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
-      run --rm "${svc}" npx prisma migrate deploy
-  done
+  "${root}/deploy/scripts/run-prisma-migrations.sh" "${project}" "${compose_file}" "${env_file}"
 
   echo "  seed auth-service (super admin only)"
   docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
-    run --rm auth-service npx prisma db seed
+    run --rm --no-deps --name "seed-auth-$$" auth-service npx prisma db seed
 
   echo "  seed company-service (plans only)"
   docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
-    run --rm company-service npx prisma db seed
+    run --rm --no-deps --name "seed-company-$$" company-service npx prisma db seed
 
   echo "  optional no-op seeds"
   for svc in driver-service fleet-service manifest-service; do
     docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
-      run --rm "${svc}" npx prisma db seed || true
+      run --rm --no-deps --name "seed-${svc}-$$" "${svc}" npx prisma db seed || true
   done
 
   echo "==> ${prefix} reset complete"

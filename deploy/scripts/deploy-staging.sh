@@ -48,6 +48,11 @@ if ! docker pull "${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}" >/dev/null 2>&1; then
   exit 1
 fi
 
+echo "==> Running Prisma migrations (one-off containers, before app start)"
+IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+  "${ROOT_DIR}/deploy/scripts/run-prisma-migrations.sh" \
+  "${PROJECT}" "${DEPLOY_DIR}/compose.staging.yml" "${APP_ENV}"
+
 IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" \
   --env-file "${APP_ENV}" \
@@ -55,15 +60,6 @@ IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
 
 echo "==> Waiting for containers to start"
 sleep 8
-
-echo "==> Running Prisma migrations (staging DBs)"
-SERVICES=(auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service)
-for svc in "${SERVICES[@]}"; do
-  echo "  migrate: ${svc}"
-  IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
-    docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" --env-file "${APP_ENV}" \
-    exec -T "${svc}" npx prisma migrate deploy
-done
 
 echo "==> Waiting for staging health endpoints"
 PORTS=(
