@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
+import { useEffect, useState, type ReactNode } from 'react';
+import { G, FONT_MONO, RADIUS } from '@/lib/theme';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank } from '@/lib/format';
@@ -12,6 +12,70 @@ import { isCompanyOwnerRole } from '@tripsheet/shared';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
+
+const PLAN_FALLBACK = [
+  { code: 'starter', name: 'Starter' },
+  { code: 'professional', name: 'Professional' },
+  { code: 'enterprise', name: 'Enterprise' },
+];
+
+function tenantStatusColor(status?: string) {
+  if (status === 'active') return G.success;
+  if (status === 'failed') return G.danger;
+  return G.gold;
+}
+
+function formatTenantStatus(status?: string) {
+  return (status || 'pending_provision').replace(/_/g, ' ');
+}
+
+function MetaCell({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: ReactNode;
+  mono?: boolean;
+}) {
+  const text = typeof value === 'string' ? value : undefined;
+  return (
+    <div
+      style={{
+        background: G.card2,
+        borderRadius: RADIUS.md,
+        padding: '10px 12px',
+        minWidth: 0,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 9,
+          color: G.muted,
+          letterSpacing: 1.5,
+          textTransform: 'uppercase',
+          marginBottom: 4,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: G.text,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+          fontFamily: mono ? FONT_MONO : undefined,
+        }}
+        title={text}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
 
 export function SuperAdminPanel({
   companies,
@@ -190,6 +254,8 @@ export function SuperAdminPanel({
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: 16,
+          gap: 12,
+          flexWrap: 'wrap',
         }}
       >
         <div>
@@ -197,7 +263,7 @@ export function SuperAdminPanel({
             Companies
           </div>
           <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-            {companies.length} registered
+            Manage tenants, plans, and database routing
           </div>
         </div>
         <Btn
@@ -208,6 +274,49 @@ export function SuperAdminPanel({
         >
           + New Company
         </Btn>
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: 10,
+          marginBottom: 16,
+        }}
+      >
+        {[
+          ['Total', companies.length],
+          ['Active', companies.filter((c: any) => c.active).length],
+          [
+            'DB ready',
+            companies.filter(
+              (c: any) => c.tenantDatabase?.status === 'active',
+            ).length,
+          ],
+          [
+            'Needs attention',
+            companies.filter(
+              (c: any) =>
+                !c.active ||
+                c.tenantDatabase?.status === 'failed' ||
+                c.tenantDatabase?.lastError,
+            ).length,
+          ],
+        ].map(([label, value]) => (
+          <Card key={String(label)} style={{ marginBottom: 0, padding: '12px 14px' }}>
+            <div
+              style={{
+                fontSize: 10,
+                color: G.muted,
+                textTransform: 'uppercase',
+                letterSpacing: 1.2,
+              }}
+            >
+              {label}
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4 }}>{value}</div>
+          </Card>
+        ))}
       </div>
 
       {show && (
@@ -305,6 +414,28 @@ export function SuperAdminPanel({
         </Card>
       )}
 
+      {companies.length === 0 && !show ? (
+        <Card style={{ textAlign: 'center', padding: '48px 24px' }}>
+          <div style={{ marginBottom: 12 }}>
+            {Icons.companies({ size: 40, color: G.muted })}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: G.text }}>
+            No companies yet
+          </div>
+          <div style={{ fontSize: 13, color: G.muted, marginTop: 6, marginBottom: 16 }}>
+            Create your first tenant to provision a database and admin account.
+          </div>
+          <Btn
+            onClick={() => {
+              setShow(true);
+              setErr('');
+            }}
+          >
+            + New Company
+          </Btn>
+        </Card>
+      ) : null}
+
       {companies.map((c: any) => {
         const admin = users.find(
           (u: any) => isCompanyOwnerRole(u.role) && u.companyId === c.id,
@@ -312,80 +443,154 @@ export function SuperAdminPanel({
         const drivers = users.filter(
           (u: any) => u.role === 'driver' && u.companyId === c.id,
         ).length;
+        const planOptions = plans.length ? plans : PLAN_FALLBACK;
+        const planName =
+          planOptions.find(
+            (p: any) => p.code === (c.plan?.code || c.planCode || 'starter'),
+          )?.name ||
+          c.plan?.code ||
+          c.planCode ||
+          '—';
+        const dbName =
+          c.tenantDatabase?.dbName ||
+          (c.slug ? `fq_tenant_${c.slug}` : '—');
+        const tenantStatus = c.tenantDatabase?.status;
+        const needsProvision =
+          tenantStatus === 'pending_provision' ||
+          tenantStatus === 'failed' ||
+          tenantStatus === 'provisioning';
+
         return (
-          <Card key={c.id}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div>
-                <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -1 }}>
-                  {c.shortName.slice(0, -1)}
-                  <span style={{ color: G.gold }}>{c.shortName.slice(-1)}</span>
+          <Card key={c.id} style={{ marginBottom: 14, padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '18px 20px 16px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: RADIUS.lg,
+                    background: G.goldBg,
+                    border: `1px solid ${G.gold}33`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    fontWeight: 800,
+                    fontSize: 13,
+                    letterSpacing: -0.5,
+                    color: G.gold,
+                  }}
+                >
+                  {c.shortName}
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, marginTop: 4 }}>
-                  {c.name}
-                </div>
-                <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
-                  {admin ? (
-                    <>
-                      Admin: {admin.name} · {admin.email}
-                    </>
-                  ) : (
-                    <span style={{ color: G.danger }}>No admin assigned</span>
-                  )}
-                  {' · '}
-                  {drivers} driver(s)
-                </div>
-                <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
-                  slug: <code>{c.slug || '—'}</code>
-                  {' · '}
-                  plan: {c.plan?.code || c.planCode || '—'}
-                  {' · '}
-                  DB:{' '}
-                  <code>
-                    {c.tenantDatabase?.dbName ||
-                      (c.slug ? `fq_tenant_${c.slug}` : '—')}
-                  </code>
-                  {' · '}
-                  route:{' '}
-                  <code>{c.tenantDatabase?.routingMode || 'shared'}</code>
-                  {' · '}
-                  etl:{' '}
-                  <code>{c.tenantDatabase?.etlStatus || 'pending'}</code>
-                  {c.tenantDatabase?.writeFreeze ? (
-                    <>
-                      {' · '}
-                      <span style={{ color: G.gold }}>frozen</span>
-                    </>
-                  ) : null}
-                  {' · '}
-                  <Pill
-                    color={
-                      c.tenantDatabase?.status === 'active'
-                        ? G.success
-                        : c.tenantDatabase?.status === 'failed'
-                          ? G.danger
-                          : G.gold
-                    }
-                    small
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      flexWrap: 'wrap',
+                    }}
                   >
-                    {(c.tenantDatabase?.status || 'pending_provision').replace(
-                      /_/g,
-                      ' ',
-                    )}
-                  </Pill>
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 800,
+                          color: G.text,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        {c.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: G.muted,
+                          marginTop: 4,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {admin ? (
+                          <>
+                            {admin.name} · {admin.email}
+                          </>
+                        ) : (
+                          <span style={{ color: G.danger }}>No admin assigned</span>
+                        )}
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                        justifyContent: 'flex-end',
+                      }}
+                    >
+                      <Pill color={c.active ? G.success : G.danger}>
+                        {c.active ? 'Active' : 'Disabled'}
+                      </Pill>
+                      {apiEnabled && (
+                        <Pill color={tenantStatusColor(tenantStatus)} small>
+                          DB {formatTenantStatus(tenantStatus)}
+                        </Pill>
+                      )}
+                      {apiEnabled && c.tenantDatabase?.etlStatus && (
+                        <Pill color={G.info} small>
+                          ETL {c.tenantDatabase.etlStatus.replace(/_/g, ' ')}
+                        </Pill>
+                      )}
+                      {c.tenantDatabase?.writeFreeze ? (
+                        <Pill color={G.warning} small>
+                          Frozen
+                        </Pill>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                      gap: 8,
+                      marginTop: 14,
+                    }}
+                  >
+                    <MetaCell label="Admin" value={admin?.name || '—'} />
+                    <MetaCell
+                      label="Drivers"
+                      value={`${drivers} registered`}
+                    />
+                    <MetaCell label="Plan" value={planName} />
+                    <MetaCell label="Slug" value={c.slug || '—'} mono />
+                    <MetaCell label="Database" value={dbName} mono />
+                    <MetaCell
+                      label="Routing"
+                      value={c.tenantDatabase?.routingMode || 'shared'}
+                    />
+                  </div>
+
                   {c.tenantDatabase?.lastError ? (
                     <div
                       style={{
-                        fontSize: 10,
+                        marginTop: 12,
+                        padding: '10px 12px',
+                        borderRadius: RADIUS.md,
+                        background: G.dangerBg,
+                        border: `1px solid ${G.danger}33`,
+                        fontSize: 12,
                         color: G.danger,
-                        marginTop: 4,
-                        maxWidth: 420,
+                        lineHeight: 1.45,
                       }}
                     >
                       {c.tenantDatabase.lastError}
@@ -393,193 +598,206 @@ export function SuperAdminPanel({
                   ) : null}
                 </div>
               </div>
+            </div>
+
+            <div
+              style={{
+                padding: '14px 20px 16px',
+                borderTop: `1px solid ${G.border}`,
+                background: G.card2,
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 12,
+                alignItems: 'flex-end',
+                justifyContent: 'space-between',
+              }}
+            >
               <div
                 style={{
                   display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  gap: 8,
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  flex: '1 1 260px',
+                  minWidth: 0,
                 }}
               >
-                <Pill color={c.active ? G.success : G.danger}>
-                  {c.active ? 'ACTIVE' : 'DISABLED'}
-                </Pill>
                 {apiEnabled && (
-                  <Sel
-                    label=""
-                    value={c.plan?.code || 'starter'}
-                    onChange={(e) => {
-                      const planCode = e.target.value;
-                      void companiesApi
-                        .changePlan(c.id, planCode)
-                        .then((updated: any) => {
-                          setCompanies((prev: any[]) =>
-                            prev.map((co) =>
-                              co.id === c.id
-                                ? {
-                                    ...co,
-                                    plan: updated.plan,
-                                    planId: updated.planId,
-                                    subscription: updated.subscription,
-                                  }
-                                : co,
-                            ),
-                          );
-                          notify(`Plan updated to ${updated.plan?.name || planCode}`);
-                        })
-                        .catch((err: any) =>
-                          notify(err?.message || 'Plan change failed', 'error'),
-                        );
-                    }}
-                    style={{ marginBottom: 0, minWidth: 140 }}
-                  >
-                    {(plans.length
-                      ? plans
-                      : [
-                          { code: 'starter', name: 'Starter' },
-                          { code: 'professional', name: 'Professional' },
-                          { code: 'enterprise', name: 'Enterprise' },
-                        ]
-                    ).map((p: any) => (
-                      <option key={p.code} value={p.code}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Sel>
-                )}
-                {apiEnabled && c.tenantDatabase?.status === 'active' && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {c.tenantDatabase?.etlStatus !== 'cutover' &&
-                      c.tenantDatabase?.etlStatus !== 'archived' && (
-                        <Btn
-                          size="sm"
-                          onClick={() => {
-                            void tenantsApi
-                              .migrate(c.id)
-                              .then(() => {
-                                notify('ETL migrate + verify complete');
-                                return refreshAll?.('all');
-                              })
-                              .catch((err: any) =>
-                                notify(
-                                  err?.message || 'Migrate failed',
-                                  'error',
-                                ),
-                              );
-                          }}
-                        >
-                          Migrate ETL
-                        </Btn>
-                      )}
-                    {c.tenantDatabase?.etlStatus === 'verified' && (
-                      <Btn
-                        size="sm"
-                        onClick={() => {
-                          void tenantsApi
-                            .cutover(c.id)
-                            .then(() => {
-                              notify('Cut over to tenant DB');
-                              return refreshAll?.('all');
-                            })
-                            .catch((err: any) =>
-                              notify(err?.message || 'Cutover failed', 'error'),
+                  <div style={{ flex: '1 1 160px', maxWidth: 220, minWidth: 140 }}>
+                    <Sel
+                      label="Subscription"
+                      value={c.plan?.code || 'starter'}
+                      onChange={(e) => {
+                        const planCode = e.target.value;
+                        void companiesApi
+                          .changePlan(c.id, planCode)
+                          .then((updated: any) => {
+                            setCompanies((prev: any[]) =>
+                              prev.map((co) =>
+                                co.id === c.id
+                                  ? {
+                                      ...co,
+                                      plan: updated.plan,
+                                      planId: updated.planId,
+                                      subscription: updated.subscription,
+                                    }
+                                  : co,
+                              ),
                             );
-                        }}
-                      >
-                        Cut over
-                      </Btn>
-                    )}
-                    {c.tenantDatabase?.etlStatus === 'cutover' && (
-                      <Btn
-                        size="sm"
-                        variant="danger"
-                        onClick={() => {
-                          void (async () => {
-                            const approved = await confirmAction({
-                              title: 'Archive shared data',
-                              message:
-                                "Delete this company's rows from shared DBs? Tenant DB keeps the data.",
-                              confirmLabel: 'Delete shared rows',
-                              variant: 'danger',
-                            });
-                            if (!approved) return;
-                            void tenantsApi
-                              .archiveShared(c.id)
-                              .then(() => {
-                                notify('Shared data archived');
-                                return refreshAll?.('all');
-                              })
-                              .catch((err: any) =>
-                                notify(
-                                  err?.message || 'Archive failed',
-                                  'error',
-                                ),
-                              );
-                          })();
-                        }}
-                      >
-                        Archive shared
-                      </Btn>
-                    )}
+                            notify(
+                              `Plan updated to ${updated.plan?.name || planCode}`,
+                            );
+                          })
+                          .catch((err: any) =>
+                            notify(err?.message || 'Plan change failed', 'error'),
+                          );
+                      }}
+                      style={{ marginBottom: 0, width: '100%' }}
+                    >
+                      {planOptions.map((p: any) => (
+                        <option key={p.code} value={p.code}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </Sel>
                   </div>
                 )}
-                {apiEnabled && c.tenantDatabase?.status === 'active' && (
-                  <Sel
-                    label=""
-                    value={c.tenantDatabase?.routingMode || 'shared'}
-                    onChange={(e) => {
-                      const mode = e.target.value as 'shared' | 'tenant';
-                      void tenantsApi
-                        .setRoutingMode(c.id, mode)
-                        .then(() => {
-                          notify(`Routing → ${mode}`);
-                          return refreshAll?.('all');
-                        })
-                        .catch((err: any) =>
-                          notify(
-                            err?.message || 'Routing mode change failed',
-                            'error',
-                          ),
-                        );
-                    }}
-                    style={{ marginBottom: 0, minWidth: 140 }}
-                  >
-                    <option value="shared">DB: shared</option>
-                    <option value="tenant">DB: tenant</option>
-                  </Sel>
-                )}
-                {apiEnabled &&
-                  (c.tenantDatabase?.status === 'pending_provision' ||
-                    c.tenantDatabase?.status === 'failed' ||
-                    c.tenantDatabase?.status === 'provisioning') && (
-                    <Btn
-                      size="sm"
-                      onClick={() => {
+                {apiEnabled && tenantStatus === 'active' && (
+                  <div style={{ flex: '1 1 160px', maxWidth: 220, minWidth: 140 }}>
+                    <Sel
+                      label="DB routing"
+                      value={c.tenantDatabase?.routingMode || 'shared'}
+                      onChange={(e) => {
+                        const mode = e.target.value as 'shared' | 'tenant';
                         void tenantsApi
-                          .provision(c.id, true)
+                          .setRoutingMode(c.id, mode)
                           .then(() => {
-                            notify('Tenant DB provisioned');
+                            notify(`Routing → ${mode}`);
                             return refreshAll?.('all');
                           })
                           .catch((err: any) =>
                             notify(
-                              err?.message || 'Provision failed',
+                              err?.message || 'Routing mode change failed',
                               'error',
                             ),
                           );
                       }}
+                      style={{ marginBottom: 0, width: '100%' }}
                     >
-                      {c.tenantDatabase?.status === 'failed'
-                        ? 'Retry provision'
-                        : 'Provision DB'}
+                      <option value="shared">Shared database</option>
+                      <option value="tenant">Tenant database</option>
+                    </Sel>
+                  </div>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  flex: '0 1 auto',
+                }}
+              >
+                {apiEnabled && needsProvision && (
+                  <Btn
+                    size="sm"
+                    onClick={() => {
+                      void tenantsApi
+                        .provision(c.id, true)
+                        .then(() => {
+                          notify('Tenant DB provisioned');
+                          return refreshAll?.('all');
+                        })
+                        .catch((err: any) =>
+                          notify(err?.message || 'Provision failed', 'error'),
+                        );
+                    }}
+                  >
+                    {tenantStatus === 'failed' ? 'Retry provision' : 'Provision DB'}
+                  </Btn>
+                )}
+                {apiEnabled &&
+                  tenantStatus === 'active' &&
+                  c.tenantDatabase?.etlStatus !== 'cutover' &&
+                  c.tenantDatabase?.etlStatus !== 'archived' && (
+                    <Btn
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        void tenantsApi
+                          .migrate(c.id)
+                          .then(() => {
+                            notify('ETL migrate + verify complete');
+                            return refreshAll?.('all');
+                          })
+                          .catch((err: any) =>
+                            notify(err?.message || 'Migrate failed', 'error'),
+                          );
+                      }}
+                    >
+                      Migrate ETL
                     </Btn>
                   )}
+                {apiEnabled && c.tenantDatabase?.etlStatus === 'verified' && (
+                  <Btn
+                    size="sm"
+                    onClick={() => {
+                      void tenantsApi
+                        .cutover(c.id)
+                        .then(() => {
+                          notify('Cut over to tenant DB');
+                          return refreshAll?.('all');
+                        })
+                        .catch((err: any) =>
+                          notify(err?.message || 'Cutover failed', 'error'),
+                        );
+                    }}
+                  >
+                    Cut over
+                  </Btn>
+                )}
+                {apiEnabled && c.tenantDatabase?.etlStatus === 'cutover' && (
+                  <Btn
+                    size="sm"
+                    variant="danger"
+                    onClick={() => {
+                      void (async () => {
+                        const approved = await confirmAction({
+                          title: 'Archive shared data',
+                          message:
+                            "Delete this company's rows from shared DBs? Tenant DB keeps the data.",
+                          confirmLabel: 'Delete shared rows',
+                          variant: 'danger',
+                        });
+                        if (!approved) return;
+                        void tenantsApi
+                          .archiveShared(c.id)
+                          .then(() => {
+                            notify('Shared data archived');
+                            return refreshAll?.('all');
+                          })
+                          .catch((err: any) =>
+                            notify(err?.message || 'Archive failed', 'error'),
+                          );
+                      })();
+                    }}
+                  >
+                    Archive shared
+                  </Btn>
+                )}
                 <Btn
-                  variant={c.active ? 'danger' : 'success'}
                   size="sm"
+                  variant={c.active ? 'outline' : 'success'}
+                  style={
+                    c.active
+                      ? { color: G.danger, borderColor: `${G.danger}44` }
+                      : undefined
+                  }
                   onClick={() => void toggleCo(c.id)}
                 >
-                  {c.active ? 'Disable' : 'Enable'}
+                  {c.active ? 'Disable company' : 'Enable company'}
                 </Btn>
               </div>
             </div>

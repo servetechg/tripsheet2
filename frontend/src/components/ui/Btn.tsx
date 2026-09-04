@@ -28,9 +28,9 @@ export function Btn({
   ...p
 }: BtnProps) {
   const sizes = {
-    sm: { padding: '8px 14px', fontSize: 12 },
-    md: { padding: '11px 18px', fontSize: 13 },
-    lg: { padding: '13px 22px', fontSize: 14 },
+    sm: { padding: '0 12px', fontSize: 12, minHeight: 32 },
+    md: { padding: '0 16px', fontSize: 13, minHeight: 38 },
+    lg: { padding: '0 20px', fontSize: 14, minHeight: 40 },
   };
   const sz = sizes[size] || sizes.md;
   const primary: CSSProperties = {
@@ -40,33 +40,33 @@ export function Btn({
     fontWeight: 600,
     borderRadius: RADIUS.md,
     cursor: 'pointer',
-    letterSpacing: 0.2,
-    transition: 'transform .15s ease, box-shadow .15s ease, opacity .15s',
+    letterSpacing: 0,
+    transition: 'background .15s ease, opacity .15s ease',
     whiteSpace: 'nowrap',
-    boxShadow: '0 4px 12px rgba(37,99,235,0.28)',
   };
   const variants: Record<BtnVariant, CSSProperties> = {
     gold: primary,
     primary,
     outline: {
-      background: G.card,
+      background: 'transparent',
       color: G.muted2,
-      border: `1px solid ${G.border2}`,
-      fontWeight: 600,
+      border: `1px solid ${G.border}`,
+      fontWeight: 500,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
-      transition: 'all .15s ease',
+      letterSpacing: 0,
+      transition: 'border-color .15s ease, color .15s ease, background .15s ease',
       whiteSpace: 'nowrap',
     },
     ghost: {
-      background: G.goldBg,
-      color: G.gold,
-      border: `1px solid ${G.gold}33`,
-      fontWeight: 600,
+      background: 'transparent',
+      color: G.muted2,
+      border: '1px solid transparent',
+      fontWeight: 500,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
+      letterSpacing: 0,
+      transition: 'background .15s ease, color .15s ease',
       whiteSpace: 'nowrap',
     },
     danger: {
@@ -76,7 +76,7 @@ export function Btn({
       fontWeight: 600,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
+      letterSpacing: 0,
       whiteSpace: 'nowrap',
     },
     success: {
@@ -86,7 +86,7 @@ export function Btn({
       fontWeight: 600,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
+      letterSpacing: 0,
       whiteSpace: 'nowrap',
     },
     info: {
@@ -96,7 +96,7 @@ export function Btn({
       fontWeight: 600,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
+      letterSpacing: 0,
       whiteSpace: 'nowrap',
     },
     purple: {
@@ -106,17 +106,21 @@ export function Btn({
       fontWeight: 600,
       borderRadius: RADIUS.md,
       cursor: 'pointer',
-      letterSpacing: 0.2,
+      letterSpacing: 0,
       whiteSpace: 'nowrap',
     },
   };
+  const isPrimary = variant === 'primary' || variant === 'gold';
   return (
     <button
-      className="ts-btn"
+      className={isPrimary ? 'ts-btn ts-btn-primary' : 'ts-btn'}
       style={{
         ...(variants[variant] || variants.primary),
         ...sz,
-        ...(full ? { width: '100%', textAlign: 'center' as const } : {}),
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...(full ? { width: '100%' } : {}),
         ...sx,
       }}
       {...p}

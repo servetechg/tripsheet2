@@ -65,17 +65,13 @@ export function AppShell({
           height: HEADER_HEIGHT,
           minHeight: HEADER_HEIGHT,
           boxSizing: 'border-box',
-          background:
-            G.mode === 'light'
-              ? 'rgba(255,255,255,0.92)'
-              : 'rgba(17,24,39,0.92)',
+          background: G.mode === 'light' ? 'rgba(255,255,255,0.92)' : G.sidebar,
           borderBottom: `1px solid ${G.border}`,
           padding: mob ? '0 16px' : '0 28px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           marginLeft: mob ? 0 : SIDEBAR_WIDTH,
-          backdropFilter: 'blur(12px)',
         }}
       >
         {mob ? (
@@ -84,7 +80,7 @@ export function AppShell({
           <div
             style={{
               fontSize: 15,
-              letterSpacing: -0.1,
+              letterSpacing: -0.2,
               color: G.text,
               fontWeight: 600,
             }}

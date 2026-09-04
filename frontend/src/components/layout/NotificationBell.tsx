@@ -1,5 +1,5 @@
 import { Icons } from '@/components/ui';
-import { G } from '@/lib/theme';
+import { G, RADIUS } from '@/lib/theme';
 
 type NotificationBellProps = {
   hasUnread?: boolean;
@@ -17,19 +17,19 @@ export function NotificationBell({
       aria-label="Notifications"
       onClick={onClick}
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+        width: 38,
+        height: 38,
+        borderRadius: RADIUS.md,
         border: `1px solid ${G.border}`,
-        background: G.card,
+        background: G.card2,
         color: G.muted2,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         cursor: 'pointer',
         position: 'relative',
-        boxShadow: G.shadow,
         fontFamily: 'inherit',
+        transition: 'border-color .15s ease, color .15s ease',
       }}
     >
       {Icons.bell({ size: 18 })}
@@ -39,11 +39,11 @@ export function NotificationBell({
             position: 'absolute',
             top: 8,
             right: 9,
-            width: 8,
-            height: 8,
+            width: 7,
+            height: 7,
             borderRadius: 99,
             background: G.danger,
-            border: `2px solid ${G.card}`,
+            border: `2px solid ${G.card2}`,
           }}
         />
       )}

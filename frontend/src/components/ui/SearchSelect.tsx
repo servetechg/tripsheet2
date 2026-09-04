@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { G, inputBase, labelBase, RADIUS } from '@/lib/theme';
+import { SEARCH_PLACEHOLDER } from '@/lib/inputPlaceholders';
 
 export type SearchSelectOption = { value: string; label: string };
 
@@ -39,7 +40,7 @@ export function SearchSelect({
   value,
   onChange,
   options,
-  placeholder = 'Search…',
+  placeholder = SEARCH_PLACEHOLDER,
   allowCustom = true,
   required,
   error,
@@ -134,6 +135,7 @@ export function SearchSelect({
       )}
       <input
         id={id}
+        className="ts-input"
         role="combobox"
         aria-expanded={open}
         aria-autocomplete="list"
@@ -159,7 +161,7 @@ export function SearchSelect({
         onKeyDown={onKeyDown}
         style={{
           ...inputBase(),
-          borderColor: error ? G.danger : G.border2,
+          borderColor: error ? G.danger : G.border,
           boxShadow: error ? `0 0 0 1px ${G.danger}55` : undefined,
         }}
       />

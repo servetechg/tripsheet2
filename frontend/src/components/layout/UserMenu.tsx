@@ -97,20 +97,19 @@ export function UserMenu({
           gap: 10,
           background: G.card,
           border: `1px solid ${G.border}`,
-          borderRadius: 14,
+          borderRadius: RADIUS.md,
           padding: '5px 10px 5px 5px',
           cursor: 'pointer',
-          boxShadow: G.shadow,
           fontFamily: 'inherit',
-          transition: 'border-color .15s ease, box-shadow .15s ease',
+          transition: 'border-color .15s ease',
         }}
       >
         <div
           style={{
             width: 34,
             height: 34,
-            borderRadius: 11,
-            background: `linear-gradient(145deg, ${G.gold}, ${G.goldDim})`,
+            borderRadius: RADIUS.md,
+            background: G.gold,
             color: G.onGold,
             display: 'flex',
             alignItems: 'center',
@@ -401,14 +400,14 @@ export function UserMenu({
             </div>
           ) : null}
           <Inp
+            label="Current password"
             type="password"
-            placeholder="Current password"
             value={currentPassword}
             onChange={(e) => setCurrentPassword(e.target.value)}
           />
           <Inp
+            label="New password"
             type="password"
-            placeholder="New password"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             style={{ marginBottom: 0 }}
