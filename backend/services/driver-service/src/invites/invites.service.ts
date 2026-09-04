@@ -568,12 +568,21 @@ export class InvitesService {
       where: { token },
     });
     if (sharedInvite) {
+      const conn = await this.tenants.resolve(sharedInvite.companyId);
+      if (!conn?.connectionUrl || conn.status !== 'active') return null;
       const store: TenantStore = {
         companyId: sharedInvite.companyId,
-        routingMode: 'shared',
-        useTenantDb: false,
+        tenantKey: conn.tenantKey,
+        dbName: conn.dbName,
+        tenantStatus: conn.status,
+        routingMode: 'tenant',
+        connectionUrl: conn.connectionUrl,
+        useTenantDb: true,
       };
-      return { invite: sharedInvite, store };
+      const invite = await tenantAls.run(store, () =>
+        this.prisma.invite.findUnique({ where: { token } }),
+      );
+      return invite ? { invite, store } : null;
     }
 
     for (const companyId of await this.tenantRoutedCompanyIds()) {

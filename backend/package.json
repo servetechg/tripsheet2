@@ -33,7 +33,9 @@
     "start:tripsheet": "npm run start:dev --prefix services/tripsheet-service",
     "start:accounting": "npm run start:dev --prefix services/accounting-service",
     "start:notification": "npm run start:dev --prefix services/notification-service",
-    "build:all": "npm run build --prefix gateway && npm run build --prefix services/auth-service && npm run build --prefix services/company-service && npm run build --prefix services/driver-service && npm run build --prefix services/fleet-service && npm run build --prefix services/manifest-service && npm run build --prefix services/tripsheet-service && npm run build --prefix services/accounting-service && npm run build --prefix services/notification-service"
+    "build:all": "npm run build --prefix gateway && npm run build --prefix services/auth-service && npm run build --prefix services/company-service && npm run build --prefix services/driver-service && npm run build --prefix services/fleet-service && npm run build --prefix services/manifest-service && npm run build --prefix services/tripsheet-service && npm run build --prefix services/accounting-service && npm run build --prefix services/notification-service",
+    "seed:e2e": "node scripts/seed-e2e.mjs",
+    "seed:all": "npm run prisma:generate --prefix services/auth-service && npm run prisma:generate --prefix services/company-service && cd services/auth-service && npx prisma db seed && cd ../company-service && npx prisma db seed"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

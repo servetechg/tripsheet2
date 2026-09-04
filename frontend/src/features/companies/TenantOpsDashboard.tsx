@@ -23,7 +23,6 @@ type OpsSummary = {
     dbName: string;
     status: string;
     routingMode: string;
-    etlStatus: string;
     schemaVersion: string;
     lastError: string;
     sizePretty: string;
@@ -174,10 +173,6 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
               </div>
               <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
                 <code>{row.dbName}</code>
-                {' · '}
-                route <code>{row.routingMode}</code>
-                {' · '}
-                etl <code>{row.etlStatus}</code>
                 {' · '}
                 schema v{row.schemaVersion}
                 {row.writeFreeze ? ' · frozen' : ''}

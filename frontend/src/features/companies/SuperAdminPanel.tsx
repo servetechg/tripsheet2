@@ -10,7 +10,6 @@ import { AppShell } from '@/components/layout/AppShell';
 import { companiesApi, authApi, plansApi, tenantsApi } from '@/lib/api';
 import { isCompanyOwnerRole } from '@tripsheet/shared';
 import { notify } from '@/components/feedback/Toast';
-import { useConfirm } from '@/context/ConfirmContext';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
 
 const PLAN_FALLBACK = [
@@ -90,7 +89,6 @@ export function SuperAdminPanel({
   activeTab,
   onTabChange,
 }: any) {
-  const confirmAction = useConfirm();
   const [tab, setTab] = useState('companies');
   const currentTab = activeTab || tab;
   const changeTab = onTabChange || setTab;
@@ -266,14 +264,16 @@ export function SuperAdminPanel({
             Manage tenants, plans, and database routing
           </div>
         </div>
-        <Btn
-          onClick={() => {
-            setShow(true);
-            setErr('');
-          }}
-        >
-          + New Company
-        </Btn>
+        {companies.length > 0 ? (
+          <Btn
+            onClick={() => {
+              setShow(true);
+              setErr('');
+            }}
+          >
+            + New Company
+          </Btn>
+        ) : null}
       </div>
 
       <div
@@ -545,16 +545,6 @@ export function SuperAdminPanel({
                           DB {formatTenantStatus(tenantStatus)}
                         </Pill>
                       )}
-                      {apiEnabled && c.tenantDatabase?.etlStatus && (
-                        <Pill color={G.info} small>
-                          ETL {c.tenantDatabase.etlStatus.replace(/_/g, ' ')}
-                        </Pill>
-                      )}
-                      {c.tenantDatabase?.writeFreeze ? (
-                        <Pill color={G.warning} small>
-                          Frozen
-                        </Pill>
-                      ) : null}
                     </div>
                   </div>
 
@@ -574,10 +564,6 @@ export function SuperAdminPanel({
                     <MetaCell label="Plan" value={planName} />
                     <MetaCell label="Slug" value={c.slug || '—'} mono />
                     <MetaCell label="Database" value={dbName} mono />
-                    <MetaCell
-                      label="Routing"
-                      value={c.tenantDatabase?.routingMode || 'shared'}
-                    />
                   </div>
 
                   {c.tenantDatabase?.lastError ? (
@@ -661,33 +647,6 @@ export function SuperAdminPanel({
                     </Sel>
                   </div>
                 )}
-                {apiEnabled && tenantStatus === 'active' && (
-                  <div style={{ flex: '1 1 160px', maxWidth: 220, minWidth: 140 }}>
-                    <Sel
-                      label="DB routing"
-                      value={c.tenantDatabase?.routingMode || 'shared'}
-                      onChange={(e) => {
-                        const mode = e.target.value as 'shared' | 'tenant';
-                        void tenantsApi
-                          .setRoutingMode(c.id, mode)
-                          .then(() => {
-                            notify(`Routing → ${mode}`);
-                            return refreshAll?.('all');
-                          })
-                          .catch((err: any) =>
-                            notify(
-                              err?.message || 'Routing mode change failed',
-                              'error',
-                            ),
-                          );
-                      }}
-                      style={{ marginBottom: 0, width: '100%' }}
-                    >
-                      <option value="shared">Shared database</option>
-                      <option value="tenant">Tenant database</option>
-                    </Sel>
-                  </div>
-                )}
               </div>
 
               <div
@@ -716,75 +675,6 @@ export function SuperAdminPanel({
                     }}
                   >
                     {tenantStatus === 'failed' ? 'Retry provision' : 'Provision DB'}
-                  </Btn>
-                )}
-                {apiEnabled &&
-                  tenantStatus === 'active' &&
-                  c.tenantDatabase?.etlStatus !== 'cutover' &&
-                  c.tenantDatabase?.etlStatus !== 'archived' && (
-                    <Btn
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        void tenantsApi
-                          .migrate(c.id)
-                          .then(() => {
-                            notify('ETL migrate + verify complete');
-                            return refreshAll?.('all');
-                          })
-                          .catch((err: any) =>
-                            notify(err?.message || 'Migrate failed', 'error'),
-                          );
-                      }}
-                    >
-                      Migrate ETL
-                    </Btn>
-                  )}
-                {apiEnabled && c.tenantDatabase?.etlStatus === 'verified' && (
-                  <Btn
-                    size="sm"
-                    onClick={() => {
-                      void tenantsApi
-                        .cutover(c.id)
-                        .then(() => {
-                          notify('Cut over to tenant DB');
-                          return refreshAll?.('all');
-                        })
-                        .catch((err: any) =>
-                          notify(err?.message || 'Cutover failed', 'error'),
-                        );
-                    }}
-                  >
-                    Cut over
-                  </Btn>
-                )}
-                {apiEnabled && c.tenantDatabase?.etlStatus === 'cutover' && (
-                  <Btn
-                    size="sm"
-                    variant="danger"
-                    onClick={() => {
-                      void (async () => {
-                        const approved = await confirmAction({
-                          title: 'Archive shared data',
-                          message:
-                            "Delete this company's rows from shared DBs? Tenant DB keeps the data.",
-                          confirmLabel: 'Delete shared rows',
-                          variant: 'danger',
-                        });
-                        if (!approved) return;
-                        void tenantsApi
-                          .archiveShared(c.id)
-                          .then(() => {
-                            notify('Shared data archived');
-                            return refreshAll?.('all');
-                          })
-                          .catch((err: any) =>
-                            notify(err?.message || 'Archive failed', 'error'),
-                          );
-                      })();
-                    }}
-                  >
-                    Archive shared
                   </Btn>
                 )}
                 <Btn

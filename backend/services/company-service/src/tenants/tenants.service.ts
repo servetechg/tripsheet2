@@ -108,9 +108,7 @@ export class TenantsService {
       port: row.port,
       status: row.status,
       schemaVersion: row.schemaVersion,
-      routingMode: (row.routingMode === 'tenant' ? 'tenant' : 'shared') as
-        | 'shared'
-        | 'tenant',
+      routingMode: 'tenant' as const,
       etlStatus: row.etlStatus,
       writeFreeze: row.writeFreeze,
       etlVerifiedAt: row.etlVerifiedAt,
@@ -122,22 +120,6 @@ export class TenantsService {
       planId: row.company.planId,
       companyStatus: row.company.status,
     };
-  }
-
-  async setRoutingMode(companyId: string, routingMode: 'shared' | 'tenant') {
-    await this.prisma.tenantDatabase.update({
-      where: { companyId },
-      data: { routingMode },
-    });
-    await this.prisma.tenantLifecycleEvent.create({
-      data: {
-        companyId,
-        action: 'tenant.routing_mode',
-        actorName: 'system',
-        detail: { routingMode, phase: 3 },
-      },
-    });
-    return this.getConnection(companyId);
   }
 
   async setConnection(

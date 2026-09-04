@@ -516,16 +516,6 @@ async function createEphemeral(
   }
 
   await sleep(300);
-  const route = await h.patch(
-    `/api/tenants/${id}/routing-mode`,
-    { routingMode: 'tenant' },
-    superToken,
-  );
-  if (route.status >= 400) {
-    throw new Error(
-      `set tenant routing ${slug}: HTTP ${route.status} ${route.raw.slice(0, 200)}`,
-    );
-  }
 
   const { token, user: logged } = await h.login(email, password);
 

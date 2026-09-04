@@ -240,7 +240,17 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           const admins = prev.filter(
             (u) => isCompanyOwnerRole(u.role) && u.companyId === companyId,
           );
-          return [...supers, ...admins, ...driverUsers];
+          const prevDrivers = prev.filter(
+            (u) => u.role === 'driver' && u.companyId === companyId,
+          );
+          const byEmail = new Map<string, AppUser>();
+          for (const d of prevDrivers) {
+            if (d.email) byEmail.set(d.email.toLowerCase(), d);
+          }
+          for (const d of driverUsers) {
+            if (d.email) byEmail.set(d.email.toLowerCase(), d);
+          }
+          return [...supers, ...admins, ...Array.from(byEmail.values())];
         });
 
         setDriverDocs(docs);

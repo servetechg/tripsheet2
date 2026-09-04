@@ -105,13 +105,9 @@ export class TenantResolverMiddleware implements NestMiddleware {
     const role = payload.role || '';
     const companyId = payload.companyId || undefined;
     let tenantKey = payload.tenantKey || undefined;
-    let routingMode: 'shared' | 'tenant' = 'shared';
+    let routingMode: 'tenant' = 'tenant';
     let tenantStatus = '';
     let dbName = '';
-    let writeFreeze = false;
-
-    const forceTenant =
-      this.config.get<string>('TENANT_RUNTIME_MODE') === 'tenant';
 
     if (role !== 'superadmin') {
       if (!companyId) {
@@ -120,44 +116,27 @@ export class TenantResolverMiddleware implements NestMiddleware {
       const info = await this.tenants.resolve(companyId);
       if (!info) {
         this.logger.warn(`No tenant registry row for ${companyId}`);
-      } else {
-        if (info.companyStatus === 'suspended' || info.status === 'suspended') {
-          throw new ForbiddenException('Company suspended');
-        }
-        tenantKey = info.tenantKey || tenantKey;
-        tenantStatus = info.status;
-        dbName = info.dbName;
-        writeFreeze = Boolean(info.writeFreeze);
-        routingMode =
-          forceTenant || info.routingMode === 'tenant' ? 'tenant' : 'shared';
-        if (routingMode === 'tenant' && info.status !== 'active') {
-          // Fall back to shared enforcement if tenant DB not ready
-          routingMode = 'shared';
-        }
+        throw new ForbiddenException('Company tenant is not registered');
       }
+      if (info.companyStatus === 'suspended' || info.status === 'suspended') {
+        throw new ForbiddenException('Company suspended');
+      }
+      if (info.status !== 'active') {
+        throw new ForbiddenException(
+          'Company tenant database is not ready yet. Try again after provisioning completes.',
+        );
+      }
+      tenantKey = info.tenantKey || tenantKey;
+      tenantStatus = info.status;
+      dbName = info.dbName;
     } else if (companyId) {
       const info = await this.tenants.resolve(companyId);
-      if (info) {
-        writeFreeze = Boolean(info.writeFreeze);
-        if (
-          (forceTenant || info.routingMode === 'tenant') &&
-          info.status === 'active'
-        ) {
-          routingMode = 'tenant';
-          tenantKey = info.tenantKey;
-          tenantStatus = info.status;
-          dbName = info.dbName;
-        }
+      if (info?.status === 'active') {
+        routingMode = 'tenant';
+        tenantKey = info.tenantKey;
+        tenantStatus = info.status;
+        dbName = info.dbName;
       }
-    }
-
-    // Phase 4: freeze shared writes during cutover window
-    const method = (req.method || 'GET').toUpperCase();
-    const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-    if (writeFreeze && routingMode === 'shared' && mutating) {
-      throw new ForbiddenException(
-        'Company writes are frozen during tenant migration cutover',
-      );
     }
 
     // Phase 5: subscription feature gates (accounting, apiAccess surface)
@@ -206,7 +185,6 @@ export class TenantResolverMiddleware implements NestMiddleware {
     if (tenantStatus) req.headers['x-tenant-status'] = tenantStatus;
     req.headers['x-tenant-routing'] = routingMode;
     if (dbName) req.headers['x-tenant-db-name'] = dbName;
-    if (writeFreeze) req.headers['x-tenant-write-freeze'] = '1';
 
     // Never put connection URL on the inbound request object from clients;
     // services resolve via internal API when routingMode=tenant.
