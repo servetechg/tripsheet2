@@ -705,11 +705,6 @@ async function createEphemeral(
   }
 
   await sleep(300);
-  await h.patch(
-    `/api/tenants/${id}/routing-mode`,
-    { routingMode: 'tenant' },
-    superToken,
-  );
 
   const { token } = await h.login(email, password);
   return {

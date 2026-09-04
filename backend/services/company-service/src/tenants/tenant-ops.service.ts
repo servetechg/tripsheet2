@@ -6,6 +6,12 @@ import { decryptSecret } from '../platform/crypto.util';
 import { parseAdminUrl } from '../platform/pg-admin.util';
 import { pushTenantOpsSchemas } from './schema-sync.util';
 import { TenantLocalService } from '../org/tenant-local.service';
+import {
+  clearTenantErrorFields,
+  tenantErrorWriteFields,
+  tenantHasActionableIssue,
+  buildTenantIssue,
+} from './tenant-error.util';
 
 @Injectable()
 export class TenantOpsService {
@@ -108,6 +114,7 @@ export class TenantOpsService {
         sizePretty: '—',
         connections: 0,
       };
+      const issue = buildTenantIssue(r, { includeTechnicalDetail: true });
       return {
         companyId: r.companyId,
         name: r.company.name,
@@ -121,7 +128,7 @@ export class TenantOpsService {
         etlStatus: r.etlStatus,
         schemaVersion: r.schemaVersion,
         writeFreeze: r.writeFreeze,
-        lastError: r.lastError,
+        issue,
         provisionedAt: r.provisionedAt,
         cutoverAt: r.cutoverAt,
         sizeBytes: stats.sizeBytes,
@@ -135,7 +142,7 @@ export class TenantOpsService {
       active: tenants.filter((t) => t.status === 'active').length,
       failed: tenants.filter((t) => t.status === 'failed').length,
       suspended: tenants.filter((t) => t.status === 'suspended').length,
-      withErrors: tenants.filter((t) => Boolean(t.lastError)).length,
+      withErrors: rows.filter((r) => tenantHasActionableIssue(r)).length,
       totalSizeBytes: tenants.reduce((s, t) => s + t.sizeBytes, 0),
       totalConnections: tenants.reduce((s, t) => s + t.connections, 0),
     };
@@ -187,7 +194,15 @@ export class TenantOpsService {
         if (pushed) {
           await this.prisma.tenantDatabase.update({
             where: { id: row.id },
-            data: { schemaVersion: '6', lastError: '' },
+            data: { schemaVersion: '6', ...clearTenantErrorFields() },
+          });
+        } else if (
+          row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
+          /no sibling prisma projects found/i.test(row.lastError || '')
+        ) {
+          await this.prisma.tenantDatabase.update({
+            where: { id: row.id },
+            data: clearTenantErrorFields(),
           });
         }
       } catch (pushErr) {
@@ -196,6 +211,12 @@ export class TenantOpsService {
         this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
         pushOk = false;
         pushError = msg.slice(0, 500);
+        await this.prisma.tenantDatabase
+          .update({
+            where: { id: row.id },
+            data: tenantErrorWriteFields(msg),
+          })
+          .catch(() => undefined);
       }
     }
 
@@ -240,18 +261,29 @@ export class TenantOpsService {
             if (pushed) {
               await this.prisma.tenantDatabase.update({
                 where: { id: row.id },
-                data: { schemaVersion: '6', lastError: '' },
+                data: { schemaVersion: '6', ...clearTenantErrorFields() },
+              });
+            } else if (
+              row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
+              /no sibling prisma projects found/i.test(row.lastError || '')
+            ) {
+              await this.prisma.tenantDatabase.update({
+                where: { id: row.id },
+                data: clearTenantErrorFields(),
               });
             }
           } catch (pushErr) {
-            this.logger.warn(
-              `ops push skip/fail ${row.dbName}: ${
-                pushErr instanceof Error ? pushErr.message : pushErr
-              }`,
-            );
-            entry.pushOk = false;
-            entry.error =
+            const msg =
               pushErr instanceof Error ? pushErr.message : String(pushErr);
+            this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
+            entry.pushOk = false;
+            entry.error = msg.slice(0, 500);
+            await this.prisma.tenantDatabase
+              .update({
+                where: { id: row.id },
+                data: tenantErrorWriteFields(msg),
+              })
+              .catch(() => undefined);
           }
         }
 
@@ -272,7 +304,7 @@ export class TenantOpsService {
         await this.prisma.tenantDatabase
           .update({
             where: { id: row.id },
-            data: { lastError: entry.error.slice(0, 2000) },
+            data: tenantErrorWriteFields(entry.error),
           })
           .catch(() => undefined);
       }

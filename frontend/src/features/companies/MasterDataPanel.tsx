@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { G } from '@/lib/theme';
+import { useEffect, useId, useRef, useState } from 'react';
+import { G, labelBase } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
@@ -134,6 +134,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const [csvText, setCsvText] = useState('');
   const [ioReport, setIoReport] = useState<any>(null);
   const [form, setForm] = useState<Record<string, string>>({ ...EMPTY_FORM });
+  const csvFileId = useId();
+  const csvTextId = useId();
 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM });
@@ -713,10 +715,11 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               ))}
             </Sel>
             <div>
-              <div style={{ fontSize: 12, color: G.muted, marginBottom: 6 }}>
+              <label htmlFor={csvFileId} style={labelBase()}>
                 CSV file
-              </div>
+              </label>
               <input
+                id={csvFileId}
                 type="file"
                 accept=".csv,text/csv"
                 onChange={(e) => {
@@ -730,10 +733,12 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             </div>
           </G2>
           <div style={{ margin: '12px 0' }}>
-            <div style={{ fontSize: 12, color: G.muted, marginBottom: 6 }}>
+            <label htmlFor={csvTextId} style={labelBase()}>
               CSV (header row required)
-            </div>
+            </label>
             <textarea
+              id={csvTextId}
+              className="ts-input"
               value={csvText}
               onChange={(e) => setCsvText(e.target.value)}
               rows={8}

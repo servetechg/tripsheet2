@@ -8,14 +8,15 @@ export function ThemeToggle({ mode, onToggle }: any) {
       type="button"
       onClick={onToggle}
       title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+      className="ts-icon-btn"
       style={{
         background: G.card2,
-        border: `1px solid ${G.border2}`,
+        border: `1px solid ${G.border}`,
         color: G.text,
-        borderRadius: RADIUS.pill,
-        padding: '7px 12px',
+        borderRadius: RADIUS.md,
+        padding: '8px 12px',
         fontSize: 12,
-        fontWeight: 700,
+        fontWeight: 500,
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
@@ -26,14 +27,7 @@ export function ThemeToggle({ mode, onToggle }: any) {
       {isLight
         ? Icons.sun({ size: 14, color: G.gold })
         : Icons.moon({ size: 14, color: G.muted2 })}
-      <span
-        style={{
-          fontSize: 10,
-          letterSpacing: 1,
-          color: G.muted,
-          textTransform: 'uppercase',
-        }}
-      >
+      <span style={{ fontSize: 12, color: G.muted2 }}>
         {isLight ? 'Light' : 'Dark'}
       </span>
     </button>

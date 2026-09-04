@@ -3,101 +3,103 @@ import { NavIcon } from '@/components/ui/Icons';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { HEADER_HEIGHT, SIDEBAR_WIDTH } from './shellLayout';
 
-export function SideNav({ tabs, active, onChange, logo, subtitle }: any) {
+export function SideNav({ tabs, active, onChange }: any) {
+  const isDark = G.mode === 'dark';
+
   return (
     <div
       style={{
         width: SIDEBAR_WIDTH,
         minWidth: SIDEBAR_WIDTH,
-        background: G.card,
-        borderRight: `1px solid ${G.border}`,
+        background: G.sidebar,
+        borderRight: isDark
+          ? '1px solid rgba(255, 255, 255, 0.06)'
+          : `1px solid ${G.border}`,
         display: 'flex',
         flexDirection: 'column',
-        minHeight: '100vh',
+        height: '100vh',
+        maxHeight: '100dvh',
         position: 'fixed',
         left: 0,
         top: 0,
         zIndex: 300,
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
-          height: HEADER_HEIGHT,
-          minHeight: HEADER_HEIGHT,
-          padding: '0 16px',
-          borderBottom: `1px solid ${G.border}`,
+          padding: '18px 20px 16px',
+          borderBottom: isDark
+            ? '1px solid rgba(255, 255, 255, 0.06)'
+            : `1px solid ${G.border}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
+          justifyContent: 'flex-start',
+          flexShrink: 0,
+          minHeight: HEADER_HEIGHT,
           boxSizing: 'border-box',
         }}
       >
-        <BrandLogo variant="full" height={28} style={{ maxWidth: 148 }} />
-        {/* {subtitle && (
-          <div
-            style={{
-              fontSize: 9,
-              letterSpacing: 0.8,
-              color: G.muted,
-              textTransform: 'uppercase',
-              fontWeight: 600,
-              borderLeft: `1px solid ${G.border}`,
-              paddingLeft: 10,
-              lineHeight: 1.2,
-              whiteSpace: 'nowrap',
-            }}
-            title={logo}
-          >
-            {subtitle}
-          </div>
-        )} */}
+        <BrandLogo variant="full" height={24} style={{ maxWidth: 140 }} />
       </div>
-      <div style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+
+      <div
+        className="ts-sidebar-nav"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: '10px 10px',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
+        }}
+      >
         {tabs.map((t: any) => {
           const on = active === t.id;
-          const color = on ? G.gold : G.muted;
+          const iconColor = on ? G.navActiveText : G.muted;
+          const labelColor = on ? G.navActiveText : G.muted;
+
           return (
             <button
               key={t.id}
               type="button"
-              className="ts-nav-item"
+              className={on ? 'ts-nav-item ts-nav-item-active' : 'ts-nav-item'}
               onClick={() => onChange(t.id)}
               style={{
                 width: '100%',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: '11px 12px',
-                background: on ? G.goldBg : 'transparent',
-                border: on ? `1px solid ${G.gold}33` : '1px solid transparent',
+                padding: '10px 14px',
+                background: on ? G.navActive : 'transparent',
+                border: 'none',
                 borderRadius: RADIUS.md,
                 cursor: 'pointer',
-                marginBottom: 4,
+                marginBottom: 2,
                 textAlign: 'left',
-                transition:
-                  'background .15s ease, border-color .15s ease, color .15s ease',
+                transition: 'background .15s ease, color .15s ease',
               }}
             >
               <span
                 style={{
-                  width: 22,
-                  height: 22,
+                  width: 20,
+                  height: 20,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  color,
+                  color: iconColor,
                   flexShrink: 0,
+                  opacity: on ? 1 : 0.85,
                 }}
               >
-                <NavIcon id={t.icon || t.id} size={20} color={color} />
+                <NavIcon id={t.icon || t.id} size={19} color={iconColor} />
               </span>
               <span
                 style={{
-                  fontSize: 13,
-                  color: on ? G.gold : G.muted2,
+                  fontSize: 15,
+                  color: labelColor,
                   fontWeight: on ? 600 : 500,
-                  letterSpacing: 0.1,
+                  letterSpacing: 0,
+                  lineHeight: 1.3,
                 }}
               >
                 {t.label}

@@ -29,27 +29,14 @@ export function StatCard({
         position: 'relative',
         background: G.card,
         border: `1px solid ${G.border}`,
-        borderRadius: RADIUS.xl,
-        padding: '16px 16px 14px',
-        boxShadow: G.shadow,
+        borderRadius: RADIUS.lg,
+        padding: '16px 18px',
         minWidth: 0,
         overflow: 'hidden',
-        transition: 'transform .18s ease, box-shadow .18s ease, border-color .18s ease',
+        transition: 'transform .18s ease, border-color .18s ease',
         ...sx,
       }}
     >
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 3,
-          background: `linear-gradient(90deg, ${color}, ${color}66)`,
-        }}
-      />
-
       <div
         style={{
           display: 'flex',
@@ -64,7 +51,6 @@ export function StatCard({
               ...TYPE.small,
               color: G.muted,
               fontWeight: 500,
-              letterSpacing: 0.2,
               marginBottom: 8,
             }}
           >
@@ -72,10 +58,10 @@ export function StatCard({
           </div>
           <div
             style={{
-              fontSize: 26,
+              fontSize: 24,
               fontWeight: 700,
               color: G.text,
-              letterSpacing: -0.45,
+              letterSpacing: -0.4,
               lineHeight: 1.15,
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -103,8 +89,8 @@ export function StatCard({
                     ...TYPE.small,
                     fontWeight: 600,
                     color: trend.up === false ? G.danger : G.success,
-                    background: (trend.up === false ? G.danger : G.success) + '14',
-                    borderRadius: RADIUS.pill,
+                    background: (trend.up === false ? G.danger : G.success) + '18',
+                    borderRadius: RADIUS.sm,
                     padding: '2px 8px',
                   }}
                 >
@@ -118,17 +104,16 @@ export function StatCard({
         {icon != null && (
           <div
             style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              background: `linear-gradient(145deg, ${color}22, ${color}0D)`,
-              border: `1px solid ${color}33`,
+              width: 40,
+              height: 40,
+              borderRadius: RADIUS.md,
+              background: `${color}14`,
+              border: `1px solid ${color}28`,
               color,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              boxShadow: `0 4px 12px ${color}18`,
             }}
           >
             {icon}
@@ -153,7 +138,7 @@ export function StatsGrid({ children, columns = 4, style: sx }: StatsGridProps) 
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-        gap: 10,
+        gap: 12,
         marginBottom: 20,
         ...sx,
       }}

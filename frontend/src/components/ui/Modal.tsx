@@ -66,7 +66,7 @@ export function Modal({
           flexDirection: 'column',
           background: G.card,
           border: `1px solid ${G.border}`,
-          borderRadius: RADIUS.xl,
+          borderRadius: RADIUS.lg,
           boxShadow: G.shadowHover,
           overflow: 'hidden',
         }}
@@ -87,7 +87,7 @@ export function Modal({
             {title ? (
               <h2
                 id="ts-modal-title"
-                style={{ margin: 0, fontSize: 18, fontWeight: 600, color: G.text }}
+                style={{ margin: 0, fontSize: 17, fontWeight: 600, color: G.text, letterSpacing: -0.2 }}
               >
                 {title}
               </h2>

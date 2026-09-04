@@ -63,7 +63,7 @@ function ConfirmDialog({
           maxWidth: 420,
           background: G.card,
           border: `1px solid ${G.border}`,
-          borderRadius: RADIUS.xl,
+          borderRadius: RADIUS.lg,
           boxShadow: G.shadowHover,
           padding: 20,
         }}

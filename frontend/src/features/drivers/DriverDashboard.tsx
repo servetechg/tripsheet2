@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { G, FONT_MONO } from '@/lib/theme';
+import { useState, useEffect, useMemo, useId } from 'react';
+import { G, FONT_MONO, labelBase } from '@/lib/theme';
 import { Btn, Card, Pill, SectionTitle, Skeleton, Sel, Icons } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { uid } from '@/lib/uid';
@@ -78,6 +78,7 @@ export function DriverDashboard({
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
   const tabLoading = useFakeLoad(tab, 350);
+  const availabilitySelectId = useId();
 
   useEffect(() => {
     if (!apiEnabled || tab !== 'contract') return;
@@ -257,7 +258,7 @@ export function DriverDashboard({
         } else {
           await tripSheetsApi.create({
             companyId: company.id,
-            driverId: user.id,
+            driverId: recordId,
             header: s.header,
             trips: s.trips,
             expenses: s.expenses,
@@ -471,24 +472,33 @@ export function DriverDashboard({
               )}
               <Card style={{ marginBottom: 10 }}>
                 <SectionTitle>MY AVAILABILITY</SectionTitle>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 180 }}>
-                    <Sel
-                      label="Status"
-                      value={availabilityStatus}
-                      onChange={(e) => setAvailabilityStatus(e.target.value)}
-                    >
-                      {(['available', 'off_duty', 'vacation', 'unavailable'] as const).map(
-                        (s) => (
-                          <option key={s} value={s}>
-                            {AVAILABILITY_LABELS[s]}
-                          </option>
-                        ),
-                      )}
-                    </Sel>
-                  </div>
+                <label htmlFor={availabilitySelectId} style={labelBase()}>
+                  Status
+                </label>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: 10,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Sel
+                    id={availabilitySelectId}
+                    style={{ marginBottom: 0, flex: 1, minWidth: 0 }}
+                    value={availabilityStatus}
+                    onChange={(e) => setAvailabilityStatus(e.target.value)}
+                  >
+                    {(['available', 'off_duty', 'vacation', 'unavailable'] as const).map(
+                      (s) => (
+                        <option key={s} value={s}>
+                          {AVAILABILITY_LABELS[s]}
+                        </option>
+                      ),
+                    )}
+                  </Sel>
                   <Btn
                     size="sm"
+                    style={{ flexShrink: 0, minHeight: 42 }}
                     disabled={
                       availBusy ||
                       availabilityStatus === (user.availabilityStatus || 'available')
@@ -842,7 +852,7 @@ export function DriverDashboard({
           )}
 
           {tab === 'contract' && (
-            <div style={{ padding: '14px 14px 30px' }}>
+            <div>
               <div
                 style={{
                   fontSize: 10,

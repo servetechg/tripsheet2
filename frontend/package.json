@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "playwright test tests/e2e-full.spec.ts"
   },
   "dependencies": {
     "@tripsheet/shared": "file:../shared",
@@ -16,6 +17,7 @@
     "react-router-dom": "^7.6.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.20.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",

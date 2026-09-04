@@ -112,12 +112,10 @@ async function resetEmptyOpsSchema(
 export async function syncTenantOpsSchemas(
   tenantUrl: string,
   opts?: { quiet?: boolean },
-): Promise<void> {
+): Promise<boolean> {
   const dirs = resolveSchemaDirs();
   if (!dirs.length) {
-    throw new Error(
-      'No sibling Prisma projects found (driver-service, fleet-service, …)',
-    );
+    return false;
   }
   const admin = new Client({ connectionString: tenantUrl });
   await admin.connect();
@@ -139,6 +137,7 @@ export async function syncTenantOpsSchemas(
   } finally {
     await admin.end().catch(() => undefined);
   }
+  return true;
 }
 
 /**

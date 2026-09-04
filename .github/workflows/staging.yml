@@ -29,11 +29,13 @@ jobs:
   build-and-push:
     needs: meta
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         include:
           - name: gateway
@@ -78,7 +80,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push ${{ matrix.name }}
+      - name: Pre-pull base images (Docker Hub flake guard)
+        run: |
+          set -euo pipefail
+          pull_retry() {
+            local img="$1"
+            local i
+            for i in 1 2 3 4 5; do
+              if docker pull "$img"; then
+                echo "pulled ${img}"
+                return 0
+              fi
+              echo "pull ${img} attempt ${i} failed — retrying..."
+              sleep $((i * 10))
+            done
+            echo "ERROR: could not pull ${img}"
+            return 1
+          }
+          pull_retry node:20-alpine
+          if [[ "${{ matrix.name }}" == "frontend" ]]; then
+            pull_retry nginx:1.27-alpine
+          fi
+
+      - name: Build & push ${{ matrix.name }} (attempt 1)
+        id: build1
+        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -90,6 +116,50 @@ jobs:
             ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:staging
           cache-from: type=gha,scope=staging-${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=staging-${{ matrix.name }}
+
+      - name: Build & push ${{ matrix.name }} (attempt 2)
+        id: build2
+        if: steps.build1.outcome == 'failure'
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          build-args: ${{ matrix.build_args || '' }}
+          tags: |
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:${{ needs.meta.outputs.image_tag }}
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:staging
+          cache-from: type=gha,scope=staging-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=staging-${{ matrix.name }}
+
+      - name: Build & push ${{ matrix.name }} (attempt 3)
+        id: build3
+        if: steps.build1.outcome == 'failure' && steps.build2.outcome == 'failure'
+        continue-on-error: true
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          build-args: ${{ matrix.build_args || '' }}
+          tags: |
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:${{ needs.meta.outputs.image_tag }}
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:staging
+          cache-from: type=gha,scope=staging-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=staging-${{ matrix.name }}
+
+      - name: Verify image build
+        if: always()
+        run: |
+          if [[ "${{ steps.build1.outcome }}" == "success" \
+             || "${{ steps.build2.outcome }}" == "success" \
+             || "${{ steps.build3.outcome }}" == "success" ]]; then
+            echo "Build succeeded for ${{ matrix.name }}"
+            exit 0
+          fi
+          echo "All build attempts failed for ${{ matrix.name }}"
+          exit 1
 
   deploy:
     needs: [meta, build-and-push]

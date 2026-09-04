@@ -10,6 +10,7 @@ import { ProvisioningService } from '../tenants/provisioning.service';
 import { toTenantSlug } from '../platform/crypto.util';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { stripInternalTenantFields } from '../tenants/tenant-error.util';
 
 @Injectable()
 export class CompaniesService {
@@ -21,31 +22,48 @@ export class CompaniesService {
   ) {}
 
   findAll() {
-    return this.prisma.company.findMany({
-      orderBy: { name: 'asc' },
-      include: {
-        plan: true,
-        subscription: true,
-        tenantDatabase: {
-          select: {
-            id: true,
-            dbName: true,
-            status: true,
-            host: true,
-            port: true,
-            schemaVersion: true,
-            routingMode: true,
-            etlStatus: true,
-            writeFreeze: true,
-            etlVerifiedAt: true,
-            cutoverAt: true,
-            archivedAt: true,
-            provisionedAt: true,
-            lastError: true,
+    return this.prisma.company
+      .findMany({
+        orderBy: { name: 'asc' },
+        include: {
+          plan: true,
+          subscription: true,
+          tenantDatabase: {
+            select: {
+              id: true,
+              dbName: true,
+              status: true,
+              host: true,
+              port: true,
+              schemaVersion: true,
+              routingMode: true,
+              etlStatus: true,
+              writeFreeze: true,
+              etlVerifiedAt: true,
+              cutoverAt: true,
+              archivedAt: true,
+              provisionedAt: true,
+              lastError: true,
+              lastErrorCode: true,
+              lastErrorMessage: true,
+              lastErrorSeverity: true,
+            },
           },
         },
-      },
-    });
+      })
+      .then((rows) => rows.map((c) => this.presentCompany(c)));
+  }
+
+  private presentCompany<T extends { tenantDatabase?: Record<string, unknown> | null }>(
+    company: T,
+  ) {
+    if (!company.tenantDatabase) return company;
+    return {
+      ...company,
+      tenantDatabase: stripInternalTenantFields(company.tenantDatabase, {
+        includeTechnicalDetail: true,
+      }),
+    };
   }
 
   async findOne(id: string) {
@@ -70,6 +88,9 @@ export class CompaniesService {
             archivedAt: true,
             provisionedAt: true,
             lastError: true,
+            lastErrorCode: true,
+            lastErrorMessage: true,
+            lastErrorSeverity: true,
           },
         },
       },
@@ -77,7 +98,7 @@ export class CompaniesService {
     if (!company) {
       throw new NotFoundException(`Company ${id} not found`);
     }
-    return company;
+    return this.presentCompany(company);
   }
 
   async create(dto: CreateCompanyDto) {

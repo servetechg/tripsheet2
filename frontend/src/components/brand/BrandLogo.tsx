@@ -19,6 +19,7 @@ export function BrandLogo({
   height = 28,
   style,
   alt = BRAND.name,
+  className,
   ...rest
 }: BrandLogoProps) {
   const src = variant === 'mark' ? BRAND.favicon : BRAND.logo;
@@ -27,6 +28,7 @@ export function BrandLogo({
       src={src}
       alt={alt}
       height={height}
+      className={['ts-brand-logo', className].filter(Boolean).join(' ')}
       style={{
         height,
         width: 'auto',

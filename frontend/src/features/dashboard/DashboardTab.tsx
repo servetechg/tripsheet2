@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { G, RADIUS, SPACE, TYPE } from '@/lib/theme';
 import { Btn, Card, Icons, Pill, StatCard, StatsGrid } from '@/components/ui';
 import { BrandLogo } from '@/components/brand/BrandLogo';
@@ -119,7 +119,6 @@ function DonutChart({
           background: `conic-gradient(${stops})`,
           position: 'relative',
           flexShrink: 0,
-          boxShadow: G.shadow,
         }}
       >
         <div
@@ -199,6 +198,7 @@ export function DashboardTab({
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
+  const searchId = useId();
 
   useEffect(() => {
     const t = window.setInterval(() => setNow(formatNow()), 30_000);
@@ -356,13 +356,12 @@ export function DashboardTab({
             style={{
               width: 48,
               height: 48,
-              borderRadius: 14,
+              borderRadius: RADIUS.lg,
               background: G.card,
               border: `1px solid ${G.border}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: G.shadow,
               flexShrink: 0,
               overflow: 'hidden',
             }}
@@ -473,6 +472,9 @@ export function DashboardTab({
             }}
           >
             <div style={{ position: 'relative', flex: '1 1 220px', minWidth: 0 }}>
+              <label htmlFor={searchId} className="ts-sr-only">
+                Search trip sheets
+              </label>
               <span
                 style={{
                   position: 'absolute',
@@ -486,6 +488,9 @@ export function DashboardTab({
                 {Icons.search({ size: 16 })}
               </span>
               <input
+                id={searchId}
+                type="search"
+                className="ts-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search driver, truck, dates…"
@@ -494,12 +499,13 @@ export function DashboardTab({
                   boxSizing: 'border-box',
                   padding: '11px 12px 11px 36px',
                   borderRadius: RADIUS.md,
-                  border: `1px solid ${G.border2}`,
+                  border: `1px solid ${G.border}`,
                   background: G.card2,
                   color: G.text,
                   fontSize: 14,
                   outline: 'none',
                   fontFamily: 'inherit',
+                  minHeight: 42,
                 }}
               />
             </div>

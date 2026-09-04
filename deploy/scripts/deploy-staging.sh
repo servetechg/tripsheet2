@@ -36,34 +36,25 @@ if [[ -z "${STAGING_DOMAIN:-}" ]]; then
   exit 1
 fi
 
-echo "==> Pulling/starting ${PROJECT} with tag ${IMAGE_TAG}"
-echo "    registry: ${IMAGE_REGISTRY}"
-if ! docker pull "${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}" >/dev/null 2>&1; then
-  echo "ERROR: cannot pull ${IMAGE_REGISTRY}/gateway:${IMAGE_TAG}"
-  echo "  - Staging CI publishes tags: <12-char-sha> and 'staging'"
-  echo "  - Production CI publishes tags: <12-char-sha> and 'latest'"
-  echo "  - Do not use git short sha (7 chars) or 'local' with GHCR"
-  echo "  - Run GitHub Actions first, then: docker login ghcr.io"
-  echo "  - Example: ./deploy/scripts/deploy-staging.sh staging"
-  exit 1
-fi
-
+echo "==> Pulling all images for ${PROJECT} (tag ${IMAGE_TAG})"
 IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" \
   --env-file "${APP_ENV}" \
-  up -d --pull missing
+  pull
+
+echo "==> Running Prisma migrations (one-off containers, before app start)"
+IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+  "${ROOT_DIR}/deploy/scripts/run-prisma-migrations.sh" \
+  "${PROJECT}" "${DEPLOY_DIR}/compose.staging.yml" "${APP_ENV}"
+
+echo "==> Starting ${PROJECT} (force-recreate with fresh images)"
+IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
+  docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" \
+  --env-file "${APP_ENV}" \
+  up -d --force-recreate --remove-orphans
 
 echo "==> Waiting for containers to start"
 sleep 8
-
-echo "==> Running Prisma migrations (staging DBs)"
-SERVICES=(auth-service company-service driver-service fleet-service manifest-service tripsheet-service accounting-service notification-service)
-for svc in "${SERVICES[@]}"; do
-  echo "  migrate: ${svc}"
-  IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
-    docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.staging.yml" --env-file "${APP_ENV}" \
-    exec -T "${svc}" npx prisma migrate deploy
-done
 
 echo "==> Waiting for staging health endpoints"
 PORTS=(
@@ -102,7 +93,11 @@ fi
 echo "  ok gateway"
 
 echo "==> Reloading Caddy (prod + staging hosts)"
-docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d
+docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d --force-recreate caddy
+
+echo "==> Staging image verification"
+docker inspect staging-frontend --format '    frontend image: {{.Config.Image}}' 2>/dev/null || true
+docker inspect staging-frontend --format '    frontend created: {{.Created}}' 2>/dev/null || true
 
 echo "==> Staging smoke checks"
 for _ in $(seq 1 30); do

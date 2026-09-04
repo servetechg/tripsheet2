@@ -136,7 +136,6 @@ function StaffOnboarding({
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
             hint={invite.passwordPolicy?.hint}
             style={{ marginBottom: 0 }}
           />
@@ -214,7 +213,7 @@ function LoginRoute() {
     <LoginScreen
       onLogin={(u: AppUser) => {
         login(u);
-        navigate(homePathForRole(u.role), { replace: true });
+        navigate(homePathForRole(u.role));
       }}
       themeMode={themeMode}
       onToggleTheme={toggleTheme}
@@ -675,7 +674,7 @@ export function AppRoutes() {
     link.id = 'ts-font-link';
     link.rel = 'stylesheet';
     link.href =
-      'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap';
+      'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap';
     document.head.appendChild(link);
   }, []);
 

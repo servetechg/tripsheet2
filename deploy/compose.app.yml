@@ -74,7 +74,7 @@ services:
       TENANT_DB_HOST: postgres
       TENANT_DB_PORT: 5432
       SHARED_DB_BASE: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
-      TENANT_DEFAULT_ROUTING_MODE: ${TENANT_DEFAULT_ROUTING_MODE:-shared}
+      TENANT_DEFAULT_ROUTING_MODE: ${TENANT_DEFAULT_ROUTING_MODE:-tenant}
     networks:
       - tripsheet-net
 
