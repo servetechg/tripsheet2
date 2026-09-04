@@ -269,10 +269,6 @@ export class ProvisioningService {
     }
 
     const ciphertext = encryptSecret(tenantUrl);
-    const defaultRouting =
-      this.config.get<string>('TENANT_DEFAULT_ROUTING_MODE') === 'tenant'
-        ? 'tenant'
-        : 'shared';
     const updated = await this.prisma.tenantDatabase.update({
       where: { companyId },
       data: {
@@ -280,7 +276,7 @@ export class ProvisioningService {
         connectionCiphertext: ciphertext,
         lastError: '',
         schemaVersion: '3',
-        routingMode: defaultRouting,
+        routingMode: 'tenant',
         provisionedAt: new Date(),
         host: admin.host,
         port: admin.port,

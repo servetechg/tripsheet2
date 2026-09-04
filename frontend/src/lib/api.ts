@@ -212,6 +212,7 @@ export type AuthUserDto = {
   permissions?: string[];
   customRoleId?: string | null;
   customRoleName?: string | null;
+  driverId?: string | null;
   mfaEnabled?: boolean;
   session?: SessionDto;
   createdAt?: string;
@@ -839,32 +840,6 @@ export const tenantsApi = {
     ),
   provisionPending: () =>
     api('/tenants/provision-pending', { method: 'POST' }),
-  setRoutingMode: (companyId: string, routingMode: 'shared' | 'tenant') =>
-    api(`/tenants/${encodeURIComponent(companyId)}/routing-mode`, {
-      method: 'PATCH',
-      body: JSON.stringify({ routingMode }),
-    }),
-  migrate: (companyId: string) =>
-    api(`/tenants/${encodeURIComponent(companyId)}/migrate`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
-  verify: (companyId: string) =>
-    api(`/tenants/${encodeURIComponent(companyId)}/verify`, {
-      method: 'POST',
-    }),
-  cutover: (companyId: string, force = false) =>
-    api(`/tenants/${encodeURIComponent(companyId)}/cutover`, {
-      method: 'POST',
-      body: JSON.stringify({ force }),
-    }),
-  archiveShared: (companyId: string) =>
-    api(`/tenants/${encodeURIComponent(companyId)}/archive-shared`, {
-      method: 'POST',
-      body: JSON.stringify({}),
-    }),
-  migrateAll: () =>
-    api('/tenants/migrate-all', { method: 'POST' }),
   schemaMigrateAll: () =>
     api<{ migrated: number; ok: number; results: unknown[] }>(
       '/tenants/schema-migrate-all',

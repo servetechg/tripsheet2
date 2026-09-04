@@ -49,6 +49,7 @@ function finishSession(
     permissions: res.user.permissions ?? [],
     customRoleId: res.user.customRoleId ?? null,
     customRoleName: res.user.customRoleName ?? null,
+    driverRecordId: res.user.driverId ?? null,
   });
 }
 
@@ -322,6 +323,7 @@ export function LoginScreen({
                     permissions: me.permissions ?? [],
                     customRoleId: me.customRoleId ?? null,
                     customRoleName: me.customRoleName ?? null,
+                    driverRecordId: me.driverId ?? null,
                   });
                 });
               }}

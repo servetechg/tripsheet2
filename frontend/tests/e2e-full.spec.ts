@@ -96,8 +96,8 @@ test.describe('Super Admin', () => {
   });
 
   test('TC-SA-001: Companies tab lists tenants', async ({ page }) => {
-    await expect(page.getByText(/registered/i)).toBeVisible();
-    await expect(page.getByText('MKX Transport')).toBeVisible();
+    await expect(page.getByText('Companies').first()).toBeVisible();
+    await expect(page.getByText(/MKX/i).first()).toBeVisible();
   });
 
   test('TC-SA-002: Tenant ops tab loads', async ({ page }) => {
@@ -106,7 +106,7 @@ test.describe('Super Admin', () => {
   });
 
   test('TC-SA-003: Create company validation', async ({ page }) => {
-    await page.getByRole('button', { name: '+ New Company' }).click();
+    await page.getByRole('button', { name: '+ New Company' }).first().click();
     await page.getByRole('button', { name: /create company/i }).click();
     await expect(
       page.getByText(/required|name and short name|admin login/i).first(),

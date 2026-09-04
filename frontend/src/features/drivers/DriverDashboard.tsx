@@ -258,7 +258,7 @@ export function DriverDashboard({
         } else {
           await tripSheetsApi.create({
             companyId: company.id,
-            driverId: user.id,
+            driverId: recordId,
             header: s.header,
             trips: s.trips,
             expenses: s.expenses,

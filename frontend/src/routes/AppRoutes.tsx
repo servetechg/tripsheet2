@@ -213,7 +213,7 @@ function LoginRoute() {
     <LoginScreen
       onLogin={(u: AppUser) => {
         login(u);
-        navigate(homePathForRole(u.role), { replace: true });
+        navigate(homePathForRole(u.role));
       }}
       themeMode={themeMode}
       onToggleTheme={toggleTheme}

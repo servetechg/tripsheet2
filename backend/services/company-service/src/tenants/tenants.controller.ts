@@ -10,7 +10,6 @@ import {
 } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { ProvisioningService } from './provisioning.service';
-import { EtlService } from './etl.service';
 import { TenantOpsService } from './tenant-ops.service';
 import { TenantLocalService } from '../org/tenant-local.service';
 
@@ -19,7 +18,6 @@ export class TenantsController {
   constructor(
     private readonly tenants: TenantsService,
     private readonly provisioning: ProvisioningService,
-    private readonly etl: EtlService,
     private readonly ops: TenantOpsService,
     private readonly tenantLocal: TenantLocalService,
   ) {}
@@ -42,24 +40,12 @@ export class TenantsController {
   }
 
   /**
-   * Phase 6: apply org SQL (+ optional Prisma push) to all active tenants.
-   * Safe for CI/CD after deploy — does not run ETL cutover.
+   * Apply org SQL (+ optional Prisma push) to all active tenants.
+   * Safe for CI/CD after deploy.
    */
   @Post('tenants/schema-migrate-all')
   schemaMigrateAll() {
     return this.ops.schemaMigrateAll('superadmin');
-  }
-
-  /** Phase 4: ETL all active tenants (sync + copy + verify). */
-  @Post('tenants/migrate-all')
-  migrateAll() {
-    return this.etl.migrateAll('superadmin');
-  }
-
-  /** Phase 4: cut over all verified tenants to routingMode=tenant. */
-  @Post('tenants/cutover-all')
-  cutoverAll() {
-    return this.etl.cutoverAllVerified('superadmin');
   }
 
   @Get('tenants/:companyId')
@@ -69,7 +55,7 @@ export class TenantsController {
     return { ...safe, hasConnection: Boolean(conn.connectionUrl) };
   }
 
-  /** Provision or retry tenant DB (Phase 2). */
+  /** Provision or retry tenant DB. */
   @Post('tenants/:companyId/provision')
   provision(
     @Param('companyId') companyId: string,
@@ -89,74 +75,6 @@ export class TenantsController {
   ) {
     return this.provisioning.deprovisionCompany(companyId, {
       dropDatabase: dropDatabase === 'true' || dropDatabase === '1',
-      actorName: 'superadmin',
-    });
-  }
-
-  /** Phase 3: switch ops traffic between shared service DB and fq_tenant_*. */
-  @Patch('tenants/:companyId/routing-mode')
-  setRoutingMode(
-    @Param('companyId') companyId: string,
-    @Body() body: { routingMode: 'shared' | 'tenant' },
-  ) {
-    const mode = body?.routingMode === 'tenant' ? 'tenant' : 'shared';
-    return this.tenants.setRoutingMode(companyId, mode);
-  }
-
-  /** Phase 4: sync schemas + copy shared rows + verify counts/checksums. */
-  @Post('tenants/:companyId/migrate')
-  migrate(
-    @Param('companyId') companyId: string,
-    @Body() body?: { skipSync?: boolean },
-  ) {
-    return this.etl.migrateCompany(companyId, {
-      skipSync: Boolean(body?.skipSync),
-      actorName: 'superadmin',
-    });
-  }
-
-  @Post('tenants/:companyId/verify')
-  verify(@Param('companyId') companyId: string) {
-    return this.etl.verifyCompany(companyId);
-  }
-
-  @Post('tenants/:companyId/freeze')
-  freeze(
-    @Param('companyId') companyId: string,
-    @Body() body?: { freeze?: boolean },
-  ) {
-    return this.etl.setWriteFreeze(
-      companyId,
-      body?.freeze !== false,
-      'superadmin',
-    );
-  }
-
-  @Post('tenants/:companyId/unfreeze')
-  unfreeze(@Param('companyId') companyId: string) {
-    return this.etl.setWriteFreeze(companyId, false, 'superadmin');
-  }
-
-  /** Phase 4: flip routingMode=tenant after verified ETL. */
-  @Post('tenants/:companyId/cutover')
-  cutover(
-    @Param('companyId') companyId: string,
-    @Body() body?: { force?: boolean },
-  ) {
-    return this.etl.cutoverCompany(companyId, {
-      force: Boolean(body?.force),
-      actorName: 'superadmin',
-    });
-  }
-
-  /** Phase 4: delete company rows from shared microservice DBs. */
-  @Post('tenants/:companyId/archive-shared')
-  archive(
-    @Param('companyId') companyId: string,
-    @Body() body?: { force?: boolean },
-  ) {
-    return this.etl.archiveSharedData(companyId, {
-      force: Boolean(body?.force),
       actorName: 'superadmin',
     });
   }

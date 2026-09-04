@@ -13,7 +13,7 @@
     "seed": "ts-node prisma/seed.ts",
     "provision:pending": "ts-node --transpile-only scripts/provision-pending-tenants.ts",
     "sync:tenant-schemas": "ts-node --transpile-only scripts/sync-tenant-schemas.ts",
-    "migrate:tenants": "ts-node --transpile-only scripts/migrate-all-tenants.ts",
+    "migrate:tenants": "npm run schema:migrate-all",
     "schema:migrate-all": "ts-node --transpile-only scripts/schema-migrate-all.ts",
     "test:rbac": "ts-node --transpile-only src/org/check-custom-roles.ts && ts-node --transpile-only src/mdm/check-party-status.ts && ts-node --transpile-only src/mdm/check-merge.ts && ts-node --transpile-only src/mdm/check-catalog.ts && ts-node --transpile-only src/mdm/check-border.ts && ts-node --transpile-only src/mdm/check-ops-ref.ts && ts-node --transpile-only src/mdm/check-csv.ts && ts-node --transpile-only src/mdm/check-chapter5-acceptance.ts",
     "test:mdm:acceptance": "ts-node --transpile-only src/mdm/check-chapter5-acceptance.ts",

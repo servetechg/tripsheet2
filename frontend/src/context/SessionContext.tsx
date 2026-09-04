@@ -59,6 +59,7 @@ function toAppUser(u: {
   permissions?: string[];
   customRoleId?: string | null;
   customRoleName?: string | null;
+  driverId?: string | null;
 }): AppUser {
   return {
     id: u.id,
@@ -70,6 +71,7 @@ function toAppUser(u: {
     permissions: u.permissions ?? [],
     customRoleId: u.customRoleId ?? null,
     customRoleName: u.customRoleName ?? null,
+    driverRecordId: u.driverId ?? null,
   };
 }
 
