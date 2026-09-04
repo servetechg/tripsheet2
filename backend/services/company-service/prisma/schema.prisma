@@ -79,7 +79,14 @@ model TenantDatabase {
   status               String    @default("pending_provision")
   /// AES-256-GCM payload (base64); empty until provisioned
   connectionCiphertext String    @default("")
+  /// Internal diagnostic (logs / support); not shown in UI
   lastError            String    @default("")
+  /// Stable code e.g. TENANT_PROVISION_FAILED
+  lastErrorCode        String    @default("")
+  /// User-facing admin message
+  lastErrorMessage     String    @default("")
+  /// error | warning | info
+  lastErrorSeverity    String    @default("")
   schemaVersion        String    @default("1")
   /// Phase 3: shared = ops on microservice DB; tenant = ops on fq_tenant_*
   routingMode          String    @default("shared")

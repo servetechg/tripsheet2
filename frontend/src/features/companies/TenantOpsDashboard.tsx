@@ -3,6 +3,7 @@ import { G } from '@/lib/theme';
 import { Btn, Card, Pill, SectionTitle } from '@/components/ui';
 import { tenantsApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { TenantIssueAlert } from '@/components/feedback/TenantIssueAlert';
 
 type OpsSummary = {
   generatedAt: string;
@@ -24,7 +25,13 @@ type OpsSummary = {
     status: string;
     routingMode: string;
     schemaVersion: string;
-    lastError: string;
+    issue?: {
+      code: string;
+      message: string;
+      severity: 'error' | 'warning' | 'info';
+      actionable?: boolean;
+      technicalDetail?: string;
+    } | null;
     sizePretty: string;
     connections: number;
     writeFreeze: boolean;
@@ -177,10 +184,8 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
                 schema v{row.schemaVersion}
                 {row.writeFreeze ? ' · frozen' : ''}
               </div>
-              {row.lastError ? (
-                <div style={{ fontSize: 11, color: G.danger, marginTop: 6 }}>
-                  {row.lastError}
-                </div>
+              {row.issue ? (
+                <TenantIssueAlert issue={row.issue} style={{ marginTop: 6 }} />
               ) : null}
             </div>
             <div style={{ textAlign: 'right' }}>

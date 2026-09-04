@@ -29,6 +29,10 @@ import {
   DEFAULT_PAYROLL_CATEGORIES,
   REF_KIND_EXPENSE,
 } from '../mdm/ops-ref.util';
+import {
+  clearTenantErrorFields,
+  tenantErrorWriteFields,
+} from './tenant-error.util';
 
 @Injectable()
 export class ProvisioningService {
@@ -117,7 +121,7 @@ export class ProvisioningService {
       where: { companyId },
       data: {
         status: 'provisioning',
-        lastError: '',
+        ...clearTenantErrorFields(),
         dbName,
         host: admin.host,
         port: admin.port,
@@ -274,7 +278,7 @@ export class ProvisioningService {
       data: {
         status: 'active',
         connectionCiphertext: ciphertext,
-        lastError: '',
+        ...clearTenantErrorFields(),
         schemaVersion: '3',
         routingMode: 'tenant',
         provisionedAt: new Date(),
@@ -537,7 +541,7 @@ export class ProvisioningService {
     this.logger.error(`Provision failed for ${dbName}: ${message}`);
     await this.prisma.tenantDatabase.update({
       where: { companyId },
-      data: { status: 'failed', lastError: message.slice(0, 2000) },
+      data: { status: 'failed', ...tenantErrorWriteFields(message) },
     });
     await this.prisma.company.update({
       where: { id: companyId },
@@ -612,7 +616,9 @@ export class ProvisioningService {
         connectionCiphertext: opts?.dropDatabase
           ? ''
           : row.connectionCiphertext,
-        lastError: opts?.dropDatabase ? 'database dropped' : '',
+        ...(opts?.dropDatabase
+          ? tenantErrorWriteFields('database dropped')
+          : clearTenantErrorFields()),
       },
     });
     await this.prisma.company.update({
@@ -689,7 +695,7 @@ export class ProvisioningService {
       data: {
         status: 'active',
         connectionCiphertext: ciphertext,
-        lastError: '',
+        ...clearTenantErrorFields(),
         dbName,
         host: admin.host,
         port: admin.port,

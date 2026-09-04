@@ -10,6 +10,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { companiesApi, authApi, plansApi, tenantsApi } from '@/lib/api';
 import { isCompanyOwnerRole } from '@tripsheet/shared';
 import { notify } from '@/components/feedback/Toast';
+import { TenantIssueAlert, tenantNeedsAttention } from '@/components/feedback/TenantIssueAlert';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
 
 const PLAN_FALLBACK = [
@@ -298,8 +299,7 @@ export function SuperAdminPanel({
             companies.filter(
               (c: any) =>
                 !c.active ||
-                c.tenantDatabase?.status === 'failed' ||
-                c.tenantDatabase?.lastError,
+                tenantNeedsAttention(c.tenantDatabase),
             ).length,
           ],
         ].map(([label, value]) => (
@@ -566,21 +566,8 @@ export function SuperAdminPanel({
                     <MetaCell label="Database" value={dbName} mono />
                   </div>
 
-                  {c.tenantDatabase?.lastError ? (
-                    <div
-                      style={{
-                        marginTop: 12,
-                        padding: '10px 12px',
-                        borderRadius: RADIUS.md,
-                        background: G.dangerBg,
-                        border: `1px solid ${G.danger}33`,
-                        fontSize: 12,
-                        color: G.danger,
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {c.tenantDatabase.lastError}
-                    </div>
+                  {c.tenantDatabase?.issue ? (
+                    <TenantIssueAlert issue={c.tenantDatabase.issue} />
                   ) : null}
                 </div>
               </div>
