@@ -1,0 +1,3 @@
+ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "brokerId" TEXT;
+ALTER TABLE "Invoice" ADD COLUMN IF NOT EXISTS "brokerName" TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS "Invoice_brokerId_idx" ON "Invoice"("brokerId");

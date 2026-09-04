@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Pill, SectionTitle, Skeleton, Icons } from '@/components/ui';
+import { Btn, Card, Pill, SectionTitle, Skeleton, Sel, Icons } from '@/components/ui';
 import { useFakeLoad } from '@/hooks/useFakeLoad';
 import { uid } from '@/lib/uid';
 import { notify } from '@/components/feedback/Toast';
@@ -14,7 +14,12 @@ import {
   tripSheetsApi,
   documentsApi,
   contractsApi,
+  driversApi,
+  settlementsApi,
 } from '@/lib/api';
+import {
+  AVAILABILITY_LABELS,
+} from '@/lib/driverLifecycle';
 import {
   driverRecordIdOf,
   matchesDriverRef,
@@ -63,6 +68,12 @@ export function DriverDashboard({
       matchesDriverRef(d.driverId, user) && d.type === '__contract__',
   );
   const [apiContract, setApiContract] = useState<any>(null);
+  const [qualifications, setQualifications] = useState<any[]>([]);
+  const [settlements, setSettlements] = useState<any[]>([]);
+  const [availabilityStatus, setAvailabilityStatus] = useState(
+    user.availabilityStatus || 'available',
+  );
+  const [availBusy, setAvailBusy] = useState(false);
   const myContract = apiEnabled ? apiContract || localContract : localContract;
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
@@ -94,6 +105,94 @@ export function DriverDashboard({
       cancelled = true;
     };
   }, [apiEnabled, tab, recordId, company.id]);
+
+  useEffect(() => {
+    if (!apiEnabled || !recordId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [quals, stl] = await Promise.all([
+          driversApi.qualifications(recordId),
+          settlementsApi.list({ companyId: company.id, driverId: recordId }),
+        ]);
+        if (!cancelled) {
+          setQualifications(Array.isArray(quals) ? quals : []);
+          setSettlements(Array.isArray(stl) ? stl : []);
+        }
+      } catch {
+        if (!cancelled) {
+          setQualifications([]);
+          setSettlements([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, recordId, company.id]);
+
+  useEffect(() => {
+    setAvailabilityStatus(user.availabilityStatus || 'available');
+  }, [user.availabilityStatus, user.id]);
+
+  const complianceAlerts = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const warn = new Date();
+    warn.setDate(warn.getDate() + 30);
+    const warnStr = warn.toISOString().slice(0, 10);
+    const alerts: Array<{ level: 'danger' | 'warning'; text: string }> = [];
+
+    for (const dt of DRIVER_DOC_TYPES) {
+      const doc = myDocs.find((d: any) => d.type === dt.id);
+      if (dt.required && !doc) {
+        alerts.push({ level: 'danger', text: `Missing required: ${dt.label}` });
+        continue;
+      }
+      if (doc?.status === 'expired' || (doc?.expiryDate && doc.expiryDate < today)) {
+        alerts.push({ level: 'danger', text: `Expired: ${dt.label}` });
+      } else if (
+        doc?.status === 'expiring_soon' ||
+        (doc?.expiryDate && doc.expiryDate <= warnStr)
+      ) {
+        alerts.push({
+          level: 'warning',
+          text: `Expiring soon: ${dt.label}${doc.expiryDate ? ` (${doc.expiryDate})` : ''}`,
+        });
+      }
+    }
+
+    for (const q of qualifications) {
+      if (q.status === 'expired') {
+        alerts.push({ level: 'danger', text: `Qualification expired: ${q.type}` });
+      } else if (q.status === 'expiring_soon') {
+        alerts.push({
+          level: 'warning',
+          text: `Qualification expiring: ${q.type}${q.expiryDate ? ` (${q.expiryDate})` : ''}`,
+        });
+      }
+    }
+
+    return alerts;
+  }, [myDocs, qualifications]);
+
+  const saveAvailability = async () => {
+    if (!apiEnabled || !recordId) return;
+    try {
+      setAvailBusy(true);
+      await driversApi.update(recordId, { availabilityStatus });
+      await refreshAll?.();
+      notify('Availability updated');
+    } catch (e: any) {
+      notify(e?.message || 'Failed to update availability', 'error');
+    } finally {
+      setAvailBusy(false);
+    }
+  };
+
+  const paidSettlements = settlements.filter((s) => s.status === 'paid').length;
+  const pendingSettlements = settlements.filter(
+    (s) => s.status === 'draft' || s.status === 'approved',
+  ).length;
 
   const saveDoc = async (typeId: string, fileData: any) => {
     const nd = {
@@ -286,6 +385,123 @@ export function DriverDashboard({
         <Skeleton rows={3} />
       ) : (
         <>
+          {(complianceAlerts.length > 0 || apiEnabled) && (
+            <div style={{ marginBottom: 14 }}>
+              {complianceAlerts.length > 0 && (
+                <Card
+                  style={{
+                    marginBottom: 10,
+                    border: `1px solid ${G.warning}44`,
+                    background: G.card2,
+                  }}
+                >
+                  <SectionTitle>COMPLIANCE ALERTS</SectionTitle>
+                  {complianceAlerts.slice(0, 6).map((a, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        fontSize: 12,
+                        color: a.level === 'danger' ? G.errText : G.warning,
+                        marginBottom: 6,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      {Icons.alert({
+                        size: 14,
+                        color: a.level === 'danger' ? G.danger : G.warning,
+                      })}
+                      {a.text}
+                    </div>
+                  ))}
+                  {complianceAlerts.length > 6 && (
+                    <div style={{ fontSize: 11, color: G.muted }}>
+                      +{complianceAlerts.length - 6} more — update docs in My Docs
+                    </div>
+                  )}
+                </Card>
+              )}
+              {apiEnabled && (
+              <Card style={{ marginBottom: 10 }}>
+                <SectionTitle>PAYROLL SUMMARY</SectionTitle>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: 10,
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 9, color: G.muted, letterSpacing: 2 }}>
+                      CONTRACT
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                      {myContract?.payType
+                        ? `${myContract.payRate || '—'} ${myContract.payUnit || ''}`
+                        : 'Not set'}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: G.muted, letterSpacing: 2 }}>
+                      PENDING
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                      {pendingSettlements} settlement(s)
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 9, color: G.muted, letterSpacing: 2 }}>
+                      PAID
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>
+                      {paidSettlements} settlement(s)
+                    </div>
+                  </div>
+                </div>
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  style={{ marginTop: 12 }}
+                  onClick={() => setTab('contract')}
+                >
+                  View contract & wage terms →
+                </Btn>
+              </Card>
+              )}
+              <Card style={{ marginBottom: 10 }}>
+                <SectionTitle>MY AVAILABILITY</SectionTitle>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <Sel
+                      label="Status"
+                      value={availabilityStatus}
+                      onChange={(e) => setAvailabilityStatus(e.target.value)}
+                    >
+                      {(['available', 'off_duty', 'vacation', 'unavailable'] as const).map(
+                        (s) => (
+                          <option key={s} value={s}>
+                            {AVAILABILITY_LABELS[s]}
+                          </option>
+                        ),
+                      )}
+                    </Sel>
+                  </div>
+                  <Btn
+                    size="sm"
+                    disabled={
+                      availBusy ||
+                      availabilityStatus === (user.availabilityStatus || 'available')
+                    }
+                    onClick={() => void saveAvailability()}
+                  >
+                    Save
+                  </Btn>
+                </div>
+              </Card>
+            </div>
+          )}
+
           {tab === 'sheets' && (
             <div>
               {myLoad && (

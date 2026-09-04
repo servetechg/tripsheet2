@@ -1,0 +1,180 @@
+# Staging application stack (single color — no blue/green).
+# Usage:
+#   IMAGE_TAG=abc123 IMAGE_REGISTRY=ghcr.io/ORG/tripsheet \
+#   docker compose -p tripsheet-staging -f deploy/compose.staging.yml \
+#     --env-file /opt/tripsheet/secrets/staging.app.env up -d
+
+services:
+  frontend:
+    image: ${IMAGE_REGISTRY}/frontend:${IMAGE_TAG:-latest}
+    container_name: staging-frontend
+    restart: unless-stopped
+    networks:
+      - tripsheet-net
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1/healthz || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  gateway:
+    image: ${IMAGE_REGISTRY}/gateway:${IMAGE_TAG:-latest}
+    container_name: staging-gateway
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      TENANT_RUNTIME_MODE: ${TENANT_RUNTIME_MODE:-enforce}
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+      AUTH_SESSION_CACHE_TTL_MS: ${AUTH_SESSION_CACHE_TTL_MS:-60000}
+      AUTH_SERVICE_URL: http://staging-auth-service:3001
+      DRIVER_SERVICE_URL: http://staging-driver-service:3003
+      FLEET_SERVICE_URL: http://staging-fleet-service:3004
+      MANIFEST_SERVICE_URL: http://staging-manifest-service:3005
+      TRIPSHEET_SERVICE_URL: http://staging-tripsheet-service:3006
+      ACCOUNTING_SERVICE_URL: http://staging-accounting-service:3007
+      NOTIFICATION_SERVICE_URL: http://staging-notification-service:3008
+    networks:
+      - tripsheet-net
+    depends_on:
+      - auth-service
+      - company-service
+      - driver-service
+      - fleet-service
+      - manifest-service
+      - tripsheet-service
+      - accounting-service
+      - notification-service
+
+  auth-service:
+    image: ${IMAGE_REGISTRY}/auth-service:${IMAGE_TAG:-latest}
+    container_name: staging-auth-service
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/auth_db_staging?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+    networks:
+      - tripsheet-net
+
+  company-service:
+    image: ${IMAGE_REGISTRY}/company-service:${IMAGE_TAG:-latest}
+    container_name: staging-company-service
+    restart: unless-stopped
+    environment:
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/company_db_staging?schema=public
+      PLATFORM_SECRETS_KEY: ${PLATFORM_SECRETS_KEY:?PLATFORM_SECRETS_KEY is required}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_PROVISION_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      TENANT_DB_HOST: postgres
+      TENANT_DB_PORT: 5432
+      SHARED_DB_BASE: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      TENANT_DEFAULT_ROUTING_MODE: ${TENANT_DEFAULT_ROUTING_MODE:-shared}
+    networks:
+      - tripsheet-net
+
+  driver-service:
+    image: ${IMAGE_REGISTRY}/driver-service:${IMAGE_TAG:-latest}
+    container_name: staging-driver-service
+    restart: unless-stopped
+    environment:
+      PORT: 3003
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/driver_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      AUTH_SERVICE_URL: http://staging-auth-service:3001
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: driver
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      CLOUDINARY_FOLDER: ${CLOUDINARY_FOLDER:-tripsheet/staging/documents}
+    networks:
+      - tripsheet-net
+
+  fleet-service:
+    image: ${IMAGE_REGISTRY}/fleet-service:${IMAGE_TAG:-latest}
+    container_name: staging-fleet-service
+    restart: unless-stopped
+    environment:
+      PORT: 3004
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/fleet_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: fleet
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+    networks:
+      - tripsheet-net
+
+  manifest-service:
+    image: ${IMAGE_REGISTRY}/manifest-service:${IMAGE_TAG:-latest}
+    container_name: staging-manifest-service
+    restart: unless-stopped
+    environment:
+      PORT: 3005
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/manifest_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: manifest
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+    networks:
+      - tripsheet-net
+
+  tripsheet-service:
+    image: ${IMAGE_REGISTRY}/tripsheet-service:${IMAGE_TAG:-latest}
+    container_name: staging-tripsheet-service
+    restart: unless-stopped
+    environment:
+      PORT: 3006
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/tripsheet_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: tripsheet
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+    networks:
+      - tripsheet-net
+
+  accounting-service:
+    image: ${IMAGE_REGISTRY}/accounting-service:${IMAGE_TAG:-latest}
+    container_name: staging-accounting-service
+    restart: unless-stopped
+    environment:
+      PORT: 3007
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/accounting_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: accounting
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+      FLEET_SERVICE_URL: http://staging-fleet-service:3004
+      TRIPSHEET_SERVICE_URL: http://staging-tripsheet-service:3006
+      DRIVER_SERVICE_URL: http://staging-driver-service:3003
+    networks:
+      - tripsheet-net
+
+  notification-service:
+    image: ${IMAGE_REGISTRY}/notification-service:${IMAGE_TAG:-latest}
+    container_name: staging-notification-service
+    restart: unless-stopped
+    environment:
+      PORT: 3008
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/notification_db_staging?schema=public
+      COMPANY_SERVICE_URL: http://staging-company-service:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
+      TENANT_DB_SCHEMA: notification
+      TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+    networks:
+      - tripsheet-net
+
+networks:
+  tripsheet-net:
+    external: true

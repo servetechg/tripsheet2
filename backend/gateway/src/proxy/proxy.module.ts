@@ -11,11 +11,30 @@ import { ManifestsProxyController } from './manifests.proxy.controller';
 import { TripSheetsProxyController } from './trip-sheets.proxy.controller';
 import { InvitesProxyController } from './invites.proxy.controller';
 import { DocumentsProxyController } from './documents.proxy.controller';
+import { QualificationsProxyController } from './qualifications.proxy.controller';
+import { EquipmentAssignmentsProxyController } from './equipment-assignments.proxy.controller';
+import { SafetyEventsProxyController } from './safety-events.proxy.controller';
+import { TrainingRecordsProxyController } from './training-records.proxy.controller';
 import { ContractsProxyController } from './contracts.proxy.controller';
 import { CarrierProfilesProxyController } from './carrier-profiles.proxy.controller';
 import { SettlementsProxyController } from './settlements.proxy.controller';
 import { ReportsProxyController } from './reports.proxy.controller';
 import { NotificationsProxyController } from './notifications.proxy.controller';
+import {
+  AccountsProxyController,
+  AuditProxyController,
+  BillsProxyController,
+  CommentsProxyController,
+  DvirProxyController,
+  InvoicesProxyController,
+  MaintenanceProxyController,
+  MessagesProxyController,
+  PaymentsProxyController,
+} from './extended.proxy.controllers';
+import {
+  PlansProxyController,
+  TenantsProxyController,
+} from './platform.proxy.controllers';
 
 @Module({
   imports: [
@@ -30,6 +49,8 @@ import { NotificationsProxyController } from './notifications.proxy.controller';
   controllers: [
     AuthProxyController,
     CompaniesProxyController,
+    PlansProxyController,
+    TenantsProxyController,
     DriversProxyController,
     LoadsProxyController,
     AssetsProxyController,
@@ -37,11 +58,24 @@ import { NotificationsProxyController } from './notifications.proxy.controller';
     TripSheetsProxyController,
     InvitesProxyController,
     DocumentsProxyController,
+    QualificationsProxyController,
+    EquipmentAssignmentsProxyController,
+    SafetyEventsProxyController,
+    TrainingRecordsProxyController,
     ContractsProxyController,
     CarrierProfilesProxyController,
     SettlementsProxyController,
     ReportsProxyController,
     NotificationsProxyController,
+    MaintenanceProxyController,
+    DvirProxyController,
+    InvoicesProxyController,
+    BillsProxyController,
+    PaymentsProxyController,
+    AccountsProxyController,
+    MessagesProxyController,
+    CommentsProxyController,
+    AuditProxyController,
   ],
   providers: [ProxyService],
 })

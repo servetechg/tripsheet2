@@ -1,0 +1,45 @@
+{
+	email {$CADDY_ACME_EMAIL}
+}
+
+# Production (blue/green via ACTIVE_COLOR)
+{$DOMAIN} {
+	encode gzip
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle /api* {
+		reverse_proxy {$ACTIVE_COLOR}-gateway:3000
+	}
+
+	handle /health {
+		reverse_proxy {$ACTIVE_COLOR}-gateway:3000
+	}
+
+	handle {
+		reverse_proxy {$ACTIVE_COLOR}-frontend:80
+	}
+}
+
+# Staging (single stack)
+{$STAGING_DOMAIN} {
+	encode gzip
+
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	handle /api* {
+		reverse_proxy staging-gateway:3000
+	}
+
+	handle /health {
+		reverse_proxy staging-gateway:3000
+	}
+
+	handle {
+		reverse_proxy staging-frontend:80
+	}
+}

@@ -1,13 +1,19 @@
-import { useState, useRef, useEffect, Fragment } from 'react';
+import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
+import { companiesApi, driversApi } from '@/lib/api';
+import {
+  availabilityAllowsDispatch,
+  lifecycleAllowsDispatch,
+} from '@/lib/driverLifecycle';
+import { driverRecordIdOf } from '@/lib/driverIds';
 
-export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack }: any) {
+export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack, apiEnabled }: any) {
   const isACI = type === "ACI";
-  const PORTS = isACI ? CA_PORTS : US_PORTS;
+  const PORTS_FALLBACK = isACI ? CA_PORTS : US_PORTS;
   const carrierCode = isACI ? (carrier.cbsaCarrierCode||"XXXX") : (carrier.scacCode||"XXXX");
 
   const emptyShipment = () => ({
@@ -16,10 +22,16 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     ccn: genCCN(carrierCode),
     shipperName:"", shipperAddress:"", shipperCity:"", shipperCountry: isACI?"US":"CA",
     consigneeName:"", consigneeAddress:"", consigneeCity:"", consigneeCountry: isACI?"CA":"US",
-    commodityDesc:"", pieces:"", weight:"", weightUnit:"KG",
+    commodityId:"", commodityDesc:"", pieces:"", weight:"", weightUnit:"KG",
     countryOfOrigin:"US",
   });
 
+  const [commodities, setCommodities] = useState<any[]>([]);
+  const [ports, setPorts] = useState<Array<{ code: string; name: string; id?: string; ace?: boolean; aci?: boolean; paps?: boolean; pars?: boolean }>>([]);
+  const [portCaps, setPortCaps] = useState<{ paps?: boolean; pars?: boolean }>({
+    paps: !isACI,
+    pars: isACI,
+  });
   const [f, setF] = useState({
     crn:         editData?.crn         || genCRN(carrierCode, type),
     portCode:    editData?.portCode    || (isACI ? "0407" : "3505"),
@@ -40,22 +52,137 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     tripLoadId:  editData?.tripLoadId  || "",
   });
 
+  useEffect(() => {
+    if (!company?.id) {
+      setPorts(PORTS_FALLBACK);
+      return;
+    }
+    void companiesApi
+      .commodities(company.id, true)
+      .then(setCommodities)
+      .catch(() => setCommodities([]));
+    void companiesApi
+      .portsOfEntry(company.id, {
+        selectableOnly: true,
+        country: isACI ? 'CA' : 'US',
+      })
+      .then((list) => {
+        if (Array.isArray(list) && list.length) {
+          setPorts(list);
+          const match =
+            list.find((p: any) => p.code === f.portCode) || list[0];
+          if (match) {
+            setPortCaps({ paps: Boolean(match.paps), pars: Boolean(match.pars) });
+          }
+        } else {
+          setPorts(PORTS_FALLBACK);
+        }
+      })
+      .catch(() => setPorts(PORTS_FALLBACK));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [company?.id, isACI]);
+
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   const updShip = (id,k,v) => setF(x=>({...x, shipments: x.shipments.map(s=>s.id===id?{...s,[k]:v}:s)}));
   const addShip = () => setF(x=>({...x, shipments:[...x.shipments, emptyShipment()]}));
   const removeShip = (id) => setF(x=>({...x, shipments:x.shipments.filter(s=>s.id!==id)}));
+
+  const onPortChange = async (code: string) => {
+    upd('portCode', code);
+    const local = ports.find((p) => p.code === code);
+    if (local?.id && company?.id) {
+      try {
+        const c = await companiesApi.portCustoms(company.id, local.id);
+        setPortCaps({ paps: Boolean(c.customsPaps), pars: Boolean(c.customsPars) });
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    setPortCaps({
+      paps: Boolean(local?.paps ?? !isACI),
+      pars: Boolean(local?.pars ?? isACI),
+    });
+  };
+
+  const pickCommodity = (shipId: string, commodityId: string) => {
+    const c = commodities.find((x: any) => x.id === commodityId);
+    setF((x) => ({
+      ...x,
+      shipments: x.shipments.map((s: any) =>
+        s.id === shipId
+          ? {
+              ...s,
+              commodityId,
+              commodityDesc: c?.name || s.commodityDesc,
+            }
+          : s,
+      ),
+    }));
+  };
 
   const selectedTruck   = trucks.find(t=>t.id===f.truckId);
   const selectedTrailer = trailers.find(t=>t.id===f.trailerId);
   const selectedDriver  = drivers.find(d=>d.id===f.driverId);
 
   const [formErr, setFormErr] = useState("");
-  const save = (status="draft") => {
+  const [showAllDrivers, setShowAllDrivers] = useState(false);
+  const [borderCheck, setBorderCheck] = useState<{ eligible: boolean; missing: string[]; warnings: string[] } | null>(null);
+
+  const eligibleDrivers = useMemo(() => {
+    const base = showAllDrivers
+      ? drivers
+      : drivers.filter((d: any) => {
+          const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+          const avail = d.availabilityStatus || 'available';
+          return lifecycleAllowsDispatch(lifecycle) && availabilityAllowsDispatch(avail);
+        });
+    return base;
+  }, [drivers, showAllDrivers]);
+
+  useEffect(() => {
+    if (!apiEnabled || !f.driverId) {
+      setBorderCheck(null);
+      return;
+    }
+    const driver = drivers.find((d: any) => d.id === f.driverId);
+    const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
+    let cancelled = false;
+    driversApi
+      .borderEligible(recordId)
+      .then((res) => {
+        if (!cancelled) setBorderCheck(res);
+      })
+      .catch(() => {
+        if (!cancelled) setBorderCheck(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, f.driverId, drivers]);
+
+  const save = async (status="draft") => {
     if (status==="submitted") {
       if (blank(f.driverId)) { setFormErr("Please select a driver."); return; }
       if (blank(f.truckId))  { setFormErr("Please select a truck."); return; }
       if (blank(f.eta))      { setFormErr("ETA date is required before submitting."); return; }
       if (f.shipments.some(s=>blank(s.ccn)||blank(s.shipperName)||blank(s.consigneeName))) { setFormErr("All shipments must have CCN, shipper and consignee."); return; }
+      if (apiEnabled && f.driverId) {
+        const driver = drivers.find((d: any) => d.id === f.driverId);
+        const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
+        try {
+          const check = borderCheck || (await driversApi.borderEligible(recordId));
+          if (!check.eligible) {
+            setFormErr(
+              `Driver is not border-eligible: ${check.missing.join(', ') || 'missing credentials'}`,
+            );
+            return;
+          }
+        } catch (e: any) {
+          setFormErr(e?.message || 'Border eligibility check failed');
+          return;
+        }
+      }
     }
     setFormErr("");
     onSave({
@@ -67,12 +194,28 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       truckNo:   selectedTruck?.unitNo   || "",
       trailerNo: selectedTrailer?.unitNo || "",
       driverName:selectedDriver?.name    || "",
-      portName:  PORTS.find(p=>p.code===f.portCode)?.name || f.portCode,
+      portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
     });
   };
 
-  const SHIP_TYPES_ACI = ["PARS","In-Bond","CSA","Courier LVS","Postal","Emergency Repair","Empty"];
-  const SHIP_TYPES_ACE = ["PAPS","In-Bond","IT (Immediate Transport)","T&E","IE","Empty"];
+  const SHIP_TYPES_ACI = [
+    ...(portCaps.pars ? ['PARS'] : []),
+    'In-Bond',
+    'CSA',
+    'Courier LVS',
+    'Postal',
+    'Emergency Repair',
+    'Empty',
+  ];
+  const SHIP_TYPES_ACE = [
+    ...(portCaps.paps ? ['PAPS'] : []),
+    'In-Bond',
+    'IT (Immediate Transport)',
+    'T&E',
+    'IE',
+    'Empty',
+  ];
+  const PORTS = ports.length ? ports : PORTS_FALLBACK;
 
   return (
     <div style={{ ...pagePlain() }}>
@@ -102,7 +245,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         </div>
         <div style={{ display:"flex", gap:8 }}>
           <Btn variant="outline" onClick={()=>save("draft")} style={{ fontSize:11, padding:"8px 14px" }}>SAVE DRAFT</Btn>
-          <Btn onClick={()=>save("submitted")} style={{ fontSize:11, padding:"8px 18px", background: isACI?G.info:G.purple }}>SUBMIT →</Btn>
+          <Btn onClick={()=>void save("submitted")} style={{ fontSize:11, padding:"8px 18px", background: isACI?G.info:G.purple }}>SUBMIT →</Btn>
         </div>
       </div>
 
@@ -142,9 +285,19 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
               <Inp label="Conveyance Reference No. (CRN)" value={f.crn} onChange={e=>upd("crn",e.target.value)} placeholder={carrierCode+"XXXXX"} />
               <div style={{ fontSize:9, color:G.muted, marginTop:-8, marginBottom:8 }}>Starts with carrier code · Unique per crossing</div>
             </div>
-            <Sel label={isACI?"Port of Entry (Canada)":"Port of Entry (USA)"} value={f.portCode} onChange={e=>upd("portCode",e.target.value)}>
+            <Sel label={isACI?"Port of Entry (Canada)":"Port of Entry (USA)"} value={f.portCode} onChange={e=>void onPortChange(e.target.value)}>
               {PORTS.map(p=><option key={p.code} value={p.code}>{p.code} — {p.name}</option>)}
             </Sel>
+            <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
+              Customs options from master:{' '}
+              {isACI
+                ? portCaps.pars
+                  ? 'ACI · PARS available'
+                  : 'ACI (PARS not flagged at this port)'
+                : portCaps.paps
+                  ? 'ACE · PAPS available'
+                  : 'ACE (PAPS not flagged at this port)'}
+            </div>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
             <Inp label="ETA Date" value={f.eta} onChange={e=>upd("eta",e.target.value)} placeholder="e.g. 2026-06-15" type="date" />
@@ -175,10 +328,55 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         {/* Section 2: Crew */}
         <div style={{ background:G.card, border:`1px solid ${G.border}`, borderRadius:12, padding:16, marginBottom:14 }}>
           <div style={{ fontSize:10, letterSpacing:3, color: isACI?G.info:G.purple, marginBottom:14, fontWeight:700 }}>2 · CREW MEMBERS</div>
-          <Sel label="Driver *" value={f.driverId} onChange={e=>upd("driverId",e.target.value)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ fontSize: 10, color: G.muted }}>
+              Showing {eligibleDrivers.length} of {drivers.length} drivers (active + available + border-ready)
+            </div>
+            <label style={{ fontSize: 10, color: G.muted, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={showAllDrivers}
+                onChange={(e) => setShowAllDrivers(e.target.checked)}
+              />
+              Show all drivers
+            </label>
+          </div>
+          <Sel label="Driver *" value={f.driverId} onChange={e=>{
+            const id = e.target.value;
+            upd("driverId", id);
+            const d = drivers.find((x: any) => x.id === id);
+            if (d) {
+              setF((x) => ({
+                ...x,
+                driverId: id,
+                driverDOB: d.dob || x.driverDOB,
+                driverCitizenship: d.citizenship || x.driverCitizenship,
+                driverPassport: d.passportNo || x.driverPassport,
+                driverFAST: d.fastCard || x.driverFAST,
+              }));
+            }
+          }}>
             <option value="">— Select driver —</option>
-            {drivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+            {eligibleDrivers.map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
           </Sel>
+          {borderCheck && f.driverId && (
+            <div
+              style={{
+                marginTop: 8,
+                marginBottom: 8,
+                padding: '8px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                background: borderCheck.eligible ? G.successTint : G.errTint,
+                color: borderCheck.eligible ? G.success : G.errText,
+                border: `1px solid ${borderCheck.eligible ? G.success + '44' : G.danger + '44'}`,
+              }}
+            >
+              {borderCheck.eligible
+                ? `Border eligible${borderCheck.warnings?.length ? ` · ${borderCheck.warnings.join('; ')}` : ''}`
+                : `Not border-eligible: ${borderCheck.missing.join(', ')}`}
+            </div>
+          )}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
             <Inp label="Date of Birth" value={f.driverDOB} onChange={e=>upd("driverDOB",e.target.value)} placeholder="YYYY-MM-DD" type="date" />
             <Sel label="Citizenship" value={f.driverCitizenship} onChange={e=>upd("driverCitizenship",e.target.value)}>
@@ -188,7 +386,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
           </div>
           <Sel label="Co-Driver (optional)" value={f.coDriverId} onChange={e=>upd("coDriverId",e.target.value)}>
             <option value="">— None —</option>
-            {drivers.filter(d=>d.id!==f.driverId).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
+            {eligibleDrivers.filter(d=>d.id!==f.driverId).map(d=><option key={d.id} value={d.id}>{d.name}</option>)}
           </Sel>
         </div>
 
@@ -213,6 +411,19 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
                   <div style={{ fontSize:9, color:G.muted, marginTop:-8, marginBottom:8 }}>Must start with carrier code · Unique per shipment</div>
                 </div>
                 <div>
+                  <Sel
+                    label="Commodity (master)"
+                    value={s.commodityId || ''}
+                    onChange={(e: any) => pickCommodity(s.id, e.target.value)}
+                  >
+                    <option value="">— Or type description —</option>
+                    {commodities.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.hazmat ? ' · HAZMAT' : ''}
+                      </option>
+                    ))}
+                  </Sel>
                   <Inp label="Commodity Description *" value={s.commodityDesc} onChange={e=>updShip(s.id,"commodityDesc",e.target.value)} placeholder="e.g. Auto parts, dry goods" />
                 </div>
               </div>

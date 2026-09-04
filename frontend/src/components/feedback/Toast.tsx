@@ -14,8 +14,15 @@ interface ToastItem {
 type ToastHandler = (toast: ToastItem) => void;
 
 let _toastSubscribers: ToastHandler[] = [];
+const _recentToasts = new Map<string, number>();
+const DEDUPE_MS = 4000;
 
 export function notify(msg: string, type: ToastType = 'success'): void {
+  const key = `${type}:${msg}`;
+  const now = Date.now();
+  const last = _recentToasts.get(key);
+  if (last != null && now - last < DEDUPE_MS) return;
+  _recentToasts.set(key, now);
   const toast: ToastItem = { id: uid(), msg, type };
   _toastSubscribers.forEach((fn) => fn(toast));
 }

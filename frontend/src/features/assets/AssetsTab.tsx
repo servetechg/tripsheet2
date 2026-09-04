@@ -1,11 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
-import { assetsApi } from '@/lib/api';
+import { assetsApi, companiesApi } from '@/lib/api';
+import {
+  ASSET_STATUSES,
+  assetStatusLabel,
+  canAssignAsset,
+  normalizeAssetStatus,
+} from '@/lib/assetStatus';
+
+const emptyAsset = {
+  type: 'truck',
+  unitNo: '',
+  year: '',
+  make: '',
+  model: '',
+  vin: '',
+  plate: '',
+  notes: '',
+  insuranceExpiry: '',
+  insuranceProviderId: '',
+  insuranceProviderName: '',
+  plateExpiry: '',
+  permitExpiry: '',
+};
 
 export function AssetsTab({
   company,
@@ -15,20 +37,22 @@ export function AssetsTab({
   apiEnabled,
   refreshAll,
 }: any) {
-  const [assetTab, setAssetTab] = useState('trucks');
+  const [assetTab, setAssetTab] = useState<'trucks' | 'trailers' | 'equipment'>(
+    'trucks',
+  );
   const [show, setShow] = useState(false);
-  const [f, setF] = useState({
-    type: 'truck',
-    unitNo: '',
-    year: '',
-    make: '',
-    model: '',
-    vin: '',
-    plate: '',
-    notes: '',
-  });
+  const [f, setF] = useState(emptyAsset);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [insurers, setInsurers] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) return;
+    void companiesApi
+      .insuranceProviders(company.id, true)
+      .then((list) => setInsurers(Array.isArray(list) ? list : []))
+      .catch(() => setInsurers([]));
+  }, [apiEnabled, company?.id]);
 
   const myTrucks = assets.filter(
     (a: any) => a.companyId === company.id && a.type === 'truck',
@@ -36,9 +60,22 @@ export function AssetsTab({
   const myTrailers = assets.filter(
     (a: any) => a.companyId === company.id && a.type === 'trailer',
   );
-  const list = assetTab === 'trucks' ? myTrucks : myTrailers;
-  const activeCount = list.filter((a: any) => a.status === 'active').length;
-  const inactiveCount = list.length - activeCount;
+  const myEquipment = assets.filter(
+    (a: any) => a.companyId === company.id && a.type === 'equipment',
+  );
+  const list =
+    assetTab === 'trucks'
+      ? myTrucks
+      : assetTab === 'trailers'
+        ? myTrailers
+        : myEquipment;
+  const activeCount = list.filter((a: any) => canAssignAsset(a.status)).length;
+  const typeLabel =
+    assetTab === 'trucks'
+      ? 'TRUCK'
+      : assetTab === 'trailers'
+        ? 'TRAILER'
+        : 'EQUIPMENT';
 
   const add = async () => {
     if (blank(f.unitNo)) {
@@ -54,11 +91,16 @@ export function AssetsTab({
       setErr('Unit No. already exists.');
       return;
     }
-    const type = assetTab === 'trucks' ? 'truck' : 'trailer';
+    const type =
+      assetTab === 'trucks'
+        ? 'truck'
+        : assetTab === 'trailers'
+          ? 'trailer'
+          : 'equipment';
     const body = {
       ...f,
       type,
-      status: 'active' as const,
+      status: 'available' as const,
       unitNo: f.unitNo.trim(),
       companyId: company.id,
     };
@@ -70,16 +112,7 @@ export function AssetsTab({
       } else {
         setAssets((p: any[]) => [...p, { ...body, id: uid() }]);
       }
-      setF({
-        type: 'truck',
-        unitNo: '',
-        year: '',
-        make: '',
-        model: '',
-        vin: '',
-        plate: '',
-        notes: '',
-      });
+      setF(emptyAsset);
       setShow(false);
       setErr('');
     } catch (e: any) {
@@ -100,7 +133,10 @@ export function AssetsTab({
             a.id === id
               ? {
                   ...a,
-                  status: a.status === 'active' ? 'inactive' : 'active',
+                  status:
+                    normalizeAssetStatus(a.status) === 'available'
+                      ? 'retired'
+                      : 'available',
                 }
               : a,
           ),
@@ -108,6 +144,21 @@ export function AssetsTab({
       }
     } catch (e: any) {
       notify(e?.message || 'Toggle failed', 'error');
+    }
+  };
+
+  const setAssetStatus = async (id: string, status: string) => {
+    try {
+      if (apiEnabled) {
+        await assetsApi.setStatus(id, status);
+        await refreshAll?.();
+      } else {
+        setAssets((p: any[]) =>
+          p.map((a) => (a.id === id ? { ...a, status } : a)),
+        );
+      }
+    } catch (e: any) {
+      notify(e?.message || 'Status update failed', 'error');
     }
   };
 
@@ -124,6 +175,9 @@ export function AssetsTab({
     }
   };
 
+  const today = new Date().toISOString().slice(0, 10);
+  const isExpired = (dt?: string) => !!dt && dt <= today;
+
   return (
     <div>
       <StatsGrid>
@@ -137,9 +191,16 @@ export function AssetsTab({
         <StatCard
           label="Trailers"
           value={myTrailers.length}
-          subtitle="Equipment"
+          subtitle="Trailers"
           accent={G.purple}
           icon={Icons.assets({ size: 20, color: G.purple })}
+        />
+        <StatCard
+          label="Equipment"
+          value={myEquipment.length}
+          subtitle="General"
+          accent={G.gold}
+          icon={Icons.status({ size: 20, color: G.gold })}
         />
         <StatCard
           label="Active"
@@ -148,19 +209,13 @@ export function AssetsTab({
           accent={G.success}
           icon={Icons.completed({ size: 20, color: G.success })}
         />
-        <StatCard
-          label="Inactive"
-          value={inactiveCount}
-          subtitle={`Current ${assetTab}`}
-          accent={G.muted}
-          icon={Icons.pending({ size: 20, color: G.muted })}
-        />
       </StatsGrid>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         {(
           [
             ['trucks', 'TRUCKS', Icons.truck],
             ['trailers', 'TRAILERS', Icons.trailer],
+            ['equipment', 'EQUIPMENT', Icons.status],
           ] as const
         ).map(([id, label, Icon]) => (
           <button
@@ -198,15 +253,13 @@ export function AssetsTab({
             setErr('');
           }}
         >
-          + ADD {assetTab === 'trucks' ? 'TRUCK' : 'TRAILER'}
+          + ADD {typeLabel}
         </Btn>
       </div>
 
       {show && (
         <Card>
-          <SectionTitle>
-            ADD {assetTab === 'trucks' ? 'TRUCK' : 'TRAILER'}
-          </SectionTitle>
+          <SectionTitle>ADD {typeLabel}</SectionTitle>
           <Err msg={err} />
           <G2 cols={2}>
             <Inp
@@ -236,9 +289,6 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, make: e.target.value }))
               }
-              placeholder={
-                assetTab === 'trucks' ? 'e.g. Kenworth' : 'e.g. Stoughton'
-              }
             />
             <Inp
               label="Model"
@@ -246,9 +296,6 @@ export function AssetsTab({
               type="text"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, model: e.target.value }))
-              }
-              placeholder={
-                assetTab === 'trucks' ? 'e.g. T680' : 'e.g. 53ft Dry Van'
               }
             />
           </G2>
@@ -269,7 +316,54 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, plate: e.target.value }))
               }
-              placeholder="e.g. AB-32054"
+            />
+          </G2>
+          <G2 cols={2}>
+            <Sel
+              label="Insurance provider"
+              value={f.insuranceProviderId}
+              onChange={(e: any) => {
+                const id = e.target.value;
+                const p = insurers.find((x: any) => x.id === id);
+                setF((x) => ({
+                  ...x,
+                  insuranceProviderId: id,
+                  insuranceProviderName: p?.name || '',
+                }));
+              }}
+            >
+              <option value="">— Optional —</option>
+              {insurers.map((p: any) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Sel>
+            <Inp
+              label="Insurance expiry"
+              value={f.insuranceExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, insuranceExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
+            />
+          </G2>
+          <G2 cols={2}>
+            <Inp
+              label="Plate expiry"
+              value={f.plateExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, plateExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
+            />
+            <Inp
+              label="Permit expiry"
+              value={f.permitExpiry}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, permitExpiry: e.target.value }))
+              }
+              placeholder="YYYY-MM-DD"
             />
           </G2>
           <Inp
@@ -301,7 +395,11 @@ export function AssetsTab({
       {list.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
           <div>
-            {(assetTab === 'trucks' ? Icons.truck : Icons.trailer)({
+            {(assetTab === 'trucks'
+              ? Icons.truck
+              : assetTab === 'trailers'
+                ? Icons.trailer
+                : Icons.status)({
               size: 36,
               color: G.muted,
             })}
@@ -342,14 +440,27 @@ export function AssetsTab({
                   >
                     #{a.unitNo}
                   </span>
-                  <Pill color={a.status === 'active' ? G.success : G.muted}>
-                    {a.status.toUpperCase()}
+                  <Pill
+                    color={
+                      canAssignAsset(a.status)
+                        ? G.success
+                        : normalizeAssetStatus(a.status) === 'out_of_service'
+                          ? G.danger
+                          : G.muted
+                    }
+                  >
+                    {assetStatusLabel(a.status)}
                   </Pill>
                   {loads.find(
                     (l: any) =>
                       ['assigned', 'in_transit'].includes(l.status) &&
                       (l.truckId === a.id || l.trailerId === a.id),
                   ) && <Pill color={G.gold}>IN USE</Pill>}
+                  {(isExpired(a.insuranceExpiry) ||
+                    isExpired(a.plateExpiry) ||
+                    isExpired(a.permitExpiry)) && (
+                    <Pill color={G.danger}>EXPIRED</Pill>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
                   {a.year} {a.make} {a.model}
@@ -360,9 +471,14 @@ export function AssetsTab({
                     <span style={{ fontFamily: FONT_MONO }}>{a.plate}</span>
                   </div>
                 )}
-                {a.vin && (
-                  <div style={{ fontSize: 10, color: G.muted }}>
-                    VIN: <span style={{ fontFamily: FONT_MONO }}>{a.vin}</span>
+                {(a.insuranceExpiry || a.plateExpiry || a.permitExpiry) && (
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
+                    Ins {a.insuranceExpiry || '—'}
+                    {a.insuranceProviderName
+                      ? ` (${a.insuranceProviderName})`
+                      : ''}{' '}
+                    · Plate {a.plateExpiry || '—'}{' '}
+                    · Permit {a.permitExpiry || '—'}
                   </div>
                 )}
                 {a.notes && (
@@ -378,22 +494,40 @@ export function AssetsTab({
                   </div>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  value={normalizeAssetStatus(a.status)}
+                  onChange={(e) => void setAssetStatus(a.id, e.target.value)}
+                  style={{
+                    background: '#0a0a0e',
+                    border: `1px solid ${G.border}`,
+                    color: G.text,
+                    borderRadius: 7,
+                    padding: '6px 8px',
+                    fontSize: 11,
+                  }}
+                >
+                  {ASSET_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s.replace(/_/g, ' ')}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => toggleStatus(a.id)}
                   style={{
                     background: 'transparent',
                     border: `1px solid ${
-                      a.status === 'active' ? G.muted : G.success
+                      canAssignAsset(a.status) ? G.muted : G.success
                     }`,
-                    color: a.status === 'active' ? G.muted : G.success,
+                    color: canAssignAsset(a.status) ? G.muted : G.success,
                     borderRadius: 7,
                     padding: '6px 12px',
                     fontSize: 11,
                     cursor: 'pointer',
                   }}
                 >
-                  {a.status === 'active' ? 'DEACTIVATE' : 'ACTIVATE'}
+                  {canAssignAsset(a.status) ? 'RETIRE' : 'MAKE AVAILABLE'}
                 </button>
                 <button
                   onClick={() => remove(a.id)}

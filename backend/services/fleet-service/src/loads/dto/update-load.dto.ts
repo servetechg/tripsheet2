@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsIn,
   IsNumber,
   IsOptional,
@@ -40,6 +41,10 @@ export class UpdateLoadDto {
 
   @IsOptional()
   @IsString()
+  actualDelivery?: string;
+
+  @IsOptional()
+  @IsString()
   tripNo?: string;
 
   @IsOptional()
@@ -53,6 +58,38 @@ export class UpdateLoadDto {
   @IsOptional()
   @IsString()
   trailerNo?: string;
+
+  @IsOptional()
+  @IsNumber()
+  customerRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  carrierCost?: number;
+
+  @IsOptional()
+  @IsNumber()
+  fuelSurcharge?: number;
+
+  @IsOptional()
+  @IsNumber()
+  accessorials?: number;
+
+  @IsOptional()
+  @IsNumber()
+  detentionHours?: number;
+
+  @IsOptional()
+  @IsNumber()
+  detentionRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  miles?: number;
+
+  @IsOptional()
+  @IsArray()
+  stops?: unknown[];
 
   @IsOptional()
   @IsNumber()
@@ -77,4 +114,71 @@ export class UpdateLoadDto {
   @IsOptional()
   @IsIn(['assigned', 'in_transit', 'delivered', 'cancelled'])
   status?: 'assigned' | 'in_transit' | 'delivered' | 'cancelled';
+
+  @IsOptional()
+  @IsString()
+  brokerId?: string;
+
+  @IsOptional()
+  @IsString()
+  customerId?: string;
+
+  @IsOptional()
+  @IsString()
+  originLocationId?: string;
+
+  @IsOptional()
+  @IsString()
+  destinationLocationId?: string;
+
+  @IsOptional()
+  @IsString()
+  brokerName?: string;
+
+  @IsOptional()
+  @IsString()
+  carrierId?: string;
+
+  @IsOptional()
+  @IsString()
+  carrierName?: string;
+
+  @IsOptional()
+  @IsString()
+  commodityId?: string;
+
+  @IsOptional()
+  @IsString()
+  commodityName?: string;
+
+  @IsOptional()
+  crossBorder?: boolean;
+
+  @IsOptional()
+  @IsString()
+  portOfEntryId?: string;
+
+  @IsOptional()
+  @IsString()
+  portOfEntryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  portOfEntryName?: string;
+
+  @IsOptional()
+  @IsString()
+  customsProgram?: string;
+
+  @IsOptional()
+  customsAce?: boolean;
+
+  @IsOptional()
+  customsAci?: boolean;
+
+  @IsOptional()
+  customsPaps?: boolean;
+
+  @IsOptional()
+  customsPars?: boolean;
 }

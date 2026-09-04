@@ -4,9 +4,11 @@ import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons }
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { PrintPreview } from './PrintPreview';
+import { companiesApi } from '@/lib/api';
 
 const emptyTrip = () => ({ id: uid(), tripNo: '', trailerNo: '', pickupDate: '', dropDate: '', from: '', to: '', notes: '' });
 const emptyExp = () => ({ id: uid(), category: 'Fuel', description: '', receiptNo: '', amount: '', currency: 'CAD' });
+const FALLBACK_EXPENSE = ['Fuel', 'Lumper', 'Toll', 'Parking', 'Repair', 'Food', 'Other'];
 
 export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any) {
   const [hdr,setHdr]    = useState(editSheet?.header || { truckNo:user.truckNo||"",startDate:"",endDate:"",driver1:user.name,driver2:"" });
@@ -15,6 +17,23 @@ export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any)
   const [notes,setNotes]= useState(editSheet?.notes||"");
   const [preview,setPreview]=useState(false);
   const [saving,setSaving]=useState(false);
+  const [expCats,setExpCats]=useState<string[]>(FALLBACK_EXPENSE);
+
+  useEffect(() => {
+    if (!company?.id) return;
+    void companiesApi
+      .referenceData(company.id, {
+        selectableOnly: true,
+        kind: 'expense_category',
+      })
+      .then((rows) => {
+        const names = (Array.isArray(rows) ? rows : [])
+          .map((r: any) => String(r.name || '').trim())
+          .filter(Boolean);
+        if (names.length) setExpCats(names);
+      })
+      .catch(() => undefined);
+  }, [company?.id]);
   const updH=(k,v)=>setHdr(h=>({...h,[k]:v}));
   const updT=(id,k,v)=>setTrips(ts=>ts.map(t=>t.id===id?{...t,[k]:v}:t));
   const updE=(id,k,v)=>setExps(es=>es.map(e=>e.id===id?{...e,[k]:v}:e));
@@ -88,7 +107,7 @@ export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any)
                 {exps.length>1&&<Btn variant="danger" style={{ padding:"4px 10px",fontSize:10 }} onClick={()=>setExps(es=>es.filter(x=>x.id!==e.id))}>REMOVE</Btn>}
               </div>
               <G2 cols={2}>
-                <Sel label="Category" value={e.category} onChange={ev=>updE(e.id,"category",ev.target.value)}>{["Fuel","Lumper","Toll","Parking","Repair","Food","Other"].map(c=><option key={c}>{c}</option>)}</Sel>
+                <Sel label="Category" value={e.category} onChange={ev=>updE(e.id,"category",ev.target.value)}>{expCats.map(c=><option key={c}>{c}</option>)}</Sel>
                 <Inp label="Description" value={e.description} onChange={ev=>updE(e.id,"description",ev.target.value)} placeholder="Details..."/>
               </G2>
               <G2 cols={2}><Inp label="Receipt #" value={e.receiptNo} onChange={ev=>updE(e.id,"receiptNo",ev.target.value)} placeholder="e.g. R-001"/><Inp label="Amount" type="number" value={e.amount} onChange={ev=>updE(e.id,"amount",ev.target.value)} placeholder="0.00"/></G2>

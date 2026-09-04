@@ -1,14 +1,24 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
+import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { invitesApi, authApi, driversApi, notificationsApi } from '@/lib/api';
+import { invitesApi, authApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
+import {
+  AVAILABILITY_LABELS,
+  DRIVER_AVAILABILITY_STATUSES,
+  DRIVER_LIFECYCLE_LABELS,
+  DRIVER_TYPE_LABELS,
+  lifecycleAllowsDispatch,
+} from '@/lib/driverLifecycle';
+import { AvailabilityBadge } from './DriverProfileChapter6Panels';
 import { DriverProfile } from './DriverProfile';
 import { matchesDriverRef } from '@/lib/driverIds';
+import { useCan } from '@/lib/permissions';
 
 export function DriversTab({
   company,
@@ -24,6 +34,8 @@ export function DriversTab({
   apiEnabled,
   refreshAll,
 }: any) {
+  const { can } = useCan();
+  const confirm = useConfirm();
   const [view, setView] = useState('list');
   const [selectedDriver, setSD] = useState<any>(null);
   const [show, setShow] = useState(false);
@@ -81,8 +93,117 @@ export function DriversTab({
     citizenship: 'CA',
     fastCard: '',
     notes: '',
+    driverType: 'company',
+    employeeNumber: '',
+    hireDate: '',
+    branchId: '',
+    availabilityStatus: 'available',
   });
+  const [searchQ, setSearchQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [branchFilter, setBranchFilter] = useState('all');
+  const [docFilter, setDocFilter] = useState('all');
+  const [branches, setBranches] = useState<any[]>([]);
   const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!apiEnabled || !company?.id) {
+      setBranches([]);
+      return;
+    }
+    let cancelled = false;
+    companiesApi
+      .branches(company.id)
+      .then((rows) => {
+        if (!cancelled) setBranches(Array.isArray(rows) ? rows : []);
+      })
+      .catch(() => {
+        if (!cancelled) setBranches([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiEnabled, company?.id]);
+
+  const driverDocsFor = (d: any) =>
+    (driverDocs || []).filter((doc: any) => matchesDriverRef(doc.driverId, d));
+
+  const driverCompliance = (d: any) => {
+    const myDocs = driverDocsFor(d);
+    const today = new Date().toISOString().slice(0, 10);
+    const warn = new Date();
+    warn.setDate(warn.getDate() + 30);
+    const warnStr = warn.toISOString().slice(0, 10);
+    const missingRequired = DRIVER_DOC_TYPES.filter(
+      (t) =>
+        t.required &&
+        !myDocs.find((doc: any) => doc.type === t.id && doc.status !== 'expired'),
+    ).length;
+    const expiringSoon = myDocs.filter((doc: any) => {
+      if (doc.status === 'expiring_soon') return true;
+      if (doc.expiryDate && doc.expiryDate >= today && doc.expiryDate <= warnStr) {
+        return true;
+      }
+      return doc.status === 'expired';
+    }).length;
+    const hasFast =
+      Boolean(d.fastCard?.trim()) ||
+      myDocs.some((doc: any) => doc.type === 'fast_card' && doc.status !== 'expired');
+    const hasHazmat = myDocs.some(
+      (doc: any) => doc.type === 'hazmat' && doc.status !== 'expired',
+    );
+    return { missingRequired, expiringSoon, hasFast, hasHazmat };
+  };
+
+  const revokeInvite = async (inv: any) => {
+    const ok = await confirm({
+      title: 'Revoke invite',
+      message: 'This link will no longer work. Continue?',
+      confirmLabel: 'Revoke',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    try {
+      if (apiEnabled) {
+        await invitesApi.revoke(inv.id);
+        await refreshAll?.();
+      } else {
+        setInvites((p: any[]) =>
+          p.map((i) => (i.id === inv.id ? { ...i, status: 'revoked' } : i)),
+        );
+      }
+      notify('Invite revoked');
+    } catch (e: any) {
+      notify(e?.message || 'Revoke failed', 'error');
+    }
+  };
+
+  const regenerateInvite = async (inv: any) => {
+    try {
+      if (apiEnabled) {
+        const next = await invitesApi.regenerate(inv.id);
+        await refreshAll?.();
+        if (next?.token) {
+          setGeneratedLink(
+            `${window.location.origin}/invite?invite=${encodeURIComponent(next.token)}`,
+          );
+        }
+      } else {
+        const token = uid();
+        setInvites((p: any[]) =>
+          p.map((i) =>
+            i.id === inv.id ? { ...i, token, status: 'pending', createdAt: new Date().toLocaleDateString('en-CA') } : i,
+          ),
+        );
+        setGeneratedLink(
+          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
+        );
+      }
+      notify('Invite regenerated');
+    } catch (e: any) {
+      notify(e?.message || 'Regenerate failed', 'error');
+    }
+  };
 
   const resetForm = () => {
     setF({
@@ -99,6 +220,11 @@ export function DriversTab({
       citizenship: 'CA',
       fastCard: '',
       notes: '',
+      driverType: 'company',
+      employeeNumber: '',
+      hireDate: '',
+      branchId: '',
+      availabilityStatus: 'available',
     });
     setEditDriver(null);
     setShow(false);
@@ -120,6 +246,11 @@ export function DriversTab({
       citizenship: d.citizenship || 'CA',
       fastCard: d.fastCard || '',
       notes: d.notes || '',
+      driverType: d.driverType || 'company',
+      employeeNumber: d.employeeNumber || '',
+      hireDate: d.hireDate || '',
+      branchId: d.branchId || '',
+      availabilityStatus: d.availabilityStatus || 'available',
     });
     setEditDriver(d);
     setShow(true);
@@ -153,6 +284,11 @@ export function DriversTab({
               fastCard: f.fastCard,
               notes: f.notes,
               sin: f.sin,
+              driverType: f.driverType,
+              employeeNumber: f.employeeNumber || undefined,
+              hireDate: f.hireDate || undefined,
+              branchId: f.branchId || undefined,
+              availabilityStatus: f.availabilityStatus || undefined,
             });
           }
           if (editDriver.id) {
@@ -196,6 +332,12 @@ export function DriversTab({
             fastCard: f.fastCard,
             notes: f.notes,
             sin: f.sin,
+            lifecycleStatus: 'active',
+            driverType: f.driverType,
+            employeeNumber: f.employeeNumber || undefined,
+            hireDate: f.hireDate || undefined,
+            branchId: f.branchId || undefined,
+            availabilityStatus: f.availabilityStatus || 'available',
           });
         }
         await refreshAll?.();
@@ -226,28 +368,66 @@ export function DriversTab({
   };
 
   const removeDriver = async (d: any) => {
-    if (!window.confirm(`Remove ${d.name}?`)) return;
+    const ok = await confirm({
+      title: 'Archive driver',
+      message: `Archive ${d.name}? Historical records are retained.`,
+      confirmLabel: 'Archive',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       if (apiEnabled) {
         const recordId = d.driverRecordId;
         if (recordId) {
-          await driversApi.remove(recordId);
+          await driversApi.archive(recordId);
         } else {
           const list = await driversApi.list(company.id);
           const match = (list as any[]).find(
             (x) => x.userId === d.id || x.email === d.email,
           );
-          if (match) await driversApi.remove(match.id);
+          if (match) await driversApi.archive(match.id);
         }
         await refreshAll?.();
       } else {
         setUsers((p: any[]) => p.filter((u) => u.id !== d.id));
       }
-      notify(`${d.name} removed.`);
+      notify(`${d.name} archived.`);
     } catch (e: any) {
-      notify(e?.message || 'Remove failed', 'error');
+      notify(e?.message || 'Archive failed', 'error');
     }
   };
+
+  const approveDriver = async (d: any, e?: { stopPropagation?: () => void }) => {
+    e?.stopPropagation?.();
+    const recordId = d.driverRecordId;
+    if (!recordId || !apiEnabled) return;
+    try {
+      await driversApi.approve(recordId);
+      await refreshAll?.();
+      notify(`${d.name} approved — now active for dispatch`);
+    } catch (err: any) {
+      notify(err?.message || 'Approve failed', 'error');
+    }
+  };
+
+  const filteredDrivers = drivers.filter((d: any) => {
+    const q = searchQ.trim().toLowerCase();
+    if (q) {
+      const hay = `${d.name} ${d.email} ${d.licenseNo || ''} ${d.employeeNumber || ''} ${d.fastCard || ''} ${d.branchId || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (branchFilter !== 'all' && (d.branchId || '') !== branchFilter) return false;
+    const compliance = driverCompliance(d);
+    if (docFilter === 'expiring' && compliance.expiringSoon === 0) return false;
+    if (docFilter === 'missing_required' && compliance.missingRequired === 0) return false;
+    if (docFilter === 'has_fast' && !compliance.hasFast) return false;
+    if (docFilter === 'has_hazmat' && !compliance.hasHazmat) return false;
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'dispatch_ready') {
+      return lifecycleAllowsDispatch(d.lifecycleStatus || 'active');
+    }
+    return (d.lifecycleStatus || 'active') === statusFilter;
+  });
 
   if (view === 'profile' && selectedDriver) {
     return (
@@ -320,6 +500,7 @@ export function DriversTab({
           Driver roster
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          {can('drivers.invite') && (
           <Btn
             variant="ghost"
             onClick={createInvite}
@@ -334,6 +515,8 @@ export function DriversTab({
             {Icons.link({ size: 16, color: G.muted })}
             SEND INVITE LINK
           </Btn>
+          )}
+          {can('drivers.create') && (
           <Btn
             onClick={() => {
               resetForm();
@@ -342,7 +525,62 @@ export function DriversTab({
           >
             + ADD MANUALLY
           </Btn>
+          )}
         </div>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          gap: 8,
+          marginBottom: 14,
+          flexWrap: 'wrap',
+          alignItems: 'flex-end',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <Inp
+            label="Search"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+            placeholder="Name, email, licence, FAST, branch…"
+          />
+        </div>
+        <Sel
+          label="Branch"
+          value={branchFilter}
+          onChange={(e) => setBranchFilter(e.target.value)}
+        >
+          <option value="all">All branches</option>
+          {branches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </Sel>
+        <Sel
+          label="Compliance"
+          value={docFilter}
+          onChange={(e) => setDocFilter(e.target.value)}
+        >
+          <option value="all">All drivers</option>
+          <option value="expiring">Expiring / expired docs</option>
+          <option value="missing_required">Missing required docs</option>
+          <option value="has_fast">Has FAST</option>
+          <option value="has_hazmat">Has hazmat</option>
+        </Sel>
+        <Sel
+          label="Status"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="all">All statuses</option>
+          <option value="dispatch_ready">Dispatch-ready (active)</option>
+          <option value="pending_review">Pending HR review</option>
+          <option value="active">Active</option>
+          <option value="suspended">Suspended</option>
+          <option value="terminated">Terminated</option>
+        </Sel>
       </div>
 
       {generatedLink && (
@@ -424,10 +662,10 @@ export function DriversTab({
               <div style={{ flex: 1, minWidth: 160 }}>
                 <Inp
                   label="SMS invite to phone"
+                  phone
                   value={invitePhone}
                   type="tel"
                   onChange={(e) => setInvitePhone(e.target.value)}
-                  placeholder="+1 (403) 000-0000"
                 />
               </div>
               <Btn
@@ -544,7 +782,7 @@ export function DriversTab({
             PENDING INVITES ({pendingInvites.length})
           </div>
           {pendingInvites.map((inv: any) => {
-            const link = `${window.location.href.split('?')[0]}?invite=${inv.token}`;
+            const link = `${window.location.origin}/invite?invite=${encodeURIComponent(inv.token)}`;
             return (
               <div
                 key={inv.id}
@@ -596,11 +834,21 @@ export function DriversTab({
                     COPY
                   </button>
                   <button
-                    onClick={() =>
-                      setInvites((p: any[]) =>
-                        p.filter((i) => i.id !== inv.id),
-                      )
-                    }
+                    onClick={() => void regenerateInvite(inv)}
+                    style={{
+                      background: 'transparent',
+                      border: `1px solid ${G.info}`,
+                      color: G.info,
+                      borderRadius: 6,
+                      padding: '5px 12px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    REGENERATE
+                  </button>
+                  <button
+                    onClick={() => void revokeInvite(inv)}
                     style={{
                       background: 'transparent',
                       border: `1px solid ${G.danger}`,
@@ -615,6 +863,7 @@ export function DriversTab({
                     }}
                   >
                     {Icons.trash({ size: 16, color: G.danger })}
+                    REVOKE
                   </button>
                 </div>
               </div>
@@ -675,12 +924,13 @@ export function DriversTab({
             />
             <Inp
               label="Phone"
+              phone
               value={f.phone}
               type="tel"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, phone: e.target.value }))
               }
-              placeholder="+1 (403) 000-0000"
+              placeholder="(403) 555-0100"
             />
           </G2>
           <div
@@ -770,12 +1020,13 @@ export function DriversTab({
             />
             <Inp
               label="Emergency Contact Phone"
+              phone
               value={f.emergencyPhone}
               type="tel"
               onChange={(e: any) =>
                 setF((x) => ({ ...x, emergencyPhone: e.target.value }))
               }
-              placeholder="+1 (403) 000-0000"
+              placeholder="(403) 555-0100"
             />
           </G2>
           <Inp
@@ -787,6 +1038,61 @@ export function DriversTab({
             }
             placeholder="Any additional notes about this driver..."
           />
+          <div
+            style={{
+              fontSize: 10,
+              letterSpacing: 2,
+              color: G.muted,
+              marginBottom: 10,
+              paddingBottom: 6,
+              borderBottom: `1px solid ${G.border}`,
+            }}
+          >
+            EMPLOYMENT
+          </div>
+          <G2 cols={2}>
+            <Sel
+              label="Driver type"
+              value={f.driverType}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, driverType: e.target.value }))
+              }
+            >
+              {Object.entries(DRIVER_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Sel>
+            <Inp
+              label="Employee #"
+              value={f.employeeNumber}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, employeeNumber: e.target.value }))
+              }
+            />
+            <Inp
+              label="Hire date"
+              type="date"
+              value={f.hireDate}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, hireDate: e.target.value }))
+              }
+            />
+          </G2>
+          <Sel
+            label="Availability"
+            value={f.availabilityStatus}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, availabilityStatus: e.target.value }))
+            }
+          >
+            {DRIVER_AVAILABILITY_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {AVAILABILITY_LABELS[s]}
+              </option>
+            ))}
+          </Sel>
           <div style={{ display: 'flex', gap: 10 }}>
             <Btn onClick={save} style={{ opacity: busy ? 0.6 : 1 }}>
               {busy
@@ -802,13 +1108,20 @@ export function DriversTab({
         </Card>
       )}
 
-      {drivers.length === 0 ? (
+      {filteredDrivers.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
           <div>{Icons.driver({ size: 36, color: G.muted })}</div>
-          <div style={{ color: G.muted, marginTop: 10 }}>No drivers yet.</div>
+          <div style={{ color: G.muted, marginTop: 10 }}>
+            {drivers.length === 0 ? 'No drivers yet.' : 'No drivers match filters.'}
+          </div>
         </Card>
       ) : (
-        drivers.map((d: any) => {
+        filteredDrivers.map((d: any) => {
+          const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+          const lifecycleLabel =
+            DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] ||
+            lifecycle;
+          const canDispatch = lifecycleAllowsDispatch(lifecycle);
           const active = loads.find(
             (l: any) =>
               matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
@@ -894,9 +1207,29 @@ export function DriversTab({
                       marginTop: 6,
                     }}
                   >
-                    <Pill color={active ? G.gold : G.success}>
-                      {active ? 'IN TRANSIT' : 'AVAILABLE'}
+                    {active ? (
+                      <Pill color={G.gold}>IN TRANSIT</Pill>
+                    ) : (
+                      <AvailabilityBadge status={d.availabilityStatus} />
+                    )}
+                    <Pill
+                      color={
+                        lifecycle === 'active'
+                          ? G.success
+                          : lifecycle === 'pending_review'
+                            ? G.warning
+                            : lifecycle === 'suspended'
+                              ? G.danger
+                              : G.muted
+                      }
+                    >
+                      {lifecycleLabel}
                     </Pill>
+                    {d.driverType && d.driverType !== 'company' && (
+                      <Pill color={G.info}>
+                        {DRIVER_TYPE_LABELS[d.driverType as keyof typeof DRIVER_TYPE_LABELS] || d.driverType}
+                      </Pill>
+                    )}
                     {d.citizenship && (
                       <Pill color={G.muted}>{d.citizenship}</Pill>
                     )}
@@ -963,7 +1296,7 @@ export function DriversTab({
                         {missing} required doc{missing !== 1 ? 's' : ''}{' '}
                         missing — cannot dispatch
                       </span>
-                    ) : (
+                    ) : canDispatch ? (
                       <span
                         style={{
                           fontSize: 11,
@@ -975,6 +1308,16 @@ export function DriversTab({
                       >
                         {Icons.completed({ size: 14, color: G.success })}
                         Dispatch-ready
+                      </span>
+                    ) : (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: G.danger,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Not dispatch-eligible ({lifecycleLabel})
                       </span>
                     )}
                     {expiring > 0 && (
@@ -1006,7 +1349,61 @@ export function DriversTab({
                   >
                     VIEW PROFILE →
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {can('drivers.approve') &&
+                      lifecycle === 'pending_review' && (
+                        <button
+                          onClick={(e) => void approveDriver(d, e)}
+                          style={{
+                            background: G.success,
+                            border: 'none',
+                            color: '#fff',
+                            borderRadius: 7,
+                            padding: '6px 12px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          APPROVE
+                        </button>
+                      )}
+                    {can('drivers.suspend') &&
+                      lifecycle === 'active' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const recordId = d.driverRecordId;
+                            if (!recordId) return;
+                            const ok = await confirm({
+                              title: 'Suspend driver',
+                              message: `Suspend ${d.name}? They will not be able to log in or receive dispatches.`,
+                              confirmLabel: 'Suspend',
+                              variant: 'danger',
+                            });
+                            if (!ok) return;
+                            try {
+                              await driversApi.suspend(recordId);
+                              await refreshAll?.();
+                              notify(`${d.name} suspended`);
+                            } catch (err: any) {
+                              notify(err?.message || 'Suspend failed', 'error');
+                            }
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: `1px solid ${G.warning}`,
+                            color: G.warning,
+                            borderRadius: 7,
+                            padding: '6px 12px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          SUSPEND
+                        </button>
+                      )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

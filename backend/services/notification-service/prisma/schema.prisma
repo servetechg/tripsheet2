@@ -22,3 +22,35 @@ model NotificationLog {
   @@index([channel])
   @@index([createdAt])
 }
+
+model Message {
+  id         String   @id @default(cuid())
+  companyId  String
+  threadType String   @default("driver") // driver | internal | customer
+  fromUserId String
+  fromName   String   @default("")
+  toUserId   String?
+  toName     String   @default("")
+  loadId     String?
+  body       String
+  readAt     String?
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([toUserId])
+  @@index([loadId])
+}
+
+model Comment {
+  id         String   @id @default(cuid())
+  companyId  String
+  entityType String // load | invoice | asset | sheet
+  entityId   String
+  userId     String
+  userName   String   @default("")
+  body       String
+  createdAt  DateTime @default(now())
+
+  @@index([companyId])
+  @@index([entityType, entityId])
+}

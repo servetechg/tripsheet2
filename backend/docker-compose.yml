@@ -18,6 +18,31 @@ services:
       timeout: 5s
       retries: 10
 
+  # Phase 3: connection pooler for many fq_tenant_* databases.
+  # App runtime URLs should use port 6432; CREATE DATABASE (provision) still uses 5432.
+  pgbouncer:
+    image: edoburu/pgbouncer:1.22.1-p0
+    container_name: tripsheet-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_USER: tripsheet
+      DB_PASSWORD: tripsheet
+      DB_HOST: postgres
+      DB_PORT: 5432
+      AUTH_TYPE: plain
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 20
+      MIN_POOL_SIZE: 2
+      RESERVE_POOL_SIZE: 5
+      SERVER_RESET_QUERY: DISCARD ALL
+      ADMIN_USERS: tripsheet
+    ports:
+      - '6432:5432'
+
   redis:
     image: redis:7-alpine
     container_name: tripsheet-redis
@@ -31,88 +56,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
-  # ---------------------------------------------------------------------------
-  # Application services (optional — uncomment when ready to run via Compose)
-  # For local development, prefer: docker compose up postgres redis
-  # then run each Nest app with npm run start:dev
-  # ---------------------------------------------------------------------------
-
-  # gateway:
-  #   build: ./gateway
-  #   container_name: tripsheet-gateway
-  #   ports:
-  #     - '3000:3000'
-  #   env_file: ./gateway/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #     auth-service:
-  #       condition: service_started
-  #     company-service:
-  #       condition: service_started
-
-  # auth-service:
-  #   build: ./services/auth-service
-  #   container_name: tripsheet-auth
-  #   ports:
-  #     - '3001:3001'
-  #   env_file: ./services/auth-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-
-  # company-service:
-  #   build: ./services/company-service
-  #   container_name: tripsheet-company
-  #   ports:
-  #     - '3002:3002'
-  #   env_file: ./services/company-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-
-  # driver-service:
-  #   build: ./services/driver-service
-  #   container_name: tripsheet-driver
-  #   ports:
-  #     - '3003:3003'
-  #   env_file: ./services/driver-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-
-  # fleet-service:
-  #   build: ./services/fleet-service
-  #   container_name: tripsheet-fleet
-  #   ports:
-  #     - '3004:3004'
-  #   env_file: ./services/fleet-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-
-  # manifest-service:
-  #   build: ./services/manifest-service
-  #   container_name: tripsheet-manifest
-  #   ports:
-  #     - '3005:3005'
-  #   env_file: ./services/manifest-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-
-  # tripsheet-service:
-  #   build: ./services/tripsheet-service
-  #   container_name: tripsheet-tripsheet
-  #   ports:
-  #     - '3006:3006'
-  #   env_file: ./services/tripsheet-service/.env
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
 
 volumes:
   postgres_data:

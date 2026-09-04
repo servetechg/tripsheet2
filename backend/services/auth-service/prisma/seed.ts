@@ -1,64 +1,32 @@
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { syncRbacCatalog } from '../src/rbac/rbac.sync';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const users: Array<{
-    id: string;
-    email: string;
-    password: string;
-    name: string;
-    role: Role;
-    companyId: string | null;
-  }> = [
-    {
-      id: 'u1',
-      email: 'admin@tripsheet.io',
-      password: 'admin123',
+  await syncRbacCatalog(prisma);
+  console.log('RBAC catalog synced');
+
+  const passwordHash = await bcrypt.hash('admin123', 10);
+  await prisma.user.upsert({
+    where: { email: 'admin@tripsheet.io' },
+    update: {
+      passwordHash,
       name: 'Super Admin',
-      role: 'superadmin',
+      role: Role.superadmin,
       companyId: null,
     },
-    {
-      id: 'u2',
-      email: 'admin@mkx.ca',
-      password: 'mkx123',
-      name: 'MKX Admin',
-      role: 'company_admin',
-      companyId: 'c1',
+    create: {
+      id: 'u1',
+      email: 'admin@tripsheet.io',
+      passwordHash,
+      name: 'Super Admin',
+      role: Role.superadmin,
+      companyId: null,
     },
-    {
-      id: 'u3',
-      email: 'divyam@mkx.ca',
-      password: 'driver123',
-      name: 'Divyam Chopra',
-      role: 'driver',
-      companyId: 'c1',
-    },
-  ];
-
-  for (const u of users) {
-    const passwordHash = await bcrypt.hash(u.password, 10);
-    await prisma.user.upsert({
-      where: { email: u.email },
-      update: {
-        passwordHash,
-        name: u.name,
-        role: u.role,
-        companyId: u.companyId,
-      },
-      create: {
-        id: u.id,
-        email: u.email,
-        passwordHash,
-        name: u.name,
-        role: u.role,
-        companyId: u.companyId,
-      },
-    });
-    console.log(`Seeded user: ${u.email} (${u.role})`);
-  }
+  });
+  console.log('Seeded user: admin@tripsheet.io (superadmin)');
 }
 
 main()

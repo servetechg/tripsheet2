@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "brokerId" TEXT;
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "customerId" TEXT;
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "originLocationId" TEXT;
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "destinationLocationId" TEXT;
+ALTER TABLE "Load" ADD COLUMN IF NOT EXISTS "brokerName" TEXT;
+
+CREATE INDEX IF NOT EXISTS "Load_brokerId_idx" ON "Load"("brokerId");

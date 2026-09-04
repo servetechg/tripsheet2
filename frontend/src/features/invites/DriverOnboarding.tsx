@@ -40,7 +40,7 @@ const emptyProfile = (): Profile => ({
  * Invite onboarding wizard.
  * Steps are inlined (not nested components) so inputs keep focus while typing.
  */
-export function DriverOnboarding({ invite: _invite, company, onComplete }: any) {
+export function DriverOnboarding({ invite, company, onComplete }: any) {
   const TOTAL = 4;
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
@@ -86,6 +86,14 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
   const goProfileNext = () => {
     if (!profile.name || !profile.email || !profile.password) {
       setProfileErr('Name, email and password are required.');
+      return;
+    }
+    const minLen = invite?.passwordPolicy?.minLength || 8;
+    if (profile.password.length < minLen) {
+      setProfileErr(
+        invite?.passwordPolicy?.hint ||
+          `Password must be at least ${minLen} characters.`,
+      );
       return;
     }
     setProfileErr('');
@@ -329,6 +337,12 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
               placeholder="Choose a secure password"
               type="password"
               autoComplete="new-password"
+              hint={
+                invite?.passwordPolicy?.hint ||
+                (invite?.passwordPolicy?.minLength
+                  ? `At least ${invite.passwordPolicy.minLength} characters`
+                  : undefined)
+              }
             />
 
             <div
@@ -346,10 +360,11 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
             <G2 cols={2}>
               <Inp
                 label="Phone"
+                phone
                 value={profile.phone}
                 type="tel"
                 onChange={(e) => upd('phone', e.target.value)}
-                placeholder="+1 (403) 000-0000"
+                placeholder="(403) 555-0100"
               />
               <Inp
                 label="Date of Birth"
@@ -415,10 +430,11 @@ export function DriverOnboarding({ invite: _invite, company, onComplete }: any) 
               />
               <Inp
                 label="Emergency Phone"
+                phone
                 value={profile.emergencyPhone}
                 type="tel"
                 onChange={(e) => upd('emergencyPhone', e.target.value)}
-                placeholder="+1 (403) 000-0000"
+                placeholder="(403) 555-0100"
               />
             </G2>
 

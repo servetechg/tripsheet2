@@ -67,6 +67,28 @@ textarea {
   outline: none;
 }
 
+select.ts-input,
+select.ts-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  padding-right: 36px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A94AD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+}
+
+[data-theme='light'] select.ts-input,
+[data-theme='light'] select.ts-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+select.ts-select {
+  background-image: none;
+}
+
 .ts-nav-item:hover {
   background: rgba(37, 99, 235, 0.06) !important;
 }
@@ -77,6 +99,24 @@ textarea {
 
 .ts-bar {
   transform-origin: bottom;
+}
+
+.ts-modal-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+}
+
+.ts-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ts-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ts-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

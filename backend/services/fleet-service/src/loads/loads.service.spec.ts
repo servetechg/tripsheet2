@@ -16,6 +16,12 @@ describe('LoadsService', () => {
       update: jest.Mock;
       delete: jest.Mock;
     };
+    asset: {
+      findUnique: jest.Mock;
+    };
+  };
+  const config = {
+    get: jest.fn() as jest.Mock,
   };
 
   beforeEach(() => {
@@ -28,8 +34,20 @@ describe('LoadsService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      asset: {
+        findUnique: jest.fn(),
+      },
     };
-    service = new LoadsService(prisma as any);
+    config.get.mockImplementation((key: string) => {
+      if (key === 'DRIVER_SERVICE_URL') return '';
+      return undefined;
+    });
+    service = new LoadsService(prisma as any, config as any);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    delete (global as any).fetch;
   });
 
   describe('create', () => {
@@ -74,6 +92,69 @@ describe('LoadsService', () => {
 
       expect(result.id).toBe('L1');
       expect(prisma.load.create).toHaveBeenCalled();
+    });
+
+    it('rejects driver not dispatch-ready (expired medical)', async () => {
+      prisma.load.findFirst.mockResolvedValue(null);
+      config.get.mockImplementation((key: string) => {
+        if (key === 'DRIVER_SERVICE_URL') return 'http://driver.test';
+        return undefined;
+      });
+      const fetchMock = jest.fn(async (url: string) => {
+        if (String(url).includes('/dispatch-ready')) {
+          return {
+            ok: true,
+            json: async () => ({
+              ready: false,
+              missing: ['medical'],
+              lifecycleOk: true,
+              availabilityOk: true,
+            }),
+          };
+        }
+        if (String(url).includes('/drivers/d1')) {
+          return {
+            ok: true,
+            json: async () => ({
+              name: 'Test Driver',
+              lifecycleStatus: 'active',
+            }),
+          };
+        }
+        return { ok: true, json: async () => ({}) };
+      });
+      global.fetch = fetchMock as any;
+
+      await expect(
+        service.create({
+          companyId: 'c1',
+          driverId: 'd1',
+          origin: 'Calgary',
+          destination: 'Toronto',
+        } as any),
+      ).rejects.toThrow(/medical/);
+      expect(prisma.load.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects Out of Service truck', async () => {
+      prisma.load.findFirst.mockResolvedValue(null);
+      global.fetch = jest.fn(async () => ({ ok: false })) as any;
+      prisma.asset.findUnique.mockResolvedValue({
+        id: 't1',
+        companyId: 'c1',
+        unitNo: 'T-101',
+        status: 'out_of_service',
+      });
+      await expect(
+        service.create({
+          companyId: 'c1',
+          driverId: 'd1',
+          truckId: 't1',
+          origin: 'Calgary',
+          destination: 'Toronto',
+        } as any),
+      ).rejects.toThrow(/Out of Service/);
+      expect(prisma.load.create).not.toHaveBeenCalled();
     });
   });
 

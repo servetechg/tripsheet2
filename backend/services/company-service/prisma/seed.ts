@@ -1,35 +1,89 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
-async function main() {
-  await prisma.company.upsert({
-    where: { id: 'c1' },
-    update: {
-      name: 'MKX Transport',
-      shortName: 'MKX',
-      tagline: 'MORE EFFICIENT',
-      address: '9 Red Sky Rd NE, Calgary, AB T3N 1P8',
-      active: true,
-    },
-    create: {
-      id: 'c1',
-      name: 'MKX Transport',
-      shortName: 'MKX',
-      tagline: 'MORE EFFICIENT',
-      address: '9 Red Sky Rd NE, Calgary, AB T3N 1P8',
-      active: true,
-    },
-  });
-  console.log('Seeded company: MKX Transport (c1)');
-}
-
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
-
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+const PLANS = [
+  {
+    id: 'plan_starter',
+    code: 'starter',
+    name: 'Starter',
+    description: 'Up to 10 drivers; basic dispatch & fleet',
+    maxDrivers: 10,
+    features: {
+      driverOnboarding: true,
+      dispatch: true,
+      fleetMaintenance: true,
+      payroll: false,
+      ocr: false,
+      accounting: false,
+      reports: true,
+      apiAccess: false,
+      customs: false,
+    },
+  },
+  {
+    id: 'plan_professional',
+    code: 'professional',
+    name: 'Professional',
+    description: 'Unlimited drivers; OCR, payroll, accounting, reports',
+    maxDrivers: -1,
+    features: {
+      driverOnboarding: true,
+      dispatch: true,
+      fleetMaintenance: true,
+      payroll: true,
+      ocr: true,
+      accounting: true,
+      reports: true,
+      apiAccess: false,
+      customs: true,
+    },
+  },
+  {
+    id: 'plan_enterprise',
+    code: 'enterprise',
+    name: 'Enterprise',
+    description: 'Unlimited; API, multi-terminal, SSO-ready, white-label',
+    maxDrivers: -1,
+    features: {
+      driverOnboarding: true,
+      dispatch: true,
+      fleetMaintenance: true,
+      payroll: true,
+      ocr: true,
+      accounting: true,
+      reports: true,
+      apiAccess: true,
+      customs: true,
+      sso: true,
+      whiteLabel: true,
+      multiTerminal: true,
+    },
+  },
+] as const;
+
+async function main() {
+  for (const p of PLANS) {
+    await prisma.plan.upsert({
+      where: { code: p.code },
+      update: {
+        name: p.name,
+        description: p.description,
+        maxDrivers: p.maxDrivers,
+        features: p.features,
+        active: true,
+      },
+      create: { ...p, active: true },
+    });
+  }
+  console.log('Seeded platform plans (no demo companies)');
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

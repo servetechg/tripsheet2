@@ -5,6 +5,33 @@ import { AxiosRequestConfig, Method } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { Request } from 'express';
 
+const SERVICE_LABELS: Record<string, string> = {
+  AUTH_SERVICE_URL: 'Auth',
+  COMPANY_SERVICE_URL: 'Company',
+  DRIVER_SERVICE_URL: 'Driver',
+  FLEET_SERVICE_URL: 'Fleet',
+  MANIFEST_SERVICE_URL: 'Manifest',
+  TRIPSHEET_SERVICE_URL: 'TripSheet',
+  ACCOUNTING_SERVICE_URL: 'Accounting',
+  NOTIFICATION_SERVICE_URL: 'Notification',
+};
+
+const FORWARD_HEADERS = [
+  'authorization',
+  'content-type',
+  'x-user-id',
+  'x-user-role',
+  'x-user-email',
+  'x-user-permissions',
+  'x-driver-id',
+  'x-company-id',
+  'x-tenant-key',
+  'x-tenant-status',
+  'x-tenant-routing',
+  'x-tenant-db-name',
+  'x-internal-api-key',
+] as const;
+
 @Injectable()
 export class ProxyService {
   private readonly logger = new Logger(ProxyService.name);
@@ -32,19 +59,27 @@ export class ProxyService {
     const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
 
     const headers: Record<string, string> = {};
-    if (req.headers.authorization) {
-      headers.authorization = String(req.headers.authorization);
+    for (const name of FORWARD_HEADERS) {
+      const v = req.headers[name];
+      if (v) headers[name] = Array.isArray(v) ? v[0] : String(v);
     }
-    if (req.headers['content-type']) {
-      headers['content-type'] = String(req.headers['content-type']);
+
+    // Non-superadmin: never let client override companyId via query
+    const role = headers['x-user-role'];
+    const companyId = headers['x-company-id'];
+    const params = { ...(req.query as Record<string, unknown>) };
+    if (role && role !== 'superadmin' && companyId) {
+      params.companyId = companyId;
     }
 
     const config: AxiosRequestConfig = {
       method,
       url,
       headers,
-      params: req.query,
-      data: ['GET', 'HEAD'].includes(method.toUpperCase()) ? undefined : req.body,
+      params,
+      data: ['GET', 'HEAD'].includes(method.toUpperCase())
+        ? undefined
+        : req.body,
       validateStatus: () => true,
     };
 
@@ -61,12 +96,17 @@ export class ProxyService {
       if (err instanceof HttpException) {
         throw err;
       }
+      const label = SERVICE_LABELS[serviceKey] || serviceKey;
       this.logger.warn(`Proxy failed ${method} ${url}: ${String(err)}`);
-      return {
-        message: 'not implemented',
-        detail: 'Upstream service unavailable or not ready',
-        target: url,
-      };
+      throw new HttpException(
+        {
+          message: `${label} service unavailable`,
+          detail: `${label} service is not running or not reachable. Ensure all backend services are started (npm run start:dev in /backend).`,
+          service: label.toLowerCase(),
+          target: url,
+        },
+        503,
+      );
     }
   }
 }

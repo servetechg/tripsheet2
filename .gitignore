@@ -65,3 +65,8 @@ Desktop.ini
 
 # Nested package lock noise is OK to commit; ignore Nest CLI generated junk
 **/nest-cli.compiled.js
+
+# Deployment secrets (never commit)
+deploy/secrets/
+**/secrets/*.env
+!deploy/secrets.example.env

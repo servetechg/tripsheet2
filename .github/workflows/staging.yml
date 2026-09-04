@@ -1,0 +1,135 @@
+name: staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.sha }}
+      image_registry: ${{ steps.meta.outputs.registry }}
+    steps:
+      - name: Image meta
+        id: meta
+        run: |
+          REPO_LC="$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+          echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "registry=${{ env.REGISTRY }}/${REPO_LC}" >> "$GITHUB_OUTPUT"
+
+  build-and-push:
+    needs: meta
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gateway
+            context: .
+            file: backend/gateway/Dockerfile
+          - name: frontend
+            context: .
+            file: frontend/Dockerfile
+            build_args: VITE_API_URL=/api
+          - name: auth-service
+            context: .
+            file: backend/services/auth-service/Dockerfile
+          - name: company-service
+            context: .
+            file: backend/services/company-service/Dockerfile
+          - name: driver-service
+            context: .
+            file: backend/services/driver-service/Dockerfile
+          - name: fleet-service
+            context: .
+            file: backend/services/fleet-service/Dockerfile
+          - name: manifest-service
+            context: .
+            file: backend/services/manifest-service/Dockerfile
+          - name: tripsheet-service
+            context: .
+            file: backend/services/tripsheet-service/Dockerfile
+          - name: accounting-service
+            context: .
+            file: backend/services/accounting-service/Dockerfile
+          - name: notification-service
+            context: .
+            file: backend/services/notification-service/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          build-args: ${{ matrix.build_args || '' }}
+          tags: |
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:${{ needs.meta.outputs.image_tag }}
+            ${{ needs.meta.outputs.image_registry }}/${{ matrix.name }}:staging
+          cache-from: type=gha,scope=staging-${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=staging-${{ matrix.name }}
+
+  deploy:
+    needs: [meta, build-and-push]
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy staging over SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
+          IMAGE_REGISTRY: ${{ needs.meta.outputs.image_registry }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ secrets.GHCR_USERNAME || github.actor }}
+        run: |
+          set -euo pipefail
+          install -m 600 /dev/null key
+          printf '%s\n' "$SSH_KEY" > key
+          ssh -i key -o StrictHostKeyChecking=accept-new "${VPS_USER}@${VPS_HOST}" bash -s <<EOF
+          set -euo pipefail
+          cd /opt/tripsheet/repo
+          git fetch --all
+          git checkout --force ${GITHUB_SHA}
+          chmod +x deploy/scripts/*.sh
+          touch /opt/tripsheet/secrets/staging.app.env
+          grep -q '^IMAGE_REGISTRY=' /opt/tripsheet/secrets/staging.app.env \
+            && sed -i 's|^IMAGE_REGISTRY=.*|IMAGE_REGISTRY=${IMAGE_REGISTRY}|' /opt/tripsheet/secrets/staging.app.env \
+            || echo "IMAGE_REGISTRY=${IMAGE_REGISTRY}" >> /opt/tripsheet/secrets/staging.app.env
+          grep -q '^IMAGE_TAG=' /opt/tripsheet/secrets/staging.app.env \
+            && sed -i 's|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|' /opt/tripsheet/secrets/staging.app.env \
+            || echo "IMAGE_TAG=${IMAGE_TAG}" >> /opt/tripsheet/secrets/staging.app.env
+          echo '${GHCR_TOKEN}' | docker login ghcr.io -u '${GHCR_USER}' --password-stdin
+          ./deploy/scripts/deploy-staging.sh ${IMAGE_TAG}
+          # Phase 6: migrate-all-tenants (org schema + optional ops push)
+          sleep 8
+          docker exec staging-company-service node -e "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{console.log(await r.text()); if(!r.ok) process.exit(1)})"
+          EOF

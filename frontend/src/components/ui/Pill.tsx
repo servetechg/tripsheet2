@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react';
+import { G } from '@/lib/theme';
 
 export interface PillProps {
-  color: string;
+  color?: string;
   children?: ReactNode;
   small?: boolean;
 }
 
-export function Pill({ color, children, small }: PillProps) {
+export function Pill({ color = G.muted, children, small }: PillProps) {
   return (
     <span
       style={{
