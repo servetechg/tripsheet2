@@ -1,0 +1,55 @@
+name: Setup Buildx with retry
+description: Pre-pull BuildKit and setup Docker Buildx with retries (Docker Hub flakes on GHA).
+runs:
+  using: composite
+  steps:
+    - name: Pre-pull BuildKit image
+      shell: bash
+      run: |
+        set -euo pipefail
+        pull_retry() {
+          local img="$1"
+          local i
+          for i in 1 2 3 4 5; do
+            if docker pull "$img"; then
+              echo "pulled ${img}"
+              return 0
+            fi
+            echo "pull ${img} attempt ${i} failed — retrying..."
+            sleep $((i * 10))
+          done
+          echo "WARN: could not pre-pull ${img}"
+          return 0
+        }
+        pull_retry moby/buildkit:buildx-stable-1
+
+    - name: Setup Buildx (attempt 1)
+      id: buildx1
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+
+    - name: Setup Buildx (attempt 2)
+      id: buildx2
+      if: steps.buildx1.outcome == 'failure'
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+
+    - name: Setup Buildx (attempt 3)
+      id: buildx3
+      if: steps.buildx1.outcome == 'failure' && steps.buildx2.outcome == 'failure'
+      continue-on-error: true
+      uses: docker/setup-buildx-action@v3
+
+    - name: Verify Buildx ready
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ "${{ steps.buildx1.outcome }}" == "success" \
+           || "${{ steps.buildx2.outcome }}" == "success" \
+           || "${{ steps.buildx3.outcome }}" == "success" ]]; then
+          docker buildx version
+          docker buildx ls
+          exit 0
+        fi
+        echo "ERROR: Docker Buildx setup failed after 3 attempts"
+        exit 1
