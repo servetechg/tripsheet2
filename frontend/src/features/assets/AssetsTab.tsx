@@ -487,24 +487,18 @@ export function AssetsTab({
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <select
+                <Sel
+                  compact
                   value={normalizeAssetStatus(a.status)}
                   onChange={(e) => void setAssetStatus(a.id, e.target.value)}
-                  style={{
-                    background: '#0a0a0e',
-                    border: `1px solid ${G.border}`,
-                    color: G.text,
-                    borderRadius: 7,
-                    padding: '6px 8px',
-                    fontSize: 11,
-                  }}
+                  aria-label={`Status for ${a.unitNo || a.id}`}
                 >
                   {ASSET_STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {s.replace(/_/g, ' ')}
+                      {assetStatusLabel(s)}
                     </option>
                   ))}
-                </select>
+                </Sel>
                 <button
                   onClick={() => toggleStatus(a.id)}
                   style={{

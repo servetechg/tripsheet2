@@ -857,6 +857,7 @@ export function CompanySettingsTab({
               onChange={(e) =>
                 setNewBranch((b) => ({ ...b, name: e.target.value }))
               }
+              style={{ marginBottom: 0 }}
             />
             <Inp
               label="Address"
@@ -864,9 +865,11 @@ export function CompanySettingsTab({
               onChange={(e) =>
                 setNewBranch((b) => ({ ...b, address: e.target.value }))
               }
+              style={{ marginBottom: 0 }}
             />
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <Btn
+                style={{ minHeight: 42, height: 42, flexShrink: 0 }}
                 onClick={() => {
                   void companiesApi
                     .saveBranch(cid, newBranch)
@@ -1116,31 +1119,42 @@ export function CompanySettingsTab({
               prep).
             </div>
           )}
-          <G2 cols={2}>
-            <Inp
-              label="Key name"
-              value={newKeyName}
-              onChange={(e) => setNewKeyName(e.target.value)}
-            />
-            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-              <Btn
-                onClick={() => {
-                  void companiesApi
-                    .createApiKey(cid, { name: newKeyName, scopes: ['read'] })
-                    .then((res: any) => {
-                      setRevealedKey(res.apiKey || '');
-                      notify('API key created — copy it now');
-                      return reload();
-                    })
-                    .catch((err: any) =>
-                      notify(err?.message || 'Failed', 'error'),
-                    );
-                }}
-              >
-                Create key
-              </Btn>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 12,
+              marginBottom: 16,
+              maxWidth: 520,
+            }}
+          >
+            <div style={{ flex: 1 }}>
+              <Inp
+                label="Key name"
+                placeholder="e.g. Integration key"
+                value={newKeyName}
+                onChange={(e) => setNewKeyName(e.target.value)}
+                style={{ marginBottom: 0 }}
+              />
             </div>
-          </G2>
+            <Btn
+              style={{ minHeight: 42, height: 42, padding: '0 20px', flexShrink: 0 }}
+              onClick={() => {
+                void companiesApi
+                  .createApiKey(cid, { name: newKeyName, scopes: ['read'] })
+                  .then((res: any) => {
+                    setRevealedKey(res.apiKey || '');
+                    notify('API key created — copy it now');
+                    return reload();
+                  })
+                  .catch((err: any) =>
+                    notify(err?.message || 'Failed', 'error'),
+                  );
+              }}
+            >
+              Create key
+            </Btn>
+          </div>
           {revealedKey && (
             <div
               style={{

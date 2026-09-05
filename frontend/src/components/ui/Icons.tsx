@@ -178,6 +178,12 @@ export const Icons = {
       <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
     </Filled>
   ),
+  arrowLeft: (p?: IconProps) => (
+    <Outline {...p}>
+      <line x1="19" y1="12" x2="5" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </Outline>
+  ),
   chevronLeft: (p?: IconProps) => (
     <Outline {...p}>
       <polyline points="15 18 9 12 15 6" />
@@ -191,6 +197,20 @@ export const Icons = {
   chevronDown: (p?: IconProps) => (
     <Outline {...p}>
       <polyline points="6 9 12 15 18 9" />
+    </Outline>
+  ),
+  calendar: (p?: IconProps) => (
+    <Outline {...p}>
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </Outline>
+  ),
+  clock: (p?: IconProps) => (
+    <Outline {...p}>
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
     </Outline>
   ),
   trendUp: (p?: IconProps) => (

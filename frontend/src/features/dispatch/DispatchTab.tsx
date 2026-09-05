@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { G, FONT_MONO } from '@/lib/theme';
+import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import {
   Btn,
   Card,
+  Chk,
   FieldInp,
   Sel,
   Pill,
@@ -736,25 +737,18 @@ export function DispatchTab({
                 {fieldErr.driverId}
               </div>
             )}
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 11,
-                color: G.muted,
-                marginBottom: 8,
-                cursor: 'pointer',
-              }}
+            <Chk
+              checked={showAllDrivers}
+              onChange={(e) => setShowAllDrivers(e.target.checked)}
+              label="Show all drivers (default: available + active only)"
+              muted
+              style={{ marginBottom: 10 }}
+            />
+            <div
+              role="radiogroup"
+              aria-label="Select driver"
+              style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
             >
-              <input
-                type="checkbox"
-                checked={showAllDrivers}
-                onChange={(e) => setShowAllDrivers(e.target.checked)}
-              />
-              Show all drivers (default: available + active only)
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {visibleDrivers.length === 0 && (
                 <div style={{ fontSize: 11, color: G.muted, padding: 10 }}>
                   No drivers match filter. Enable &quot;Show all drivers&quot; to see everyone.
@@ -773,11 +767,17 @@ export function DispatchTab({
                     ['assigned', 'in_transit'].includes(l.status),
                 );
                 const selected = f.driverId === d.id;
+                const selectable = canDispatch && !onLoad;
                 return (
                   <div
                     key={d.id}
+                    role="radio"
+                    aria-checked={selected}
+                    aria-disabled={!selectable}
+                    className="ts-driver-pick"
+                    data-selectable={selectable ? 'true' : 'false'}
                     onClick={() => {
-                      if (canDispatch && !onLoad) upd('driverId', d.id);
+                      if (selectable) upd('driverId', d.id);
                     }}
                     title={
                       !canDispatch
@@ -790,12 +790,12 @@ export function DispatchTab({
                     }
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
+                      gap: 12,
                       background: selected
                         ? G.goldBg
                         : canDispatch
-                          ? '#0a0a0e'
+                          ? G.card2
                           : G.dangerBg,
                       border: `1px solid ${
                         selected
@@ -806,12 +806,48 @@ export function DispatchTab({
                       }`,
                       borderRadius: 9,
                       padding: '10px 14px',
-                      cursor: canDispatch && !onLoad ? 'pointer' : 'not-allowed',
+                      cursor: selectable ? 'pointer' : 'not-allowed',
                       opacity: onLoad ? 0.5 : 1,
                       transition: 'all .15s',
                     }}
                   >
-                    <div>
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: RADIUS.pill,
+                        border: `2px solid ${
+                          selected
+                            ? G.gold
+                            : selectable
+                              ? G.border2
+                              : G.border
+                        }`,
+                        background: selected ? G.gold : G.card,
+                        flexShrink: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: selected
+                          ? 'none'
+                          : selectable
+                            ? `0 0 0 1px ${G.border} inset`
+                            : 'none',
+                      }}
+                    >
+                      {selected && (
+                        <span
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: RADIUS.pill,
+                            background: G.onGold,
+                          }}
+                        />
+                      )}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
                       <div
                         style={{
                           fontSize: 13,
@@ -865,9 +901,6 @@ export function DispatchTab({
                         </div>
                       )}
                     </div>
-                    {selected && (
-                      <span style={{ color: G.gold, fontSize: 16 }}>✓</span>
-                    )}
                   </div>
                 );
               })}
@@ -1141,7 +1174,6 @@ export function DispatchTab({
               value={f.pickupTime}
               onChange={(e: any) => upd('pickupTime', e.target.value)}
               error={fieldErr.pickupTime}
-              inputStyle={{ colorScheme: G.mode === 'light' ? 'light' : 'dark' }}
             />
             <FieldInp
               label="ETA"
@@ -1151,7 +1183,6 @@ export function DispatchTab({
               onChange={(e: any) => upd('eta', e.target.value)}
               error={fieldErr.eta}
               hint="Must be on or after pickup"
-              inputStyle={{ colorScheme: G.mode === 'light' ? 'light' : 'dark' }}
             />
           </G2>
           <SectionTitle>Economics & stops</SectionTitle>

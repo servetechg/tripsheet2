@@ -43,7 +43,6 @@ export function AppShell({
 }: AppShellProps) {
   const w = useMediaQuery();
   const mob = w < 768;
-  const wide = activeTab === 'dashboard';
   const showUserMenu = !!(onLogout || onToggleTheme);
 
   return (
@@ -72,6 +71,7 @@ export function AppShell({
           alignItems: 'center',
           justifyContent: 'space-between',
           marginLeft: mob ? 0 : SIDEBAR_WIDTH,
+          width: mob ? '100%' : `calc(100% - ${SIDEBAR_WIDTH}px)`,
         }}
       >
         {mob ? (
@@ -108,11 +108,11 @@ export function AppShell({
           marginLeft: mob ? 0 : SIDEBAR_WIDTH,
           padding: mob
             ? '14px 13px 90px'
-            : wide
-              ? '24px 28px 48px'
-              : '22px 28px 40px',
-          maxWidth: mob ? '100%' : wide ? 1360 : 1120,
+            : '24px 28px 48px',
+          width: mob ? '100%' : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          maxWidth: '100%',
           boxSizing: 'border-box',
+          minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
         }}
       >
         {children}

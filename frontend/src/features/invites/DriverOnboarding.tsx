@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, page } from '@/lib/theme';
-import { Btn, Inp, Sel, G2, Icons } from '@/components/ui';
+import { Btn, BackButton, Inp, Sel, G2, Icons } from '@/components/ui';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
@@ -174,7 +174,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               style={{
                 fontSize: 22,
                 fontWeight: 900,
-                color: G.white,
+                color: G.text,
                 marginBottom: 8,
               }}
             >
@@ -272,14 +272,14 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               style={{
                 fontSize: 14,
                 fontWeight: 700,
-                color: G.white,
+                color: G.text,
                 marginBottom: 4,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              {Icons.driver({ size: 16, color: G.white })}
+              {Icons.driver({ size: 16, color: G.gold })}
               Your Profile
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 20 }}>
@@ -433,9 +433,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             </G2>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-              <Btn variant="outline" onClick={() => setStep(1)}>
-                ← BACK
-              </Btn>
+              <BackButton onClick={() => setStep(1)} />
               <Btn onClick={goProfileNext} style={{ flex: 1, padding: 14 }}>
                 NEXT: UPLOAD DOCUMENTS →
               </Btn>
@@ -449,14 +447,14 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               style={{
                 fontSize: 14,
                 fontWeight: 700,
-                color: G.white,
+                color: G.text,
                 marginBottom: 4,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              {Icons.docs({ size: 16, color: G.white })}
+              {Icons.docs({ size: 16, color: G.gold })}
               Upload Documents
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 4 }}>
@@ -628,9 +626,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             })}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-              <Btn variant="outline" onClick={() => setStep(2)}>
-                ← BACK
-              </Btn>
+              <BackButton onClick={() => setStep(2)} />
               <Btn onClick={() => setStep(4)} style={{ flex: 1, padding: 14 }}>
                 NEXT: REVIEW CONTRACT →
               </Btn>
@@ -655,14 +651,14 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               style={{
                 fontSize: 14,
                 fontWeight: 700,
-                color: G.white,
+                color: G.text,
                 marginBottom: 4,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 8,
               }}
             >
-              {Icons.contract({ size: 16, color: G.white })}
+              {Icons.contract({ size: 16, color: G.gold })}
               Employment Contract
             </div>
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 20 }}>
@@ -908,9 +904,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <Btn variant="outline" onClick={() => setStep(3)}>
-                ← BACK
-              </Btn>
+              <BackButton onClick={() => setStep(3)} />
               <Btn
                 onClick={() => void finish()}
                 style={{
@@ -949,7 +943,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               }}
             >
               Your profile, documents, and signed contract have been sent to{' '}
-              <strong style={{ color: G.white }}>{company.name}</strong>.
+              <strong style={{ color: G.text }}>{company.name}</strong>.
               <br />
               You can now sign in with:{' '}
               <span style={{ color: G.gold }}>{profile.email}</span>

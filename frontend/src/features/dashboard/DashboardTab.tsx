@@ -193,7 +193,7 @@ export function DashboardTab({
   onNavigate,
 }: DashboardTabProps) {
   const width = useMediaQuery();
-  const narrow = width < 1100;
+  const narrow = width < 1280;
   const [now, setNow] = useState(formatNow);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -435,18 +435,25 @@ export function DashboardTab({
         />
       </StatsGrid>
 
-      {/* Main content */}
+      {/* Main content — sheets table + fleet status */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: narrow ? '1fr' : 'minmax(0, 1.65fr) minmax(280px, 1fr)',
           gap: 16,
-          alignItems: 'start',
-          marginBottom: SPACE.xl,
+          alignItems: 'stretch',
+          marginBottom: 16,
         }}
       >
         {/* Left: recent sheets */}
-        <Card style={{ marginBottom: 0 }}>
+        <Card
+          style={{
+            marginBottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: narrow ? undefined : 400,
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -532,12 +539,19 @@ export function DashboardTab({
           <div
             className="ts-table-wrap"
             style={{
+              flex: 1,
+              minHeight: 220,
               border: `1px solid ${G.border}`,
               borderRadius: RADIUS.lg,
               overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <table className="ts-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <table
+              className="ts-table"
+              style={{ width: '100%', borderCollapse: 'collapse', flex: 1 }}
+            >
               <thead>
                 <tr style={{ background: G.card2 }}>
                   {['Driver', 'Truck', 'Period', 'Legs', 'Status', ''].map((h) => (
@@ -569,6 +583,8 @@ export function DashboardTab({
                         textAlign: 'center',
                         color: G.muted,
                         fontSize: 14,
+                        height: 180,
+                        verticalAlign: 'middle',
                       }}
                     >
                       No trip sheets match your filters.
@@ -677,9 +693,24 @@ export function DashboardTab({
           </div>
         </Card>
 
-        {/* Right panels */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Card style={{ marginBottom: 0 }}>
+        {/* Right: live fleet status */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+            minHeight: '100%',
+          }}
+        >
+          <Card
+            style={{
+              marginBottom: 0,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+            }}
+          >
             <div
               style={{
                 display: 'flex',
@@ -693,7 +724,17 @@ export function DashboardTab({
                 Driver Status
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                flex: 1,
+                minHeight: 120,
+                maxHeight: 280,
+                overflowY: 'auto',
+              }}
+            >
               {driverStatus.length === 0 ? (
                 <div style={{ ...TYPE.small, color: G.muted }}>No drivers yet.</div>
               ) : (
@@ -749,7 +790,15 @@ export function DashboardTab({
             </div>
           </Card>
 
-          <Card style={{ marginBottom: 0 }}>
+          <Card
+            style={{
+              marginBottom: 0,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: 0,
+            }}
+          >
             <div
               style={{
                 display: 'flex',
@@ -763,7 +812,17 @@ export function DashboardTab({
                 Vehicle Status
               </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto' }}>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 8,
+                flex: 1,
+                minHeight: 80,
+                maxHeight: 220,
+                overflowY: 'auto',
+              }}
+            >
               {vehicleStatus.length === 0 ? (
                 <div style={{ ...TYPE.small, color: G.muted }}>No trucks yet.</div>
               ) : (
@@ -797,92 +856,117 @@ export function DashboardTab({
               )}
             </div>
           </Card>
+        </div>
+      </div>
 
-          <Card style={{ marginBottom: 0 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginBottom: 14,
-              }}
-            >
-              <span style={{ color: G.info }}>{Icons.chart({ size: 18 })}</span>
-              <div style={{ ...TYPE.cardTitle, color: G.text, fontWeight: 600 }}>
-                Trip Statistics
-              </div>
+      {/* Trip stats + quick actions */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: narrow ? '1fr' : '1fr 1fr',
+          gap: 16,
+          marginBottom: SPACE.xl,
+        }}
+      >
+        <Card style={{ marginBottom: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 14,
+            }}
+          >
+            <span style={{ color: G.info }}>{Icons.chart({ size: 18 })}</span>
+            <div style={{ ...TYPE.cardTitle, color: G.text, fontWeight: 600 }}>
+              Trip Statistics
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {[
-                ['Sheets filed', String(sheets.length)],
-                ['Active drivers', String(drivers.length)],
-                ['Fleet trucks', String(trucks.length)],
-                ['Completion', `${metrics.total ? Math.round((metrics.completed / metrics.total) * 100) : 0}%`],
-              ].map(([k, v]) => (
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: narrow ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
+              gap: 10,
+            }}
+          >
+            {[
+              ['Sheets filed', String(sheets.length)],
+              ['Active drivers', String(drivers.length)],
+              ['Fleet trucks', String(trucks.length)],
+              [
+                'Completion',
+                `${metrics.total ? Math.round((metrics.completed / metrics.total) * 100) : 0}%`,
+              ],
+            ].map(([k, v]) => (
+              <div
+                key={k}
+                style={{
+                  padding: '12px 12px',
+                  borderRadius: RADIUS.md,
+                  background: G.card2,
+                  border: `1px solid ${G.border}`,
+                }}
+              >
+                <div style={{ ...TYPE.small, color: G.muted }}>{k}</div>
                 <div
-                  key={k}
                   style={{
-                    padding: '12px 12px',
-                    borderRadius: RADIUS.md,
-                    background: G.card2,
-                    border: `1px solid ${G.border}`,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: G.text,
+                    marginTop: 4,
                   }}
                 >
-                  <div style={{ ...TYPE.small, color: G.muted }}>{k}</div>
-                  <div
-                    style={{
-                      fontSize: 18,
-                      fontWeight: 700,
-                      color: G.text,
-                      marginTop: 4,
-                    }}
-                  >
-                    {v}
-                  </div>
+                  {v}
                 </div>
-              ))}
-            </div>
-          </Card>
+              </div>
+            ))}
+          </div>
+        </Card>
 
-          <Card style={{ marginBottom: 0 }}>
-            <div style={{ ...TYPE.cardTitle, color: G.text, fontWeight: 600, marginBottom: 12 }}>
-              Quick Actions
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <Btn
-                size="sm"
-                onClick={() => onNavigate?.('dispatch')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {Icons.plus({ size: 14 })} Dispatch
-              </Btn>
-              <Btn
-                size="sm"
-                variant="outline"
-                onClick={() => onNavigate?.('track')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {Icons.track({ size: 14 })} Track
-              </Btn>
-              <Btn
-                size="sm"
-                variant="outline"
-                onClick={() => onNavigate?.('sheets')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {Icons.sheets({ size: 14 })} Sheets
-              </Btn>
-              <Btn
-                size="sm"
-                variant="outline"
-                onClick={() => onNavigate?.('reports')}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-              >
-                {Icons.chart({ size: 14 })} Reports
-              </Btn>
-            </div>
-          </Card>
-        </div>
+        <Card style={{ marginBottom: 0 }}>
+          <div style={{ ...TYPE.cardTitle, color: G.text, fontWeight: 600, marginBottom: 12 }}>
+            Quick Actions
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: narrow ? '1fr 1fr' : 'repeat(4, minmax(0, 1fr))',
+              gap: 8,
+            }}
+          >
+            <Btn
+              size="sm"
+              onClick={() => onNavigate?.('dispatch')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              {Icons.plus({ size: 14 })} Dispatch
+            </Btn>
+            <Btn
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate?.('track')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              {Icons.track({ size: 14 })} Track
+            </Btn>
+            <Btn
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate?.('sheets')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              {Icons.sheets({ size: 14 })} Sheets
+            </Btn>
+            <Btn
+              size="sm"
+              variant="outline"
+              onClick={() => onNavigate?.('reports')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+            >
+              {Icons.chart({ size: 14 })} Reports
+            </Btn>
+          </div>
+        </Card>
       </div>
 
       {/* Charts */}

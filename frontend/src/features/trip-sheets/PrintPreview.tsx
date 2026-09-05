@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
+import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 
 export function PrintPreview({ company, header, trips, expenses, notes, onBack, branding }: any) {
   const ref = useRef<any>(null);
@@ -253,7 +253,7 @@ export function PrintPreview({ company, header, trips, expenses, notes, onBack, 
     <div style={{ fontFamily:FONT_UI, background:"#b0b8c0", minHeight:"100vh" }}>
       {/* Top bar */}
       <div style={{ background:"#111", borderBottom:"2px solid #D4A017", padding:"11px 16px", display:"flex", gap:12, alignItems:"center", position:"sticky", top:0, zIndex:100 }}>
-        <Btn onClick={onBack} style={{ padding:"9px 16px", fontSize:12 }}>← BACK</Btn>
+        <BackButton onClick={onBack} />
         <span style={{ fontSize:11, fontWeight:700, color:"#D4A017", flex:1, letterSpacing:2 }}>TRIP SHEET · A4 PREVIEW</span>
         <Btn onClick={doPrint} style={{ padding:"9px 20px", fontSize:12, display:'inline-flex', alignItems:'center', gap:6 }}>
           {Icons.print({ size: 16, color: '#fff' })}

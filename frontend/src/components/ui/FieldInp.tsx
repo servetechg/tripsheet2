@@ -13,6 +13,7 @@ import {
   resolveInputType,
 } from '@/lib/inputPlaceholders';
 import { Icons } from './Icons';
+import { DatePickerInput, type DatePickerMode } from './DatePickerInput';
 
 export interface FieldInpProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode;
@@ -58,6 +59,10 @@ export function FieldInp({
   onChange,
   maxLength,
   placeholder,
+  value,
+  min,
+  max,
+  disabled,
   ...p
 }: FieldInpProps) {
   const autoId = useId();
@@ -65,6 +70,10 @@ export function FieldInp({
   const [showPassword, setShowPassword] = useState(false);
   const resolvedInputType = resolveInputType(type, label, phone);
   const isPassword = resolvedInputType === 'password';
+  const isPicker =
+    resolvedInputType === 'date' ||
+    resolvedInputType === 'time' ||
+    resolvedInputType === 'datetime-local';
   const showToggle = isPassword && passwordToggle !== false;
   const resolvedType =
     isPassword && showToggle && showPassword ? 'text' : resolvedInputType;
@@ -91,6 +100,41 @@ export function FieldInp({
     onChange?.(e);
   };
 
+  if (isPicker) {
+    const pickerMode: DatePickerMode =
+      resolvedInputType === 'datetime-local'
+        ? 'datetime'
+        : resolvedInputType === 'time'
+          ? 'time'
+          : 'date';
+    return (
+      <div style={{ marginBottom: 12, ...sx }}>
+        {label ? (
+          <label htmlFor={inputId} style={labelBase()}>
+            {label}
+          </label>
+        ) : null}
+        <DatePickerInput
+          id={inputId}
+          mode={pickerMode}
+          value={value != null ? String(value) : ''}
+          onChange={onChange}
+          placeholder={resolvedPlaceholder}
+          disabled={disabled}
+          min={min != null ? String(min) : undefined}
+          max={max != null ? String(max) : undefined}
+          style={inputStyle}
+          error={Boolean(error)}
+        />
+        {error ? (
+          <div style={{ fontSize: 11, color: G.danger, marginTop: 4 }}>{error}</div>
+        ) : hint ? (
+          <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>{hint}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div style={{ marginBottom: 12, ...sx }}>
       {label ? (
@@ -113,6 +157,10 @@ export function FieldInp({
           placeholder={resolvedPlaceholder}
           onChange={handleChange}
           maxLength={phone ? PHONE_INPUT_MAX_LENGTH : maxLength}
+          value={value}
+          min={min}
+          max={max}
+          disabled={disabled}
           {...(phone
             ? { inputMode: 'tel' as const, autoComplete: p.autoComplete ?? 'tel' }
             : {})}

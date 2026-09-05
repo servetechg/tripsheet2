@@ -40,7 +40,7 @@ export type Manifest = Record<string, unknown> & {
 export type AppUser = AuthUserDto & {
   role: Role | string;
   password?: string;
-  driverRecordId?: string;
+  driverRecordId?: string | null;
   phone?: string;
   dob?: string;
   licenseNo?: string;

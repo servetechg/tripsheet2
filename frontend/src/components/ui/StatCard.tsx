@@ -42,7 +42,7 @@ export function StatCard({
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          gap: 12,
+          gap: 10,
         }}
       >
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -52,19 +52,27 @@ export function StatCard({
               color: G.muted,
               fontWeight: 500,
               marginBottom: 8,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
+            title={label}
           >
             {label}
           </div>
           <div
             style={{
-              fontSize: 24,
+              fontSize: 'clamp(20px, 2vw, 24px)',
               fontWeight: 700,
               color: G.text,
               letterSpacing: -0.4,
               lineHeight: 1.15,
               fontVariantNumeric: 'tabular-nums',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
+            title={String(value)}
           >
             {value}
           </div>
@@ -79,7 +87,18 @@ export function StatCard({
               }}
             >
               {subtitle && (
-                <div style={{ ...TYPE.small, color: G.muted, lineHeight: 1.35 }}>
+                <div
+                  style={{
+                    ...TYPE.small,
+                    color: G.muted,
+                    lineHeight: 1.35,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '100%',
+                  }}
+                  title={subtitle}
+                >
                   {subtitle}
                 </div>
               )}
@@ -92,6 +111,7 @@ export function StatCard({
                     background: (trend.up === false ? G.danger : G.success) + '18',
                     borderRadius: RADIUS.sm,
                     padding: '2px 8px',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {trend.label}
@@ -104,8 +124,8 @@ export function StatCard({
         {icon != null && (
           <div
             style={{
-              width: 40,
-              height: 40,
+              width: 38,
+              height: 38,
               borderRadius: RADIUS.md,
               background: `${color}14`,
               border: `1px solid ${color}28`,
@@ -135,9 +155,11 @@ export type StatsGridProps = {
 export function StatsGrid({ children, columns = 4, style: sx }: StatsGridProps) {
   return (
     <div
+      className={`ts-stats-grid ts-stats-grid--${columns}`}
+      data-cols={columns}
       style={{
         display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${columns >= 6 ? '180px' : '210px'}), 1fr))`,
         gap: 12,
         marginBottom: 20,
         ...sx,
