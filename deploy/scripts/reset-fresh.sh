@@ -99,26 +99,44 @@ migrate_and_seed() {
   local compose_file="$2"
   local env_file="$3"
   local prefix="$4"
+  local stack_color="${5:-blue}"
   local root="${ROOT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-  echo "==> migrate + seed via ${project}"
-  "${root}/deploy/scripts/run-prisma-migrations.sh" "${project}" "${compose_file}" "${env_file}"
+  echo "==> migrate + seed via ${project} (COLOR=${stack_color})"
+  COLOR="${stack_color}" IMAGE_TAG="${IMAGE_TAG:-latest}" \
+    "${root}/deploy/scripts/run-prisma-migrations.sh" "${project}" "${compose_file}" "${env_file}"
 
   echo "  seed auth-service (super admin only)"
-  docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
+  COLOR="${stack_color}" docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
     run --rm --no-deps --name "seed-auth-$$" auth-service npx prisma db seed
 
   echo "  seed company-service (plans only)"
-  docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
+  COLOR="${stack_color}" docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
     run --rm --no-deps --name "seed-company-$$" company-service npx prisma db seed
 
   echo "  optional no-op seeds"
   for svc in driver-service fleet-service manifest-service; do
-    docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
+    COLOR="${stack_color}" docker compose -p "${project}" -f "${compose_file}" --env-file "${env_file}" \
       run --rm --no-deps --name "seed-${svc}-$$" "${svc}" npx prisma db seed || true
   done
 
   echo "==> ${prefix} reset complete"
+}
+
+set_active_color() {
+  local color="$1"
+  local tmp
+  tmp="$(mktemp)"
+  awk -v c="${color}" '
+    BEGIN{updated=0}
+    /^ACTIVE_COLOR=/ { print "ACTIVE_COLOR=" c; updated=1; next }
+    { print }
+    END { if (!updated) print "ACTIVE_COLOR=" c }
+  ' "${EDGE_ENV}" > "${tmp}"
+  mv "${tmp}" "${EDGE_ENV}"
+  echo "ACTIVE_COLOR=${color}" > "${DEPLOY_DIR}/caddy/active.env"
+  docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d --force-recreate caddy
+  echo "==> Edge ACTIVE_COLOR=${color} (Caddy recreated)"
 }
 
 echo "==> Stopping app containers (infra stays up)"
@@ -134,7 +152,8 @@ drop_tenant_dbs
 
 if [[ "${DO_PROD}" -eq 1 ]]; then
   reset_service_dbs ""
-  migrate_and_seed "tripsheet-blue" "${DEPLOY_DIR}/compose.app.yml" "${SECRETS_DIR}/app.env" "production"
+  migrate_and_seed "tripsheet-blue" "${DEPLOY_DIR}/compose.app.yml" "${SECRETS_DIR}/app.env" "production" blue
+  set_active_color blue
   echo "Redeploy production: ./deploy/scripts/deploy.sh blue latest"
 fi
 

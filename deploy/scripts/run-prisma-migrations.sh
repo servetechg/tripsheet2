@@ -30,7 +30,10 @@ source "${ENV_FILE}"
 
 export IMAGE_TAG="${IMAGE_TAG:?IMAGE_TAG must be set}"
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:?IMAGE_REGISTRY must be set}"
-export COLOR="${COLOR:-}"
+if [[ -z "${COLOR:-}" && "${PROJECT}" =~ ^tripsheet-(blue|green)$ ]]; then
+  COLOR="${BASH_REMATCH[1]}"
+fi
+export COLOR="${COLOR:-blue}"
 
 COMPOSE=(docker compose -p "${PROJECT}" -f "${COMPOSE_PATH}" --env-file "${ENV_FILE}")
 

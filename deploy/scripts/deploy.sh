@@ -67,7 +67,7 @@ COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
 COLOR="${COLOR}" IMAGE_TAG="${IMAGE_TAG}" IMAGE_REGISTRY="${IMAGE_REGISTRY}" \
   docker compose -p "${PROJECT}" -f "${DEPLOY_DIR}/compose.app.yml" \
   --env-file "${APP_ENV}" \
-  up -d --force-recreate
+  up -d --force-recreate --remove-orphans
 
 echo "==> Waiting for containers to start"
 sleep 8
@@ -108,6 +108,13 @@ if ! docker exec "${COLOR}-gateway" wget -qO- "http://127.0.0.1:3000/health" >/d
 fi
 echo "  ok gateway"
 
+if ! docker exec "${COLOR}-gateway" wget -qO- "http://${COLOR}-frontend:80/healthz" >/dev/null 2>&1; then
+  echo "  FAIL frontend"
+  docker logs "${COLOR}-frontend" --tail 40 2>&1 || true
+  exit 1
+fi
+echo "  ok frontend"
+
 echo "==> Switching edge traffic to ${COLOR}"
 # Update edge.env ACTIVE_COLOR and recreate caddy
 tmp="$(mktemp)"
@@ -134,6 +141,23 @@ for _ in $(seq 1 30); do
   fi
   sleep 2
 done
+
+html=""
+for _ in $(seq 1 15); do
+  html="$(curl -fsS "https://${DOMAIN}/login" 2>/dev/null || curl -fsS "http://${DOMAIN}/login" 2>/dev/null || true)"
+  if [[ -n "${html}" ]]; then
+    break
+  fi
+  sleep 2
+done
+if [[ -z "${html}" ]]; then
+  echo "ERROR: ${DOMAIN}/login not reachable (502?) — try: ./deploy/scripts/repair-production-edge.sh ${COLOR}"
+  exit 1
+fi
+if grep -q 'Welcome back' <<<"${html}"; then
+  echo "WARN: old login UI detected — recreate caddy and verify ${COLOR}-frontend image"
+  docker compose -f "${DEPLOY_DIR}/compose.edge.yml" --env-file "${EDGE_ENV}" up -d --force-recreate caddy
+fi
 
 curl -fsS "https://${DOMAIN}/health" >/dev/null 2>&1 \
   || curl -fsS "http://${DOMAIN}/health" >/dev/null 2>&1 \
