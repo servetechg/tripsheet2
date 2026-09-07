@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
+import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
@@ -222,7 +222,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       {/* Top bar */}
       <div style={{ position:"sticky", top:0, zIndex:200, background:G.card, borderBottom:`2px solid ${isACI?G.info:G.purple}`, padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-          <Btn variant="outline" onClick={onBack} style={{ padding:"7px 14px", fontSize:11 }}>← BACK</Btn>
+          <BackButton onClick={onBack} />
           <div>
             <span
               style={{

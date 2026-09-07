@@ -14,6 +14,7 @@ import {
   resolveInputType,
 } from '@/lib/inputPlaceholders';
 import { Icons } from './Icons';
+import { DatePickerInput, type DatePickerMode } from './DatePickerInput';
 
 export interface InpProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode;
@@ -58,6 +59,10 @@ export function Inp({
   onChange,
   maxLength,
   placeholder,
+  value,
+  min,
+  max,
+  disabled,
   ...p
 }: InpProps) {
   const autoId = useId();
@@ -65,6 +70,10 @@ export function Inp({
   const [showPassword, setShowPassword] = useState(false);
   const resolvedInputType = resolveInputType(type, label, phone);
   const isPassword = resolvedInputType === 'password';
+  const isPicker =
+    resolvedInputType === 'date' ||
+    resolvedInputType === 'time' ||
+    resolvedInputType === 'datetime-local';
   const showToggle = isPassword && passwordToggle !== false;
   const resolvedType =
     isPassword && showToggle && showPassword ? 'text' : resolvedInputType;
@@ -91,6 +100,38 @@ export function Inp({
     onChange?.(e);
   };
 
+  if (isPicker) {
+    const pickerMode: DatePickerMode =
+      resolvedInputType === 'datetime-local'
+        ? 'datetime'
+        : resolvedInputType === 'time'
+          ? 'time'
+          : 'date';
+    return (
+      <div style={{ marginBottom: 12, ...sx }}>
+        {label ? (
+          <label htmlFor={inputId} style={labelBase()}>
+            {label}
+          </label>
+        ) : null}
+        <DatePickerInput
+          id={inputId}
+          mode={pickerMode}
+          value={value != null ? String(value) : ''}
+          onChange={onChange}
+          placeholder={resolvedPlaceholder}
+          disabled={disabled}
+          min={min != null ? String(min) : undefined}
+          max={max != null ? String(max) : undefined}
+          style={inputStyle}
+        />
+        {hint ? (
+          <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>{hint}</div>
+        ) : null}
+      </div>
+    );
+  }
+
   const inputProps: InputHTMLAttributes<HTMLInputElement> = {
     ...p,
     id: inputId,
@@ -98,6 +139,10 @@ export function Inp({
     placeholder: resolvedPlaceholder,
     onChange: handleChange,
     maxLength: phone ? PHONE_INPUT_MAX_LENGTH : maxLength,
+    value,
+    min,
+    max,
+    disabled,
     ...(phone
       ? { inputMode: 'tel', autoComplete: p.autoComplete ?? 'tel' }
       : {}),

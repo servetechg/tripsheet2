@@ -1,4 +1,6 @@
-export { Btn } from './Btn';
+export { Btn, BackButton } from './Btn';
+export { Chk } from './Chk';
+export type { ChkProps } from './Chk';
 export { Modal } from './Modal';
 export type { ModalProps } from './Modal';
 export { Card } from './Card';

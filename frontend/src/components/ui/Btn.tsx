@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 import { G, RADIUS } from '@/lib/theme';
+import { Icons } from './Icons';
 
 export type BtnVariant =
   | 'gold'
@@ -126,6 +127,54 @@ export function Btn({
       {...p}
     >
       {children}
+    </button>
+  );
+}
+
+export function BackButton({
+  onClick,
+  label = 'BACK',
+  style: sx,
+  className,
+  ...rest
+}: {
+  onClick?: () => void;
+  label?: ReactNode;
+  style?: CSSProperties;
+  className?: string;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'rgba(255, 255, 255, 0.03)',
+        border: `1px solid ${G.border}`,
+        color: G.muted2,
+        borderRadius: RADIUS.md,
+        padding: '7px 14px',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        transition: 'all .15s ease',
+        ...sx,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = G.gold;
+        e.currentTarget.style.color = G.text;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = G.border;
+        e.currentTarget.style.color = G.muted2;
+      }}
+      className={className}
+      {...rest}
+    >
+      {Icons.arrowLeft({ size: 15, color: 'currentColor' })}
+      <span>{label}</span>
     </button>
   );
 }
