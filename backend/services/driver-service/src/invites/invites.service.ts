@@ -682,6 +682,7 @@ export class InvitesService {
     const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
     const origin =
       this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
+      this.config.get<string>('APP_PUBLIC_ORIGIN') ||
       'http://localhost:5173';
     if (!notifyUrl || !invite.email) return;
     const link = `${origin.replace(/\/$/, '')}/invite?invite=${encodeURIComponent(invite.token)}`;
@@ -693,9 +694,14 @@ export class InvitesService {
           companyId: invite.companyId,
           channel: 'email',
           to: invite.email,
-          body: `You are invited as ${invite.role}. Set your password: ${link}`,
+          body: `You are invited to FleetQuix as ${invite.role}.\n\nComplete your account setup:\n${link}`,
           status: 'queued',
-          meta: { type: 'staff_invite', role: invite.role, token: invite.token },
+          meta: {
+            type: invite.role === 'driver' ? 'driver_invite' : 'staff_invite',
+            subject: 'You are invited to FleetQuix',
+            role: invite.role,
+            token: invite.token,
+          },
         }),
       });
     } catch (e) {
