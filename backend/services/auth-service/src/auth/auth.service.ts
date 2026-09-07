@@ -460,21 +460,12 @@ export class AuthService {
         entityId: user.id,
         meta: { ip: meta.ip },
       });
-      const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
-      const expose =
-        this.config.get<string>('AUTH_EXPOSE_RESET_URL') === '1' ||
-        this.config.get<string>('NODE_ENV') === 'test' ||
-        !notifyUrl;
-      if (expose) {
-        const origin =
-          this.config.get<string>('APP_PUBLIC_ORIGIN') ||
-          this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
-          'http://localhost:5173';
+      if (this.shouldExposeResetUrl()) {
+        const origin = this.publicAppOrigin();
         return {
           ok: true,
-          message: notifyUrl
-            ? 'Reset link queued (resetUrl exposed for local/test).'
-            : 'Reset link ready (notification service not configured — use resetUrl locally).',
+          message:
+            'Reset link ready (dev mode — copy the link below; production sends email).',
           resetUrl: `${origin.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(raw)}`,
         };
       }
@@ -490,7 +481,7 @@ export class AuthService {
     return {
       ok: true,
       message:
-        'If an account exists for that email, a reset link has been queued.',
+        'If an account exists for that email, a reset link has been sent.',
     };
   }
 
@@ -566,12 +557,30 @@ export class AuthService {
     return createHash('sha256').update(raw).digest('hex');
   }
 
-  private async queuePasswordResetEmail(user: User, rawToken: string) {
-    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
-    const origin =
+  /** Public frontend origin for links in emails (never localhost in production). */
+  private publicAppOrigin(): string {
+    return (
       this.config.get<string>('APP_PUBLIC_ORIGIN') ||
       this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
-      'http://localhost:5173';
+      'http://localhost:5173'
+    );
+  }
+
+  /**
+   * Expose resetUrl in API response only for local/test debugging.
+   * Production must email the link — never return it in JSON.
+   */
+  private shouldExposeResetUrl(): boolean {
+    if (this.config.get<string>('AUTH_EXPOSE_RESET_URL') === '1') return true;
+    const nodeEnv = this.config.get<string>('NODE_ENV') || 'development';
+    if (nodeEnv === 'production') return false;
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    return nodeEnv === 'test' || !notifyUrl;
+  }
+
+  private async queuePasswordResetEmail(user: User, rawToken: string) {
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    const origin = this.publicAppOrigin();
     if (!notifyUrl) return;
     const link = `${origin.replace(/\/$/, '')}/reset-password?token=${encodeURIComponent(rawToken)}`;
     try {
@@ -582,9 +591,13 @@ export class AuthService {
           companyId: user.companyId || null,
           channel: 'email',
           to: user.email,
-          body: `Reset your FleetQuix password (link expires in 1 hour): ${link}`,
+          body: `Reset your FleetQuix password (link expires in 1 hour):\n\n${link}\n\nIf you did not request this, ignore this email.`,
           status: 'queued',
-          meta: { type: 'password_reset', userId: user.id },
+          meta: {
+            type: 'password_reset',
+            subject: 'Reset your FleetQuix password',
+            userId: user.id,
+          },
         }),
       });
     } catch (e) {

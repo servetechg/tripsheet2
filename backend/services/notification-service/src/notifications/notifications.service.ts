@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
+import { EmailService } from '../email/email.service';
 import { SmsService } from '../sms/sms.service';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly emailService: EmailService,
     private readonly smsService: SmsService,
   ) {}
 
@@ -26,10 +28,19 @@ export class NotificationsService {
     if (!to || !text) {
       throw new BadRequestException('to and body are required');
     }
+    const channel = String(body.channel || 'email');
+    if (channel === 'email') {
+      return this.emailService.send({
+        to,
+        body: text,
+        companyId: body.companyId ? String(body.companyId) : undefined,
+        meta: (body.meta as Record<string, unknown>) ?? undefined,
+      });
+    }
     return this.prisma.notificationLog.create({
       data: {
         companyId: body.companyId ? String(body.companyId) : null,
-        channel: String(body.channel || 'email'),
+        channel,
         to,
         body: text,
         status: String(body.status || 'queued'),
@@ -51,6 +62,7 @@ export class NotificationsService {
     return {
       redis: redisOk ? 'ok' : 'down',
       twilioConfigured: this.smsService.isTwilioConfigured(),
+      smtpConfigured: this.emailService.isSmtpConfigured(),
     };
   }
 }
