@@ -20,8 +20,11 @@ export function ForgotPasswordScreen() {
     setLoading(true);
     try {
       const res = await authApi.forgotPassword(email.trim());
-      setMsg(res.message || 'If an account exists, a reset link was sent.');
-      if (res.resetUrl) setResetUrl(res.resetUrl);
+      setMsg(
+        res.message ||
+          'If an account exists for that email, a reset link has been sent.',
+      );
+      if (res.resetUrl && import.meta.env.DEV) setResetUrl(res.resetUrl);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Request failed');
     } finally {
@@ -46,7 +49,7 @@ export function ForgotPasswordScreen() {
         <BrandLogo />
         <h1 style={{ fontSize: 22, margin: '24px 0 8px' }}>Forgot password</h1>
         <p style={{ color: G.muted, fontSize: 13, marginBottom: 20 }}>
-          Enter your account email. We will queue a one-time reset link (valid 1
+          Enter your account email. We will send a one-time reset link (valid 1
           hour). All sessions are revoked after you reset.
         </p>
         {err ? <Err msg={err} /> : null}
@@ -55,9 +58,9 @@ export function ForgotPasswordScreen() {
             {msg}
           </div>
         ) : null}
-        {resetUrl ? (
+        {resetUrl && import.meta.env.DEV ? (
           <div style={{ fontSize: 12, color: G.muted, marginBottom: 12 }}>
-            Local reset link:{' '}
+            Dev reset link (local only):{' '}
             <a href={resetUrl} style={{ color: G.gold }}>
               {resetUrl}
             </a>
