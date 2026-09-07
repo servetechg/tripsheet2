@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Deploy / update the staging stack (single stack, not blue/green).
-# Usage: ./deploy/scripts/deploy-staging.sh <IMAGE_TAG>
+# Usage:
+#   ./deploy/scripts/deploy-staging.sh            # uses IMAGE_TAG from staging.app.env (default: staging)
+#   ./deploy/scripts/deploy-staging.sh staging    # explicit tag
+#   ./deploy/scripts/deploy-staging.sh abc1234567 # specific CI sha tag
 set -euo pipefail
 
-CLI_IMAGE_TAG="${1:?Usage: deploy-staging.sh <IMAGE_TAG>}"
+CLI_IMAGE_TAG="${1:-}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_DIR="${ROOT_DIR}/deploy"
 SECRETS_DIR="${SECRETS_DIR:-/opt/tripsheet/secrets}"
@@ -21,7 +24,7 @@ source "${APP_ENV}"
 # shellcheck disable=SC1090
 source "${EDGE_ENV}"
 
-IMAGE_TAG="${CLI_IMAGE_TAG}"
+IMAGE_TAG="${CLI_IMAGE_TAG:-${IMAGE_TAG:-staging}}"
 export IMAGE_TAG
 export IMAGE_REGISTRY="${IMAGE_REGISTRY:?IMAGE_REGISTRY must be set in staging.app.env}"
 export POSTGRES_USER POSTGRES_PASSWORD REDIS_PASSWORD
