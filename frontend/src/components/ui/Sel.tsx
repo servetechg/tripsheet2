@@ -6,20 +6,22 @@ export interface SelProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: ReactNode;
   style?: CSSProperties;
   children?: ReactNode;
+  /** Compact inline select for toolbars / card actions (no label spacing). */
+  compact?: boolean;
 }
 
-export function Sel({ label, children, style: sx, id, ...p }: SelProps) {
+export function Sel({ label, children, style: sx, id, compact, ...p }: SelProps) {
   const autoId = useId();
   const selectId = id ?? autoId;
 
   return (
-    <div style={{ marginBottom: 12, ...sx }}>
+    <div style={{ marginBottom: compact ? 0 : 12, ...sx }}>
       {label ? (
         <label htmlFor={selectId} style={labelBase()}>
           {label}
         </label>
       ) : null}
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: 'relative', display: compact ? 'inline-block' : 'block' }}>
         <select
           id={selectId}
           className="ts-input ts-select"
@@ -29,8 +31,20 @@ export function Sel({ label, children, style: sx, id, ...p }: SelProps) {
             WebkitAppearance: 'none',
             MozAppearance: 'none',
             cursor: 'pointer',
-            paddingRight: 36,
-            width: '100%',
+            ...(compact
+              ? {
+                  width: 'auto',
+                  minWidth: 132,
+                  minHeight: 32,
+                  padding: '6px 32px 6px 10px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  textTransform: 'capitalize',
+                }
+              : {
+                  paddingRight: 36,
+                  width: '100%',
+                }),
           }}
           {...p}
         >

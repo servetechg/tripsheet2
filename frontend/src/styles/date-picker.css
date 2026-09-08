@@ -1,0 +1,328 @@
+.ts-date-picker-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.ts-date-picker-wrap .ts-date-picker-input {
+  width: 100%;
+  cursor: pointer;
+}
+
+.ts-date-picker-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+
+.ts-date-picker-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1200;
+  min-width: 320px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-hover, 0 12px 32px rgba(15, 23, 42, 0.18));
+  padding: 12px;
+  animation: ts-date-pop-in 0.15s ease;
+}
+
+@keyframes ts-date-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* react-day-picker v10 theme */
+.ts-day-picker.rdp-root {
+  --rdp-accent-color: var(--color-primary);
+  --rdp-accent-background-color: rgba(61, 140, 255, 0.14);
+  --rdp-day-height: 38px;
+  --rdp-day-width: 38px;
+  --rdp-day_button-border-radius: 10px;
+  --rdp-selected-border: none;
+  --rdp-disabled-opacity: 0.38;
+  --rdp-outside-opacity: 0.42;
+  --rdp-today-color: var(--color-primary);
+  --rdp-dropdown-gap: 0.5rem;
+  --rdp-nav_button-height: 2rem;
+  --rdp-nav_button-width: 2rem;
+  --rdp-nav-height: 2.6rem;
+  --rdp-weekday-opacity: 1;
+  --rdp-weekday-padding: 0.4rem 0;
+  --rdp-weekday-text-align: center;
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  margin: 0 auto;
+}
+
+.ts-day-picker .rdp-month_caption {
+  padding-bottom: 8px;
+}
+
+.ts-day-picker .rdp-dropdowns {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.ts-scroll-dropdown {
+  position: relative;
+  min-width: 92px;
+}
+
+.ts-scroll-dropdown-trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ts-scroll-dropdown-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ts-scroll-dropdown-trigger:hover:not(:disabled),
+.ts-scroll-dropdown[data-open='true'] .ts-scroll-dropdown-trigger {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(61, 140, 255, 0.12);
+}
+
+.ts-scroll-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1300;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-hover, 0 10px 24px rgba(15, 23, 42, 0.16));
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-muted) transparent;
+}
+
+.ts-scroll-dropdown-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ts-scroll-dropdown-option:hover:not(:disabled) {
+  background: rgba(61, 140, 255, 0.14);
+  color: var(--color-text);
+}
+
+.ts-scroll-dropdown-option.is-selected {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.ts-scroll-dropdown-option:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ts-day-picker .rdp-caption_label,
+.ts-day-picker .rdp-dropdown {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ts-day-picker .rdp-dropdowns select,
+.ts-day-picker select.rdp-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 6px 28px 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+}
+
+[data-theme='dark'] .ts-day-picker .rdp-dropdowns select,
+[data-theme='dark'] .ts-day-picker select.rdp-dropdown {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A94AD' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+.ts-day-picker .rdp-day_button {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ts-day-picker .rdp-day_button:hover:not([disabled]) {
+  background: rgba(61, 140, 255, 0.16);
+  color: var(--color-text);
+}
+
+.ts-day-picker .rdp-selected .rdp-day_button {
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+}
+
+.ts-day-picker .rdp-selected .rdp-day_button:hover {
+  background: var(--color-primary-hover, #5ba0ff);
+  color: #fff;
+}
+
+.ts-day-picker .rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.ts-day-picker .rdp-weekday {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.ts-day-picker .rdp-button_previous,
+.ts-day-picker .rdp-button_next {
+  color: var(--color-muted-2);
+  border-radius: 8px;
+}
+
+.ts-day-picker .rdp-button_previous:hover,
+.ts-day-picker .rdp-button_next:hover {
+  background: rgba(61, 140, 255, 0.1);
+  color: var(--color-primary);
+}
+
+.ts-date-picker-time {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 10px 4px 4px;
+  border-top: 1px solid var(--color-border);
+  margin-top: 8px;
+}
+
+.ts-date-picker-time-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.ts-date-picker-time-select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ts-date-picker-time-select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(61, 140, 255, 0.18);
+}
+
+.ts-date-picker-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  margin-top: 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.ts-date-picker-footer-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ts-date-picker-footer-btn--ghost {
+  background: transparent;
+  color: var(--color-muted);
+}
+
+.ts-date-picker-footer-btn--ghost:hover {
+  color: var(--color-text);
+  background: rgba(61, 140, 255, 0.08);
+}
+
+.ts-date-picker-footer-btn--primary {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.ts-date-picker-footer-btn--primary:hover {
+  background: var(--color-primary-hover, #5ba0ff);
+}
+
+@media (max-width: 480px) {
+  .ts-date-picker-popover {
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: min(320px, calc(100vw - 24px));
+  }
+}
