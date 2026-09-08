@@ -3,7 +3,7 @@ import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
-import { useConfirm } from '@/context/ConfirmContext';
+import { useConfirm, usePrompt } from '@/context/ConfirmContext';
 import { useCan } from '@/lib/permissions';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { CustomRolesPanel } from './CustomRolesPanel';
@@ -153,6 +153,7 @@ export function CompanySettingsTab({
 }) {
   const { can } = useCan();
   const confirm = useConfirm();
+  const prompt = usePrompt();
   const [sub, setSub] = useState<Sub>(initialSub || 'profile');
   const [ent, setEnt] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
@@ -942,12 +943,28 @@ export function CompanySettingsTab({
             size="sm"
             style={{ marginTop: 8 }}
             onClick={() => {
-              const name = prompt('Department name');
-              if (!name) return;
-              void companiesApi
-                .saveDepartment(cid, { name, code: name.slice(0, 8) })
-                .then(reload)
-                .catch((err: any) => notify(err?.message || 'Failed', 'error'));
+              void (async () => {
+                const name = await prompt({
+                  title: 'Add department',
+                  message:
+                    'Departments group staff for reporting and assignment.',
+                  label: 'Department name',
+                  placeholder: 'e.g. Dispatch',
+                  confirmLabel: 'Add department',
+                  maxLength: 60,
+                });
+                if (!name) return;
+                try {
+                  await companiesApi.saveDepartment(cid, {
+                    name,
+                    code: name.slice(0, 8),
+                  });
+                  await reload();
+                  notify('Department added');
+                } catch (err: any) {
+                  notify(err?.message || 'Failed', 'error');
+                }
+              })();
             }}
           >
             Add department

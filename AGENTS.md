@@ -62,9 +62,10 @@ MKX (`c1`) uses **tenant routing** (`fq_tenant_mkx`). Public routes (invite by-t
 ## Commands (common)
 
 ```powershell
-cd backend && npm run start:dev    # all services
+cd backend && npm run infra:up       # postgres + redis
+cd backend && npm run migrate:all    # all Prisma service DBs
+cd backend && npm run start:dev      # all services
 cd frontend && npm run dev
-cd backend && npm run infra:up     # postgres + redis
 ```
 
 Do not commit `.env`, credentials, or `dist/` unless explicitly requested.

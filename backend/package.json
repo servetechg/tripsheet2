@@ -18,6 +18,8 @@
     "test:drivers:all": "npm run test:drivers && npm run test:drivers:live",
     "test": "npm run test --prefix services/driver-service && npm run test --prefix services/fleet-service && npm run test --prefix services/accounting-service && npm run test --prefix services/notification-service",
     "env:copy": "powershell -NoProfile -File scripts/copy-env.ps1",
+    "migrate:all": "node scripts/migrate-all.mjs",
+    "migrate:status": "node scripts/migrate-all.mjs --status",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down",
     "infra:logs": "docker compose logs -f postgres redis",
