@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { G } from '@/lib/theme';
+import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
@@ -8,56 +8,8 @@ import { useCan } from '@/lib/permissions';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { CustomRolesPanel } from './CustomRolesPanel';
 import { MasterDataPanel } from './MasterDataPanel';
-
-function LoginHistoryList({ companyId }: { companyId: string }) {
-  const [rows, setRows] = useState<
-    Array<{
-      id: string;
-      email: string;
-      success: boolean;
-      reason: string;
-      ip: string;
-      createdAt: string;
-    }>
-  >([]);
-
-  useEffect(() => {
-    void authApi
-      .loginHistory({ scope: 'company', limit: 40, companyId })
-      .then(setRows)
-      .catch(() => setRows([]));
-  }, [companyId]);
-
-  if (!rows.length) {
-    return (
-      <div style={{ color: G.muted, fontSize: 13 }}>No login events yet.</div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {rows.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 12,
-            fontSize: 12,
-          }}
-        >
-          <span>
-            {r.email} · {r.success ? 'success' : r.reason || 'failed'}
-            {r.ip ? ` · ${r.ip}` : ''}
-          </span>
-          <span style={{ color: G.muted }}>
-            {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { LoginHistoryPanel } from './LoginHistoryPanel';
+import { DepartmentsPanel } from './DepartmentsPanel';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -80,7 +32,7 @@ function SecurityEventsList({ companyId }: { companyId: string }) {
 
   if (!rows.length) {
     return (
-      <div style={{ color: G.muted, fontSize: 13 }}>
+      <div style={{ color: G.muted, fontSize: 13, padding: '12px 0' }}>
         No security events yet. Logins, password changes, lockouts, role
         changes, MFA disable, and invite acceptance are recorded here and
         queued as email notifications when the notification service is
@@ -90,35 +42,71 @@ function SecurityEventsList({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {rows.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 12,
-            fontSize: 12,
-          }}
-        >
-          <span>
-            <span
-              style={{
-                color: r.severity === 'warning' ? G.danger : G.muted,
-              }}
-            >
-              {r.type.replace('security.', '')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {rows.map((r) => {
+        const isWarn = r.severity === 'warning' || r.severity === 'danger';
+        return (
+          <div
+            key={r.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '10px 14px',
+              borderRadius: RADIUS.md,
+              background: G.card2,
+              border: `1px solid ${G.border}`,
+              fontSize: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '2px 8px',
+                  borderRadius: RADIUS.sm,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  background: isWarn ? 'rgba(248, 113, 113, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                  color: isWarn ? G.danger : G.info,
+                  border: `1px solid ${isWarn ? 'rgba(248, 113, 113, 0.25)' : 'rgba(56, 189, 248, 0.25)'}`,
+                }}
+              >
+                {r.type.replace('security.', '')}
+              </span>
+              <span style={{ color: G.text, fontWeight: 500 }}>
+                {r.message}
+              </span>
+              {r.ip && (
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    color: G.muted,
+                    background: G.bg,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  {r.ip === '::1' || r.ip === '127.0.0.1' ? 'localhost' : r.ip}
+                </span>
+              )}
+            </div>
+            <span style={{ color: G.muted, flexShrink: 0, fontSize: 11 }}>
+              {new Date(r.createdAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
             </span>
-            {' · '}
-            {r.message.slice(0, 90)}
-            {r.message.length > 90 ? '…' : ''}
-            {r.ip ? ` · ${r.ip}` : ''}
-          </span>
-          <span style={{ color: G.muted, flexShrink: 0 }}>
-            {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -934,45 +922,12 @@ export function CompanySettingsTab({
       {sub === 'masterdata' && <MasterDataPanel companyId={cid} />}
 
       {sub === 'departments' && (
-        <Card>
-          <SectionTitle>Departments</SectionTitle>
-          {departments.map((d) => (
-            <div key={d.id} style={{ fontSize: 13, padding: '6px 0' }}>
-              <strong>{d.name}</strong>{' '}
-              <code style={{ color: G.muted }}>{d.code}</code>
-            </div>
-          ))}
-          <Btn
-            size="sm"
-            style={{ marginTop: 8 }}
-            onClick={() => {
-              void (async () => {
-                const name = await prompt({
-                  title: 'Add department',
-                  message:
-                    'Departments group staff for reporting and assignment.',
-                  label: 'Department name',
-                  placeholder: 'e.g. Dispatch',
-                  confirmLabel: 'Add department',
-                  maxLength: 60,
-                });
-                if (!name) return;
-                try {
-                  await companiesApi.saveDepartment(cid, {
-                    name,
-                    code: name.slice(0, 8),
-                  });
-                  await reload();
-                  notify('Department added');
-                } catch (err: any) {
-                  notify(err?.message || 'Failed', 'error');
-                }
-              })();
-            }}
-          >
-            Add department
-          </Btn>
-        </Card>
+        <DepartmentsPanel
+          companyId={cid}
+          departments={departments}
+          canManage={can('company.edit')}
+          onReload={reload}
+        />
       )}
 
       {sub === 'branding' && branding && (
@@ -1351,7 +1306,10 @@ export function CompanySettingsTab({
           </Btn>
           <Divider />
           <SectionTitle>Login history</SectionTitle>
-          <LoginHistoryList companyId={cid} />
+          <div style={{ color: G.muted, fontSize: 13, marginBottom: 14 }}>
+            Detailed audit log of company authentication events, IPs, clients, and security status.
+          </div>
+          <LoginHistoryPanel companyId={cid} />
           <Divider />
           <SectionTitle>Security events</SectionTitle>
           <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
