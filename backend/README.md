@@ -73,29 +73,21 @@ Or from `backend/`: `npm run install:all`
 
 ## 4. Prisma migrate & seed
 
-**Auth service:**
+From `backend/` after Postgres is up (`npm run infra:up`):
 
 ```bash
-cd services/auth-service
-npx prisma migrate dev --name init
-npm run seed
+npm run migrate:all      # generate client + apply pending migrations on every service
+npm run migrate:status   # show which services are behind
+npm run seed:all         # platform seeds (super admin + plans)
 ```
 
-**Company service:**
+`migrate:all` is the command to run on a new PC (or after `git pull` when schemas changed). It uses `prisma migrate deploy` — safe for existing databases; it does **not** reset data.
+
+Tenant-specific SQL (per-company DBs) is separate. After services are running:
 
 ```bash
-cd services/company-service
-npx prisma migrate dev --name init
-npm run seed
-```
-
-**Stub services** (optional until you expand models):
-
-```bash
-cd services/driver-service && npx prisma migrate dev --name init
-cd ../fleet-service && npx prisma migrate dev --name init
-cd ../manifest-service && npx prisma migrate dev --name init
-cd ../tripsheet-service && npx prisma migrate dev --name init
+# super-admin JWT required in production; locally company-service may expose:
+curl -X POST http://localhost:3002/tenants/schema-migrate-all
 ```
 
 ## 5. Start services (dev)
@@ -107,7 +99,8 @@ npm install                 # once — installs concurrently
 npm run infra:up            # Postgres + Redis
 powershell -File scripts/copy-env.ps1   # once — create .env files
 npm run install:all         # once — install each Nest app
-npm run start:dev           # gateway + all 6 services
+npm run migrate:all         # apply schema to all service databases
+npm run start:dev           # gateway + all services
 ```
 
 Color-coded logs: `gateway`, `auth`, `company`, `driver`, `fleet`, `manifest`, `tripsheet`.
