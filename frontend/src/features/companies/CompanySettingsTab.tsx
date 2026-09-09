@@ -10,6 +10,7 @@ import { CustomRolesPanel } from './CustomRolesPanel';
 import { MasterDataPanel } from './MasterDataPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { DepartmentsPanel } from './DepartmentsPanel';
+import { NotificationRulesPanel } from './NotificationRulesPanel';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -337,7 +338,7 @@ export function CompanySettingsTab({
                 </Sel>
               </G2>
               <Btn
-                style={{ marginTop: 12 }}
+                style={{ marginTop: 12, marginBottom: 12 }}
                 disabled={inviteBusy}
                 onClick={() => {
                   if (!inviteForm.email.trim() || !inviteForm.name.trim()) {
@@ -366,7 +367,7 @@ export function CompanySettingsTab({
                     .finally(() => setInviteBusy(false));
                 }}
               >
-                Invite staff
+                Invite Staff
               </Btn>
               {inviteLink && (
                 <div style={{ marginTop: 12, fontSize: 12, color: G.muted }}>
@@ -501,190 +502,190 @@ export function CompanySettingsTab({
                       flexWrap: 'wrap',
                     }}
                   >
-                  {can('users.assign_role') && !locked ? (
-                    <Sel
-                      value={value}
-                      style={{ marginBottom: 0, minWidth: 220 }}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        const body = v.startsWith('custom:')
-                          ? { customRoleId: v.slice(7) }
-                          : { role: v.slice(4), customRoleId: null };
-                        void authApi
-                          .updateUser(u.id, body)
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'Role updated. The user must sign in again to refresh permissions.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Update failed', 'error'),
-                          );
-                      }}
-                    >
-                      <optgroup label="System">
-                        {[
-                          'dispatcher',
-                          'dispatcher_supervisor',
-                          'general_manager',
-                          'fleet_manager',
-                          'safety_manager',
-                          'accountant',
-                          'hr_manager',
-                          'maintenance_coordinator',
-                          'driver',
-                        ].map((r) => (
-                          <option key={r} value={`sys:${r}`}>
-                            {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
-                          </option>
-                        ))}
-                      </optgroup>
-                      {customRoles.length > 0 && (
-                        <optgroup label="Custom">
-                          {customRoles.map((r) => (
-                            <option key={r.id} value={`custom:${r.id}`}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {u.customRoleId &&
-                        !customRoles.some((r) => r.id === u.customRoleId) && (
-                          <option value={`custom:${u.customRoleId}`}>
-                            {u.customRoleName || 'Removed custom role'}
-                          </option>
-                        )}
-                    </Sel>
-                  ) : (
-                    <span style={{ color: G.muted }}>
-                      {u.customRoleName ||
-                        ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ||
-                        u.role}
-                    </span>
-                  )}
-                  {canStatus && st === 'active' && (
-                    <Btn
-                      variant="ghost"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void authApi
-                          .setUserStatus(u.id, 'suspended')
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'User suspended. Active sessions are revoked.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Suspend failed', 'error'),
-                          );
-                      }}
-                    >
-                      Suspend
-                    </Btn>
-                  )}
-                  {canStatus && st === 'active' && (
-                    <Btn
-                      variant="ghost"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void authApi
-                          .setUserStatus(u.id, 'locked')
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'User locked. Active sessions are revoked.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Lock failed', 'error'),
-                          );
-                      }}
-                    >
-                      Lock
-                    </Btn>
-                  )}
-                  {canStatus &&
-                    (st === 'locked' ||
-                      (st === 'active' &&
-                        u.lockedUntil &&
-                        new Date(u.lockedUntil).getTime() > Date.now())) && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
+                    {can('users.assign_role') && !locked ? (
+                      <Sel
+                        value={value}
+                        style={{ marginBottom: 0, minWidth: 220 }}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const body = v.startsWith('custom:')
+                            ? { customRoleId: v.slice(7) }
+                            : { role: v.slice(4), customRoleId: null };
                           void authApi
-                            .unlockUser(u.id)
+                            .updateUser(u.id, body)
                             .then(() => authApi.listUsers(cid).then(setStaff))
                             .then(() =>
                               notify(
-                                'User unlocked. Temporary lockout cleared.',
+                                'Role updated. The user must sign in again to refresh permissions.',
                               ),
                             )
                             .catch((err: any) =>
-                              notify(
-                                err?.message || 'Unlock failed',
-                                'error',
-                              ),
+                              notify(err?.message || 'Update failed', 'error'),
                             );
                         }}
                       >
-                        Unlock
-                      </Btn>
+                        <optgroup label="System">
+                          {[
+                            'dispatcher',
+                            'dispatcher_supervisor',
+                            'general_manager',
+                            'fleet_manager',
+                            'safety_manager',
+                            'accountant',
+                            'hr_manager',
+                            'maintenance_coordinator',
+                            'driver',
+                          ].map((r) => (
+                            <option key={r} value={`sys:${r}`}>
+                              {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
+                            </option>
+                          ))}
+                        </optgroup>
+                        {customRoles.length > 0 && (
+                          <optgroup label="Custom">
+                            {customRoles.map((r) => (
+                              <option key={r.id} value={`custom:${r.id}`}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {u.customRoleId &&
+                          !customRoles.some((r) => r.id === u.customRoleId) && (
+                            <option value={`custom:${u.customRoleId}`}>
+                              {u.customRoleName || 'Removed custom role'}
+                            </option>
+                          )}
+                      </Sel>
+                    ) : (
+                      <span style={{ color: G.muted }}>
+                        {u.customRoleName ||
+                          ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ||
+                          u.role}
+                      </span>
                     )}
-                  {canStatus &&
-                    (st === 'suspended' || st === 'inactive') && (
+                    {canStatus && st === 'active' && (
                       <Btn
                         variant="ghost"
                         size="sm"
                         style={{ marginBottom: 0, fontSize: 12 }}
                         onClick={() => {
                           void authApi
-                            .setUserStatus(u.id, 'active')
+                            .setUserStatus(u.id, 'suspended')
                             .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() => notify('User reactivated'))
-                            .catch((err: any) =>
+                            .then(() =>
                               notify(
-                                err?.message || 'Reactivate failed',
-                                'error',
+                                'User suspended. Active sessions are revoked.',
                               ),
+                            )
+                            .catch((err: any) =>
+                              notify(err?.message || 'Suspend failed', 'error'),
                             );
                         }}
                       >
-                        Reactivate
+                        Suspend
                       </Btn>
                     )}
-                  {canStatus && st !== 'archived' && !locked && (
-                    <Btn
-                      variant="danger"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void (async () => {
-                          const ok = await confirm({
-                            title: 'Archive user',
-                            message: `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
-                            confirmLabel: 'Archive',
-                            variant: 'danger',
-                          });
-                          if (!ok) return;
+                    {canStatus && st === 'active' && (
+                      <Btn
+                        variant="ghost"
+                        size="sm"
+                        style={{ marginBottom: 0, fontSize: 12 }}
+                        onClick={() => {
                           void authApi
-                            .setUserStatus(u.id, 'archived')
+                            .setUserStatus(u.id, 'locked')
                             .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() => notify('User archived'))
+                            .then(() =>
+                              notify(
+                                'User locked. Active sessions are revoked.',
+                              ),
+                            )
                             .catch((err: any) =>
-                              notify(err?.message || 'Archive failed', 'error'),
+                              notify(err?.message || 'Lock failed', 'error'),
                             );
-                        })();
-                      }}
-                    >
-                      Archive
-                    </Btn>
-                  )}
+                        }}
+                      >
+                        Lock
+                      </Btn>
+                    )}
+                    {canStatus &&
+                      (st === 'locked' ||
+                        (st === 'active' &&
+                          u.lockedUntil &&
+                          new Date(u.lockedUntil).getTime() > Date.now())) && (
+                        <Btn
+                          variant="ghost"
+                          size="sm"
+                          style={{ marginBottom: 0, fontSize: 12 }}
+                          onClick={() => {
+                            void authApi
+                              .unlockUser(u.id)
+                              .then(() => authApi.listUsers(cid).then(setStaff))
+                              .then(() =>
+                                notify(
+                                  'User unlocked. Temporary lockout cleared.',
+                                ),
+                              )
+                              .catch((err: any) =>
+                                notify(
+                                  err?.message || 'Unlock failed',
+                                  'error',
+                                ),
+                              );
+                          }}
+                        >
+                          Unlock
+                        </Btn>
+                      )}
+                    {canStatus &&
+                      (st === 'suspended' || st === 'inactive') && (
+                        <Btn
+                          variant="ghost"
+                          size="sm"
+                          style={{ marginBottom: 0, fontSize: 12 }}
+                          onClick={() => {
+                            void authApi
+                              .setUserStatus(u.id, 'active')
+                              .then(() => authApi.listUsers(cid).then(setStaff))
+                              .then(() => notify('User reactivated'))
+                              .catch((err: any) =>
+                                notify(
+                                  err?.message || 'Reactivate failed',
+                                  'error',
+                                ),
+                              );
+                          }}
+                        >
+                          Reactivate
+                        </Btn>
+                      )}
+                    {canStatus && st !== 'archived' && !locked && (
+                      <Btn
+                        variant="danger"
+                        size="sm"
+                        style={{ marginBottom: 0, fontSize: 12 }}
+                        onClick={() => {
+                          void (async () => {
+                            const ok = await confirm({
+                              title: 'Archive user',
+                              message: `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
+                              confirmLabel: 'Archive',
+                              variant: 'danger',
+                            });
+                            if (!ok) return;
+                            void authApi
+                              .setUserStatus(u.id, 'archived')
+                              .then(() => authApi.listUsers(cid).then(setStaff))
+                              .then(() => notify('User archived'))
+                              .catch((err: any) =>
+                                notify(err?.message || 'Archive failed', 'error'),
+                              );
+                          })();
+                        }}
+                      >
+                        Archive
+                      </Btn>
+                    )}
                   </div>
                 </div>
               );
@@ -737,7 +738,7 @@ export function CompanySettingsTab({
                 .catch((err: any) => notify(err?.message || 'Save failed', 'error'));
             }}
           >
-            Save profile
+            Save Profile
           </Btn>
         </Card>
       )}
@@ -831,14 +832,14 @@ export function CompanySettingsTab({
                 );
             }}
           >
-            Save settings
+            Save Settings
           </Btn>
         </Card>
       )}
 
       {sub === 'branches' && (
         <Card>
-          <SectionTitle>Branches / terminals</SectionTitle>
+          <SectionTitle>Branches / Terminals</SectionTitle>
           <G2 cols={3}>
             <Inp
               label="Name"
@@ -871,7 +872,7 @@ export function CompanySettingsTab({
                     );
                 }}
               >
-                Add branch
+                Add Branch
               </Btn>
             </div>
           </G2>
@@ -996,7 +997,7 @@ export function CompanySettingsTab({
                 );
             }}
           >
-            Save branding
+            Save Branding
           </Btn>
         </Card>
       )}
@@ -1037,7 +1038,7 @@ export function CompanySettingsTab({
                 .catch((err: any) => notify(err?.message || 'Failed', 'error'));
             }}
           >
-            Add document
+            Add Document
           </Btn>
           <div style={{ marginTop: 12 }}>
             {docs.map((d) => (
@@ -1124,7 +1125,7 @@ export function CompanySettingsTab({
                   );
               }}
             >
-              Create key
+              Create Key
             </Btn>
           </div>
           {revealedKey && (
@@ -1321,48 +1322,11 @@ export function CompanySettingsTab({
       )}
 
       {sub === 'notifications' && (
-        <Card>
-          <SectionTitle>Admin notification rules</SectionTitle>
-          <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
-            Includes security.* rules (login, password, role, MFA, invite,
-            lockout) seeded for each company. Delivery remains a queue until
-            SMTP is configured.
-          </div>
-          {rules.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '8px 0',
-                borderBottom: `1px solid ${G.border}`,
-                fontSize: 13,
-              }}
-            >
-              <div>
-                <strong>{r.eventType}</strong> → {r.channel} / {r.target}
-              </div>
-              <label style={{ fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(r.enabled)}
-                  onChange={(e) => {
-                    void companiesApi
-                      .saveNotificationRule(cid, {
-                        ...r,
-                        enabled: e.target.checked,
-                      })
-                      .then(reload)
-                      .catch((err: any) =>
-                        notify(err?.message || 'Failed', 'error'),
-                      );
-                  }}
-                />{' '}
-                enabled
-              </label>
-            </div>
-          ))}
-        </Card>
+        <NotificationRulesPanel
+          cid={cid}
+          rules={rules}
+          onReload={reload}
+        />
       )}
 
       {sub === 'plan' && (

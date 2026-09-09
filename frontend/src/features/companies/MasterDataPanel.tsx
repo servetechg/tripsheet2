@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { G, labelBase } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider } from '@/components/ui';
+import { G, labelBase, inputBase, RADIUS } from '@/lib/theme';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -132,6 +132,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [ioEntity, setIoEntity] = useState<IoKind>('brokers');
   const [csvText, setCsvText] = useState('');
+  const [csvFileName, setCsvFileName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [ioReport, setIoReport] = useState<any>(null);
   const [form, setForm] = useState<Record<string, string>>({ ...EMPTY_FORM });
   const csvFileId = useId();
@@ -643,15 +645,15 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
 
   const statusOpts =
     kind === 'locations' ||
-    kind === 'commodities' ||
-    kind === 'warehouses' ||
-    kind === 'ports' ||
-    kind === 'vendors' ||
-    kind === 'fuel' ||
-    kind === 'insurance' ||
-    kind === 'costcenters' ||
-    kind === 'payroll' ||
-    kind === 'refs'
+      kind === 'commodities' ||
+      kind === 'warehouses' ||
+      kind === 'ports' ||
+      kind === 'vendors' ||
+      kind === 'fuel' ||
+      kind === 'insurance' ||
+      kind === 'costcenters' ||
+      kind === 'payroll' ||
+      kind === 'refs'
       ? CATALOG_STATUSES
       : PARTY_STATUSES;
 
@@ -668,13 +670,13 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {(
           [
-            ['import', 'Import / export'],
-            ['ports', 'Ports of entry'],
+            ['import', 'Import / Export'],
+            ['ports', 'Ports of Entry'],
             ['vendors', 'Vendors'],
-            ['fuel', 'Fuel stations'],
+            ['fuel', 'Fuel Stations'],
             ['insurance', 'Insurance'],
-            ['costcenters', 'Cost centers'],
-            ['payroll', 'Payroll cats'],
+            ['costcenters', 'Cost Centers'],
+            ['payroll', 'Payroll Cats'],
             ['refs', 'Reference'],
             ['commodities', 'Commodities'],
             ['warehouses', 'Warehouses'],
@@ -716,20 +718,107 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             </Sel>
             <div>
               <label htmlFor={csvFileId} style={labelBase()}>
-                CSV file
+                CSV File
               </label>
               <input
                 id={csvFileId}
+                ref={fileInputRef}
                 type="file"
                 accept=".csv,text/csv"
+                style={{ display: 'none' }}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   if (!f) return;
+                  setCsvFileName(f.name);
                   const reader = new FileReader();
                   reader.onload = () => setCsvText(String(reader.result || ''));
                   reader.readAsText(f);
                 }}
               />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files?.[0];
+                  if (!f) return;
+                  setCsvFileName(f.name);
+                  const reader = new FileReader();
+                  reader.onload = () => setCsvText(String(reader.result || ''));
+                  reader.readAsText(f);
+                }}
+                style={{
+                  ...inputBase(),
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  cursor: 'pointer',
+                  padding: '4px 8px 4px 12px',
+                  userSelect: 'none',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: csvFileName ? G.text : G.muted,
+                    fontSize: 13,
+                  }}
+                >
+                  <span style={{ color: csvFileName ? G.success : G.muted, display: 'flex', alignItems: 'center' }}>
+                    {csvFileName ? Icons.docs({ size: 16, color: G.success }) : Icons.upload({ size: 16, color: G.muted })}
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {csvFileName || 'Choose CSV file or drag & drop…'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {csvFileName && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCsvFileName('');
+                        setCsvText('');
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: G.muted,
+                        cursor: 'pointer',
+                        padding: '4px 6px',
+                        borderRadius: RADIUS.sm,
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                      title="Clear file"
+                    >
+                      {Icons.close({ size: 14 })}
+                    </button>
+                  )}
+                  <span
+                    style={{
+                      background: G.card,
+                      border: `1px solid ${G.border}`,
+                      color: G.text,
+                      borderRadius: RADIUS.sm,
+                      padding: '5px 12px',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      letterSpacing: 0.2,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Browse
+                  </span>
+                </div>
+              </div>
             </div>
           </G2>
           <div style={{ margin: '12px 0' }}>
@@ -762,7 +851,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               disabled={busy}
               onClick={() => void exportKind(ioEntity)}
             >
-              Export current
+              Export Current
             </Btn>
             <Btn
               variant="outline"
@@ -820,12 +909,12 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             {(kind === 'costcenters' ||
               kind === 'payroll' ||
               kind === 'refs') && (
-              <Inp
-                label="Code"
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
-              />
-            )}
+                <Inp
+                  label="Code"
+                  value={form.code}
+                  onChange={(e) => setForm({ ...form, code: e.target.value })}
+                />
+              )}
             {kind === 'refs' && (
               <Inp
                 label="Kind"
@@ -927,14 +1016,14 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                     kind === 'carriers' ||
                     kind === 'vendors' ||
                     kind === 'insurance') && (
-                    <Inp
-                      label="Email"
-                      value={form.email}
-                      onChange={(e) =>
-                        setForm({ ...form, email: e.target.value })
-                      }
-                    />
-                  )}
+                      <Inp
+                        label="Email"
+                        value={form.email}
+                        onChange={(e) =>
+                          setForm({ ...form, email: e.target.value })
+                        }
+                      />
+                    )}
                 </>
               )}
             {kind === 'carriers' && (
@@ -998,7 +1087,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               ))}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
             <Btn onClick={() => void saveRecord()} disabled={busy}>
               {busy ? 'Saving…' : editingId ? 'Save changes' : 'Add'}
             </Btn>
@@ -1022,109 +1111,109 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       )}
 
       {kind !== 'import' && (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {busy && !rows.length && (
-          <div style={{ color: G.muted, fontSize: 13 }}>Loading…</div>
-        )}
-        {!busy && !rows.length && (
-          <div style={{ color: G.muted, fontSize: 13 }}>
-            {kind === 'ports'
-              ? 'No ports yet — run schema migrate to seed CA–US ports.'
-              : 'No records yet.'}
-          </div>
-        )}
-        {rows.map((r) => {
-          const title = rowTitle(kind, r);
-          const meta = rowMeta(kind, r);
-          const isEditing = editingId === r.id;
-          return (
-          <div
-            key={r.id}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: 12,
-              alignItems: 'flex-start',
-              fontSize: 13,
-              padding: '10px 12px',
-              borderRadius: 10,
-              border: `1px solid ${isEditing ? G.gold : G.border}`,
-              background: isEditing ? G.goldBg : G.card,
-            }}
-          >
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <strong>{title}</strong>
-              {meta ? (
-                <div style={{ color: G.muted, fontSize: 12, marginTop: 4 }}>
-                  {meta}
-                </div>
-              ) : null}
-              {kind === 'ports' && (
-                <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {r.ace && <Pill>ACE</Pill>}
-                  {r.aci && <Pill>ACI</Pill>}
-                  {r.paps && <Pill>PAPS</Pill>}
-                  {r.pars && <Pill>PARS</Pill>}
-                  {r.fastLane && <Pill>FAST</Pill>}
-                </div>
-              )}
-              <div style={{ marginTop: 6 }}>
-                <Pill
-                  color={
-                    r.status === 'active' || r.status === 'watch'
-                      ? G.success
-                      : G.danger
-                  }
-                >
-                  {String(r.status || '').toUpperCase()}
-                </Pill>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {busy && !rows.length && (
+            <div style={{ color: G.muted, fontSize: 13 }}>Loading…</div>
+          )}
+          {!busy && !rows.length && (
+            <div style={{ color: G.muted, fontSize: 13 }}>
+              {kind === 'ports'
+                ? 'No ports yet — run schema migrate to seed CA–US ports.'
+                : 'No records yet.'}
             </div>
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 6,
-                alignItems: 'flex-end',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{ display: 'flex', gap: 6 }}>
-                <Btn
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => startEdit(r)}
-                >
-                  Edit
-                </Btn>
-                {r.status !== 'inactive' && (
-                  <Btn
-                    size="sm"
-                    variant="danger"
-                    disabled={busy}
-                    onClick={() => void archiveRecord(r.id, title)}
-                  >
-                    Archive
-                  </Btn>
-                )}
-              </div>
-              <Sel
-                label=""
-                value={r.status}
-                onChange={(e: any) => void setStatus(r.id, e.target.value)}
+          )}
+          {rows.map((r) => {
+            const title = rowTitle(kind, r);
+            const meta = rowMeta(kind, r);
+            const isEditing = editingId === r.id;
+            return (
+              <div
+                key={r.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  fontSize: 13,
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  border: `1px solid ${isEditing ? G.gold : G.border}`,
+                  background: isEditing ? G.goldBg : G.card,
+                }}
               >
-                {statusOpts.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Sel>
-            </div>
-          </div>
-          );
-        })}
-      </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <strong>{title}</strong>
+                  {meta ? (
+                    <div style={{ color: G.muted, fontSize: 12, marginTop: 4 }}>
+                      {meta}
+                    </div>
+                  ) : null}
+                  {kind === 'ports' && (
+                    <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {r.ace && <Pill>ACE</Pill>}
+                      {r.aci && <Pill>ACI</Pill>}
+                      {r.paps && <Pill>PAPS</Pill>}
+                      {r.pars && <Pill>PARS</Pill>}
+                      {r.fastLane && <Pill>FAST</Pill>}
+                    </div>
+                  )}
+                  <div style={{ marginTop: 6 }}>
+                    <Pill
+                      color={
+                        r.status === 'active' || r.status === 'watch'
+                          ? G.success
+                          : G.danger
+                      }
+                    >
+                      {String(r.status || '').toUpperCase()}
+                    </Pill>
+                  </div>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    alignItems: 'flex-end',
+                    flexShrink: 0,
+                  }}
+                >
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <Btn
+                      size="sm"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => startEdit(r)}
+                    >
+                      Edit
+                    </Btn>
+                    {r.status !== 'inactive' && (
+                      <Btn
+                        size="sm"
+                        variant="danger"
+                        disabled={busy}
+                        onClick={() => void archiveRecord(r.id, title)}
+                      >
+                        Archive
+                      </Btn>
+                    )}
+                  </div>
+                  <Sel
+                    label=""
+                    value={r.status}
+                    onChange={(e: any) => void setStatus(r.id, e.target.value)}
+                  >
+                    {statusOpts.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </Sel>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </Card>
   );

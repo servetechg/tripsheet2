@@ -1,4 +1,14 @@
 import { useEffect, useId, useMemo, useState } from 'react';
+import {
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  Tooltip as RechartsTooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
 import { G, RADIUS, SPACE, TYPE } from '@/lib/theme';
 import { Btn, Card, Icons, Pill, StatCard, StatsGrid } from '@/components/ui';
 import { BrandLogo } from '@/components/brand/BrandLogo';
@@ -36,58 +46,157 @@ function formatNow() {
   });
 }
 
+function CustomBarTooltip({
+  active,
+  payload,
+  label,
+  seriesNames,
+}: any) {
+  if (!active || !payload || !payload.length) return null;
+  return (
+    <div
+      style={{
+        background: '#151C2C',
+        border: `1px solid ${G.border}`,
+        borderRadius: 8,
+        padding: '6px 10px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        fontSize: 12,
+        whiteSpace: 'nowrap',
+        zIndex: 1000,
+      }}
+    >
+      <div style={{ color: G.muted, marginBottom: 4, fontWeight: 600, fontSize: 11 }}>
+        {label}
+      </div>
+      {payload.map((entry: any, i: number) => {
+        const name = seriesNames?.[i] || entry.name;
+        const val = Number(entry.value || 0);
+        return (
+          <div
+            key={i}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              color: G.text,
+              fontSize: 12,
+              marginTop: i > 0 ? 3 : 0,
+            }}
+          >
+            <span
+              style={{
+                width: 7,
+                height: 7,
+                borderRadius: 99,
+                background: entry.color || entry.fill,
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            {name ? <span style={{ color: G.muted2, marginRight: 2 }}>{name}:</span> : null}
+            <span style={{ fontWeight: 600 }}>{val.toLocaleString()}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function BarChart({
   labels,
   series,
   colors,
+  seriesNames,
 }: {
   labels: string[];
   series: number[][];
   colors: string[];
+  seriesNames?: string[];
 }) {
-  const max = Math.max(1, ...series.flat());
+  const data = useMemo(() => {
+    return labels.map((label, idx) => {
+      const item: Record<string, any> = { label };
+      series.forEach((s, sIdx) => {
+        item[`s_${sIdx}`] = s[idx] ?? 0;
+      });
+      return item;
+    });
+  }, [labels, series]);
+
+  const barSize = series.length > 1 ? 10 : 18;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, height: 140 }}>
-      {labels.map((label, i) => (
-        <div
-          key={label}
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 6,
-            minWidth: 0,
-          }}
+    <div style={{ width: '100%', height: 140 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <RechartsBarChart
+          data={data}
+          margin={{ top: 8, right: 4, left: 4, bottom: 0 }}
+          barGap={3}
+          barCategoryGap="20%"
         >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 3,
-              height: 110,
-              width: '100%',
-              justifyContent: 'center',
-            }}
-          >
-            {series.map((s, si) => (
-              <div
-                key={si}
-                className="ts-bar"
-                style={{
-                  width: series.length > 1 ? 10 : 18,
-                  height: `${Math.max(4, (s[i] / max) * 100)}%`,
-                  background: colors[si],
-                  borderRadius: 6,
-                  transition: 'height .4s ease',
-                }}
-                title={`${labels[i]}: ${s[i]}`}
-              />
-            ))}
-          </div>
-          <div style={{ ...TYPE.small, color: G.muted, fontSize: 11 }}>{label}</div>
-        </div>
-      ))}
+          <XAxis
+            dataKey="label"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fill: G.muted, fontSize: 11 }}
+            dy={4}
+          />
+          <RechartsTooltip
+            content={<CustomBarTooltip seriesNames={seriesNames} />}
+            cursor={{ fill: 'rgba(255, 255, 255, 0.03)', radius: 4 }}
+            wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+            allowEscapeViewBox={{ x: true, y: true }}
+          />
+          {series.map((_, sIdx) => (
+            <Bar
+              key={sIdx}
+              dataKey={`s_${sIdx}`}
+              fill={colors[sIdx]}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={barSize}
+              minPointSize={3}
+            />
+          ))}
+        </RechartsBarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function DonutTooltip({ active, payload, coordinate }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const item = payload[0];
+  if (!item || item.name === 'No data') return null;
+  const isTopHalf = (coordinate?.y ?? 56) < 56;
+  return (
+    <div
+      style={{
+        background: '#151C2C',
+        border: `1px solid ${G.border}`,
+        borderRadius: 8,
+        padding: '4px 8px',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        fontSize: 11,
+        whiteSpace: 'nowrap',
+        zIndex: 1000,
+        transform: isTopHalf ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+        transition: 'transform 0.15s ease',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span
+          style={{
+            width: 7,
+            height: 7,
+            borderRadius: 99,
+            background: item.payload?.color || item.color || item.fill,
+            flexShrink: 0,
+          }}
+        />
+        <span style={{ color: G.muted2 }}>{item.name}:</span>
+        <span style={{ fontWeight: 600, color: G.text }}>{item.value}</span>
+      </div>
     </div>
   );
 }
@@ -97,16 +206,15 @@ function DonutChart({
 }: {
   segments: { label: string; value: number; color: string }[];
 }) {
-  const total = Math.max(1, segments.reduce((a, s) => a + s.value, 0));
-  let acc = 0;
-  const stops = segments
-    .map((s) => {
-      const start = (acc / total) * 100;
-      acc += s.value;
-      const end = (acc / total) * 100;
-      return `${s.color} ${start}% ${end}%`;
-    })
-    .join(', ');
+  const total = segments.reduce((a, s) => a + s.value, 0);
+
+  const displayData = useMemo(() => {
+    const activeSegments = segments.filter((s) => s.value > 0);
+    if (activeSegments.length > 0) {
+      return activeSegments;
+    }
+    return [{ label: 'No data', value: 1, color: G.border2 }];
+  }, [segments]);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
@@ -115,26 +223,59 @@ function DonutChart({
         style={{
           width: 112,
           height: 112,
-          borderRadius: '50%',
-          background: `conic-gradient(${stops})`,
           position: 'relative',
           flexShrink: 0,
         }}
       >
+        {/* Center count & label positioned behind tooltip with transparent background */}
         <div
           style={{
             position: 'absolute',
-            inset: 22,
-            borderRadius: '50%',
-            background: G.card,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'column',
+            pointerEvents: 'none',
+            zIndex: 1,
+            userSelect: 'none',
           }}
         >
-          <div style={{ fontSize: 18, fontWeight: 700, color: G.text }}>{total}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: G.text, lineHeight: 1.1 }}>
+            {total}
+          </div>
           <div style={{ ...TYPE.small, color: G.muted, fontSize: 10 }}>Total</div>
+        </div>
+
+        <div style={{ width: 112, height: 112, position: 'relative', zIndex: 2 }}>
+          <ResponsiveContainer width={112} height={112}>
+            <PieChart>
+              <Pie
+                data={displayData}
+                dataKey="value"
+                nameKey="label"
+                cx="50%"
+                cy="50%"
+                innerRadius={34}
+                outerRadius={54}
+                paddingAngle={displayData.length > 1 ? 2 : 0}
+                stroke="none"
+                isAnimationActive={true}
+              >
+                {displayData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <RechartsTooltip
+                content={<DonutTooltip />}
+                wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
+                offset={{ x: 0, y: 2 }}
+                allowEscapeViewBox={{ x: true, y: true }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 120 }}>
@@ -993,6 +1134,7 @@ export function DashboardTab({
             labels={MONTHS}
             series={[metrics.monthlyTrips]}
             colors={[G.info]}
+            seriesNames={['Trips']}
           />
         </Card>
 
@@ -1007,6 +1149,7 @@ export function DashboardTab({
             labels={MONTHS}
             series={[metrics.monthlyRevenue, metrics.monthlyExpenses]}
             colors={[G.success, G.danger]}
+            seriesNames={['Revenue', 'Expenses']}
           />
           <div
             style={{
