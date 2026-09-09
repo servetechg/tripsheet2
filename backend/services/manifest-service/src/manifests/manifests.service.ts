@@ -60,11 +60,10 @@ export class ManifestsService {
 
   async update(id: string, dto: UpdateManifestDto) {
     const manifest = await this.ensureExists(id);
-    if (manifest.status === 'cancelled') {
-      throw new BadRequestException('Cannot update a cancelled manifest');
-    }
-    if (manifest.status === 'accepted') {
-      throw new BadRequestException('Cannot update an accepted manifest');
+    if (!['draft', 'rejected'].includes(manifest.status)) {
+      throw new BadRequestException(
+        `Cannot update a ${manifest.status} manifest`,
+      );
     }
 
     return this.prisma.manifest.update({
@@ -100,6 +99,8 @@ export class ManifestsService {
   }
 
   async submit(id: string) {
+    const manifest = await this.ensureExists(id);
+    await this.validateForSubmission(manifest);
     return this.transition(id, 'submitted', {
       submittedAt: new Date().toISOString(),
       rejectionReason: null,
@@ -140,6 +141,52 @@ export class ManifestsService {
       where: { id },
       data: { status: to, ...extra },
     });
+  }
+
+  private async validateForSubmission(
+    manifest: Awaited<ReturnType<ManifestsService['ensureExists']>>,
+  ) {
+    const missing: string[] = [];
+    if (!manifest.crn?.trim() || manifest.crn.startsWith('XXXX')) {
+      missing.push('valid CRN');
+    }
+    if (!manifest.driverId?.trim()) missing.push('driver');
+    if (!manifest.truckId?.trim()) missing.push('truck');
+    if (!manifest.portOfEntry?.trim()) missing.push('port of entry');
+    if (!manifest.estimatedArrival?.trim()) missing.push('estimated arrival');
+
+    const shipments = Array.isArray(manifest.shipments)
+      ? (manifest.shipments as Array<Record<string, unknown>>)
+      : [];
+    if (!shipments.length) {
+      missing.push('at least one shipment');
+    } else if (
+      shipments.some(
+        (shipment) =>
+          !String(shipment.ccn || '').trim() ||
+          !String(shipment.shipperName || '').trim() ||
+          !String(shipment.consigneeName || '').trim(),
+      )
+    ) {
+      missing.push('CCN, shipper, and consignee for every shipment');
+    }
+
+    const carrier = await this.prisma.carrierProfile.findUnique({
+      where: { companyId: manifest.companyId },
+    });
+    const carrierCode =
+      manifest.type === 'ACI' ? carrier?.cbsaCarrierCode : carrier?.scacCode;
+    if (!carrierCode?.trim()) {
+      missing.push(
+        manifest.type === 'ACI' ? 'CBSA carrier code' : 'SCAC code',
+      );
+    }
+
+    if (missing.length) {
+      throw new BadRequestException(
+        `Cannot submit eManifest: missing ${missing.join(', ')}`,
+      );
+    }
   }
 
   private async ensureExists(id: string) {

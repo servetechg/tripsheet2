@@ -9,6 +9,22 @@ import { EManifestForm } from './EManifestForm';
 import { EManifestCard } from './EManifestCard';
 import { LeadSheet } from './LeadSheet';
 
+function normalizeManifest(row: any) {
+  const formData =
+    row?.formData && typeof row.formData === 'object' ? row.formData : {};
+  const estimated = String(row?.estimatedArrival || '');
+  const [eta = '', etaTime = ''] = estimated.split(/[ T]/, 2);
+  return {
+    ...formData,
+    ...row,
+    portCode: formData.portCode || row.portOfEntry || '',
+    eta: formData.eta || eta,
+    etaTime: formData.etaTime || etaTime,
+    tripLoadId: formData.tripLoadId || row.loadId || '',
+    shipments: Array.isArray(row.shipments) ? row.shipments : [],
+  };
+}
+
 export function EManifestTab({
   company,
   manifests,
@@ -125,10 +141,28 @@ export function EManifestTab({
     try {
       if (apiEnabled) {
         const existing = manifests.find((x: any) => x.id === m.id);
+        let saved: any;
         if (existing) {
-          await manifestsApi.update(m.id, toApiBody(m));
+          saved = await manifestsApi.update(m.id, toApiBody(m));
         } else {
-          await manifestsApi.create(toApiBody(m));
+          saved = await manifestsApi.create(toApiBody(m));
+        }
+        const persistedId = existing?.id || saved?.id;
+        if (
+          m.status === 'submitted' &&
+          persistedId &&
+          existing?.status !== 'submitted'
+        ) {
+          try {
+            await manifestsApi.submit(persistedId);
+          } catch (submitError) {
+            // The form uses a temporary client id. If a create succeeded but
+            // submit failed, remove that draft so retrying cannot duplicate it.
+            if (!existing) {
+              await manifestsApi.remove(persistedId).catch(() => undefined);
+            }
+            throw submitError;
+          }
         }
         await refreshAll?.();
       } else {
@@ -139,8 +173,14 @@ export function EManifestTab({
       }
       setEditingManifest(null);
       setSubTab('list');
+      notify(
+        m.status === 'submitted'
+          ? 'eManifest submitted successfully.'
+          : 'eManifest draft saved.',
+      );
     } catch (e: any) {
       notify(e?.message || 'Failed to save eManifest', 'error');
+      throw e;
     }
   };
 
@@ -359,7 +399,7 @@ export function EManifestTab({
     }
   };
 
-  const sorted = [...manifests].sort((a, b) =>
+  const sorted = manifests.map(normalizeManifest).sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
 

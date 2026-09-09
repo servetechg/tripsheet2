@@ -78,7 +78,7 @@ async function schemaHasRows(admin: Client, schema: string): Promise<boolean> {
 const SCHEMA_PROBE_TABLE: Record<string, string> = {
   driver: 'Driver',
   fleet: 'Load',
-  manifest: 'EManifest',
+  manifest: 'Manifest',
   tripsheet: 'TripSheet',
   accounting: 'LedgerAccount',
   notification: 'NotificationLog',

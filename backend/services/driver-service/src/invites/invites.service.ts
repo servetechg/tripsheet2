@@ -14,6 +14,7 @@ import { FilesService } from '../files/files.service';
 import { QualificationsService } from '../qualifications/qualifications.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { CompleteInviteDto } from './dto/complete-invite.dto';
+import { SendInviteDto } from './dto/send-invite.dto';
 import {
   assertPermission,
   getTenantStore,
@@ -106,9 +107,117 @@ export class InvitesService {
       if (fresh.status !== 'pending') {
         throw new NotFoundException('Invite not found or no longer pending');
       }
-      const passwordPolicy = await this.fetchPasswordPolicy(invite.companyId);
-      return { ...fresh, passwordPolicy };
+      const [passwordPolicy, company] = await Promise.all([
+        this.fetchPasswordPolicy(invite.companyId),
+        this.fetchCompanySummary(invite.companyId),
+      ]);
+      // Onboarding runs unauthenticated, so the company identity has to ship
+      // with the invite — the /companies API is behind the RBAC gate.
+      return { ...fresh, passwordPolicy, company };
     });
+  }
+
+  /** Re-send an existing pending invite link over email or SMS. */
+  async sendLink(id: string, dto: SendInviteDto) {
+    const invite = await this.prisma.invite.findUnique({ where: { id } });
+    if (!invite) {
+      throw new NotFoundException(`Invite ${id} not found`);
+    }
+    if (invite.kind === 'driver') {
+      assertPermission('drivers.invite');
+    } else {
+      assertPermission('users.create');
+      assertPermission('users.assign_role');
+    }
+    const fresh = await this.refreshExpiry(invite);
+    if (fresh.status !== 'pending') {
+      throw new BadRequestException(
+        `This invite is already ${fresh.status}. Regenerate it before sending.`,
+      );
+    }
+
+    const channel = dto.channel === 'sms' ? 'sms' : 'email';
+    const to = dto.to?.trim() || (channel === 'email' ? invite.email : null);
+    if (!to) {
+      throw new BadRequestException(
+        channel === 'email'
+          ? 'No email address on this invite — enter one to send.'
+          : 'Enter a phone number to send the invite by SMS.',
+      );
+    }
+    if (channel === 'email' && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+      throw new BadRequestException('Enter a valid email address');
+    }
+
+    const notifyUrl =
+      this.config.get<string>('NOTIFICATION_SERVICE_URL') ||
+      'http://localhost:3008';
+
+    const company = await this.fetchCompanySummary(invite.companyId);
+    const brand = company?.name || 'FleetQuix';
+    const link = this.inviteLink(invite.token);
+
+    if (channel === 'email' && to !== invite.email) {
+      await this.prisma.invite.update({
+        where: { id: invite.id },
+        data: { email: to.toLowerCase() },
+      });
+    }
+
+    const base = notifyUrl.replace(/\/$/, '');
+    const path = channel === 'sms' ? '/notifications/sms' : '/notifications/log';
+    const body =
+      channel === 'sms'
+        ? {
+            companyId: invite.companyId,
+            to,
+            body: `${brand}: you are invited as ${invite.role}. Complete your account setup: ${link}`,
+            meta: {
+              type: invite.role === 'driver' ? 'driver_invite' : 'staff_invite',
+              token: invite.token,
+            },
+          }
+        : {
+            companyId: invite.companyId,
+            channel: 'email',
+            to,
+            body: `You are invited to join ${brand} as ${invite.role}.\n\nComplete your account setup:\n${link}\n\nIf you did not expect this invite, ignore this email.`,
+            status: 'queued',
+            meta: {
+              type: invite.role === 'driver' ? 'driver_invite' : 'staff_invite',
+              subject: `You are invited to join ${brand}`,
+              role: invite.role,
+              token: invite.token,
+            },
+          };
+
+    let res: Response;
+    try {
+      res = await fetch(`${base}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch (e) {
+      this.logger.warn(`invite ${channel} send failed: ${String(e)}`);
+      throw new BadRequestException(
+        'Notification service is unreachable — try again.',
+      );
+    }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      this.logger.warn(
+        `invite ${channel} send failed: HTTP ${res.status} ${detail.slice(0, 200)}`,
+      );
+      throw new BadRequestException(
+        `Could not send the invite by ${channel}. Check notification settings.`,
+      );
+    }
+
+    const log = (await res.json().catch(() => null)) as {
+      status?: string;
+    } | null;
+    return { channel, to, status: log?.status || 'queued' };
   }
 
   async complete(token: string, dto: CompleteInviteDto) {
@@ -672,6 +781,14 @@ export class InvitesService {
     }
   }
 
+  private inviteLink(token: string) {
+    const origin =
+      this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
+      this.config.get<string>('APP_PUBLIC_ORIGIN') ||
+      'http://localhost:5173';
+    return `${origin.replace(/\/$/, '')}/invite?invite=${encodeURIComponent(token)}`;
+  }
+
   private async queueInviteEmail(invite: {
     token: string;
     companyId: string;
@@ -680,12 +797,8 @@ export class InvitesService {
     role: string;
   }) {
     const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
-    const origin =
-      this.config.get<string>('INVITE_PUBLIC_ORIGIN') ||
-      this.config.get<string>('APP_PUBLIC_ORIGIN') ||
-      'http://localhost:5173';
     if (!notifyUrl || !invite.email) return;
-    const link = `${origin.replace(/\/$/, '')}/invite?invite=${encodeURIComponent(invite.token)}`;
+    const link = this.inviteLink(invite.token);
     try {
       await fetch(`${notifyUrl.replace(/\/$/, '')}/notifications/log`, {
         method: 'POST',
@@ -735,6 +848,29 @@ export class InvitesService {
       });
     } catch (e) {
       this.logger.warn(`invite accepted security notify failed: ${String(e)}`);
+    }
+  }
+
+  private async fetchCompanySummary(companyId: string) {
+    const base =
+      this.config.get<string>('COMPANY_SERVICE_URL') ||
+      'http://localhost:3002';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/internal/companies/${encodeURIComponent(companyId)}/summary`,
+        { headers: { 'x-internal-api-key': key } },
+      );
+      if (!res.ok) return null;
+      return (await res.json()) as {
+        id: string;
+        name: string;
+        shortName: string | null;
+      };
+    } catch (e) {
+      this.logger.warn(`company summary for invite failed: ${String(e)}`);
+      return null;
     }
   }
 

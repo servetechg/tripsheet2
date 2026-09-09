@@ -85,6 +85,15 @@ export class TenantsController {
     return this.tenants.listTenantRoutedCompanyIds();
   }
 
+  @Get('internal/companies/:companyId/summary')
+  internalCompanySummary(
+    @Param('companyId') companyId: string,
+    @Headers('x-internal-api-key') key?: string,
+  ) {
+    this.tenants.assertInternalKey(key);
+    return this.tenants.getPublicCompanySummary(companyId);
+  }
+
   @Post('internal/tenants/:companyId/ensure-driver-schema')
   async internalEnsureDriverSchema(
     @Param('companyId') companyId: string,

@@ -997,6 +997,11 @@ export const invitesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  send: (id: string, body: { channel: 'email' | 'sms'; to?: string }) =>
+    api<{ channel: string; to: string; status: string }>(
+      `/invites/${id}/send`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
   revoke: (id: string) =>
     api<any>(`/invites/${id}/revoke`, { method: 'POST', body: '{}' }),
   regenerate: (id: string) =>
