@@ -646,6 +646,7 @@ export function DriversTab({
           <div
             style={{
               background: G.strip,
+              border: `1px solid ${G.border}`,
               borderRadius: 8,
               padding: '10px 14px',
               marginBottom: 10,
@@ -658,10 +659,11 @@ export function DriversTab({
             <div
               style={{
                 flex: 1,
-                fontSize: 11,
-                color: G.gold,
+                fontSize: 12,
+                color: G.mode === 'light' ? G.goldDim : G.gold,
                 wordBreak: 'break-all',
                 fontFamily: 'monospace',
+                fontWeight: 600,
               }}
             >
               {generatedLink}
@@ -716,12 +718,19 @@ export function DriversTab({
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="driver@example.com"
+                    style={{ marginBottom: 0 }}
                   />
                 </div>
                 <Btn
-                  size="sm"
+                  size="md"
                   disabled={sending !== null}
                   onClick={() => void sendInvite('email')}
+                  style={{
+                    height: 42,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0 16px',
+                  }}
                 >
                   {sending === 'email' ? 'Sending…' : 'Send email'}
                 </Btn>
@@ -741,13 +750,20 @@ export function DriversTab({
                     value={invitePhone}
                     onChange={(e) => setInvitePhone(e.target.value)}
                     placeholder="(403) 555-0100"
+                    style={{ marginBottom: 0 }}
                   />
                 </div>
                 <Btn
-                  size="sm"
+                  size="md"
                   variant="outline"
                   disabled={sending !== null}
                   onClick={() => void sendInvite('sms')}
+                  style={{
+                    height: 42,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0 16px',
+                  }}
                 >
                   {sending === 'sms' ? 'Sending…' : 'Send SMS'}
                 </Btn>

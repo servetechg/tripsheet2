@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { G, RADIUS } from '@/lib/theme';
-import { Btn } from './Btn';
+import { Icons } from './Icons';
 
 export type ModalProps = {
   open: boolean;
@@ -95,9 +95,38 @@ export function Modal({
               <span />
             )}
             {showClose ? (
-              <Btn size="sm" variant="outline" onClick={onClose}>
-                Close
-              </Btn>
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: RADIUS.md,
+                  border: 'none',
+                  background: 'transparent',
+                  color: G.muted,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  transition: 'color .15s ease, background .15s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = G.text;
+                  e.currentTarget.style.background =
+                    G.mode === 'light'
+                      ? 'rgba(0, 0, 0, 0.06)'
+                      : 'rgba(255, 255, 255, 0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = G.muted;
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                {Icons.close({ size: 18 })}
+              </button>
             ) : null}
           </div>
         )}
