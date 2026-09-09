@@ -195,7 +195,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             invitesApi.list(companyId).catch(() => []),
             assetsApi.list(companyId).catch(() => []),
             loadsApi.list({ companyId }).catch(() => []),
-            manifestsApi.list(companyId).catch(() => []),
+            manifestsApi.list(companyId).catch((error: unknown) => {
+              const detail =
+                error instanceof Error ? error.message : 'request failed';
+              setApiError(`eManifest data unavailable: ${detail}`);
+              return [];
+            }),
             carrierProfilesApi.get(companyId).catch(() => null),
           ]);
         }

@@ -7,7 +7,7 @@ import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { invitesApi, authApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
+import { invitesApi, authApi, driversApi, companiesApi } from '@/lib/api';
 import {
   AVAILABILITY_LABELS,
   DRIVER_AVAILABILITY_STATUSES,
@@ -41,34 +41,78 @@ export function DriversTab({
   const [show, setShow] = useState(false);
   const [editDriver, setEditDriver] = useState<any>(null);
   const [generatedLink, setGeneratedLink] = useState<any>(null);
+  const [generatedInviteId, setGeneratedInviteId] = useState<string | null>(
+    null,
+  );
   const [invitePhone, setInvitePhone] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sending, setSending] = useState<'email' | 'sms' | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const showInviteLink = (invite: any) => {
+    setGeneratedInviteId(invite?.id ?? null);
+    setInviteEmail(invite?.email || '');
+    setGeneratedLink(
+      `${window.location.origin}/invite?invite=${encodeURIComponent(invite.token)}`,
+    );
+  };
 
   const createInvite = async () => {
     try {
       if (apiEnabled) {
         const invite = await invitesApi.create(company.id);
-        const token = invite.token;
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink(invite);
         await refreshAll?.();
       } else {
-        const token = uid() + uid();
         const invite = {
           id: uid(),
-          token,
+          token: uid() + uid(),
           companyId: company.id,
           status: 'pending',
           createdAt: new Date().toLocaleDateString('en-CA'),
         };
         setInvites((p: any[]) => [...p, invite]);
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink(invite);
       }
     } catch (e: any) {
       notify(e?.message || 'Failed to create invite', 'error');
+    }
+  };
+
+  /** Server builds the link and dispatches it, so the origin stays correct. */
+  const sendInvite = async (channel: 'email' | 'sms') => {
+    const to = (channel === 'email' ? inviteEmail : invitePhone).trim();
+    if (!to) {
+      notify(
+        channel === 'email' ? 'Enter an email address' : 'Enter a phone number',
+        'error',
+      );
+      return;
+    }
+    if (!generatedInviteId) {
+      notify('Regenerate this invite before sending', 'error');
+      return;
+    }
+    setSending(channel);
+    try {
+      const res = await invitesApi.send(generatedInviteId, { channel, to });
+      if (res.status === 'failed') {
+        notify(
+          `Provider rejected the ${channel === 'email' ? 'email' : 'SMS'} — check delivery settings`,
+          'error',
+        );
+      } else if (res.status === 'queued' || res.status === 'simulated') {
+        notify(
+          `Invite logged for ${to} — ${channel === 'email' ? 'SMTP' : 'Twilio'} is not configured yet`,
+        );
+      } else {
+        notify(`Invite sent to ${to}`);
+      }
+      await refreshAll?.();
+    } catch (e: any) {
+      notify(e?.message || `Could not send invite by ${channel}`, 'error');
+    } finally {
+      setSending(null);
     }
   };
 
@@ -184,9 +228,7 @@ export function DriversTab({
         const next = await invitesApi.regenerate(inv.id);
         await refreshAll?.();
         if (next?.token) {
-          setGeneratedLink(
-            `${window.location.origin}/invite?invite=${encodeURIComponent(next.token)}`,
-          );
+          showInviteLink(next);
         }
       } else {
         const token = uid();
@@ -195,9 +237,7 @@ export function DriversTab({
             i.id === inv.id ? { ...i, token, status: 'pending', createdAt: new Date().toLocaleDateString('en-CA') } : i,
           ),
         );
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink({ ...inv, token });
       }
       notify('Invite regenerated');
     } catch (e: any) {
@@ -649,48 +689,69 @@ export function DriversTab({
               COPY
             </button>
           </div>
-          {apiEnabled && (
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                marginBottom: 10,
-                flexWrap: 'wrap',
-                alignItems: 'flex-end',
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <Inp
-                  label="SMS invite to phone"
-                  phone
-                  value={invitePhone}
-                  onChange={(e) => setInvitePhone(e.target.value)}
-                  placeholder="(403) 555-0100"
-                />
-              </div>
-              <Btn
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  if (!invitePhone.trim()) {
-                    notify('Enter a phone number', 'error');
-                    return;
-                  }
-                  try {
-                    await notificationsApi.sendSms({
-                      to: invitePhone.trim(),
-                      body: `${company.name || 'TripSheet'}: complete onboarding ${generatedLink}`,
-                      companyId: company.id,
-                      meta: { type: 'invite' },
-                    });
-                    notify('Invite SMS queued');
-                  } catch (e: any) {
-                    notify(e?.message || 'SMS failed', 'error');
-                  }
+          {apiEnabled && generatedInviteId && (
+            <div style={{ marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: G.muted,
+                  marginBottom: 6,
                 }}
               >
-                Send SMS
-              </Btn>
+                Send the link directly instead of sharing it manually.
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  marginBottom: 8,
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-end',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Inp
+                    label="Email invite to"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="driver@example.com"
+                  />
+                </div>
+                <Btn
+                  size="sm"
+                  disabled={sending !== null}
+                  onClick={() => void sendInvite('email')}
+                >
+                  {sending === 'email' ? 'Sending…' : 'Send email'}
+                </Btn>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-end',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Inp
+                    label="SMS invite to phone"
+                    phone
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    placeholder="(403) 555-0100"
+                  />
+                </div>
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  disabled={sending !== null}
+                  onClick={() => void sendInvite('sms')}
+                >
+                  {sending === 'sms' ? 'Sending…' : 'Send SMS'}
+                </Btn>
+              </div>
             </div>
           )}
           <div style={{ fontSize: 11, color: G.muted }}>
@@ -700,7 +761,9 @@ export function DriversTab({
           <button
             onClick={() => {
               setGeneratedLink(null);
+              setGeneratedInviteId(null);
               setInvitePhone('');
+              setInviteEmail('');
             }}
             style={{
               background: 'transparent',
@@ -815,7 +878,7 @@ export function DriversTab({
                   <button
                     onClick={() => {
                       navigator.clipboard?.writeText(link);
-                      setGeneratedLink(link);
+                      showInviteLink(inv);
                     }}
                     style={{
                       background: 'transparent',

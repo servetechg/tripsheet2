@@ -40,10 +40,10 @@ export function FleetOpsTab({
       const [m, v, vendorsList] = await Promise.all([
         maintenanceApi.list(company.id),
         dvirApi.list(company.id),
-        companiesApi.listVendors(company.id).catch(() => []),
+        companiesApi.maintenanceVendors(company.id, true).catch(() => []),
       ]);
-      setRows(m.rows || []);
-      setDvirs(v.rows || []);
+      setRows(Array.isArray(m) ? m : []);
+      setDvirs(Array.isArray(v) ? v : []);
       setVendors(vendorsList || []);
     } catch {
       notify('Could not load fleet ops', 'error');
@@ -60,17 +60,20 @@ export function FleetOpsTab({
       return;
     }
     try {
-      await maintenanceApi.create(company.id, {
+      await maintenanceApi.create({
+        companyId: company.id,
         ...f,
         cost: Number(f.cost),
       });
-      await auditApi.log(
-        company.id,
-        'fleet.maintenance',
-        `Maintenance: ${f.title}`,
-        { f },
-        adminUser?.sub,
-      );
+      await auditApi.create({
+        companyId: company.id,
+        actorId: adminUser?.sub || adminUser?.id,
+        actorName: adminUser?.name,
+        action: 'fleet.maintenance',
+        entityType: 'maintenance',
+        entityId: f.assetId,
+        meta: { title: f.title, form: f },
+      });
       setF({
         assetId: '',
         type: 'pm',
@@ -94,7 +97,8 @@ export function FleetOpsTab({
       return;
     }
     try {
-      await dvirApi.create(company.id, {
+      await dvirApi.create({
+        companyId: company.id,
         ...d,
         unitNo: assets.find((a: any) => a.id === d.assetId)?.unitNo,
         driverName: drivers.find((dr: any) => dr.id === d.driverId)?.name,

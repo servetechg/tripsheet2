@@ -15,7 +15,7 @@ import { driverRecordIdOf } from '@/lib/driverIds';
 export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack, apiEnabled }: any) {
   const isACI = type === "ACI";
   const PORTS_FALLBACK = isACI ? CA_PORTS : US_PORTS;
-  const carrierCode = isACI ? (carrier.cbsaCarrierCode||"XXXX") : (carrier.scacCode||"XXXX");
+  const carrierCode = isACI ? (carrier?.cbsaCarrierCode||"XXXX") : (carrier?.scacCode||"XXXX");
 
   const emptyShipment = () => ({
     id: uid(),
@@ -127,6 +127,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
   const selectedDriver  = drivers.find(d=>d.id===f.driverId);
 
   const [formErr, setFormErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [borderCheck, setBorderCheck] = useState<{ eligible: boolean; missing: string[]; warnings: string[] } | null>(null);
 
@@ -164,6 +165,12 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
 
   const save = async (status="draft") => {
     if (status==="submitted") {
+      if (carrierCode === "XXXX") {
+        setFormErr(
+          `Add the ${isACI ? 'CBSA carrier code' : 'SCAC code'} in Carrier profile before submitting.`,
+        );
+        return;
+      }
       if (blank(f.driverId)) { setFormErr("Please select a driver."); return; }
       if (blank(f.truckId))  { setFormErr("Please select a truck."); return; }
       if (blank(f.eta))      { setFormErr("ETA date is required before submitting."); return; }
@@ -186,17 +193,24 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       }
     }
     setFormErr("");
-    onSave({
-      id: editData?.id || uid(),
-      type, status,
-      companyId: company.id,
-      createdAt: editData?.createdAt || new Date().toLocaleDateString("en-CA"),
-      ...f,
-      truckNo:   selectedTruck?.unitNo   || "",
-      trailerNo: selectedTrailer?.unitNo || "",
-      driverName:selectedDriver?.name    || "",
-      portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id || uid(),
+        type, status,
+        companyId: company.id,
+        createdAt: editData?.createdAt || new Date().toLocaleDateString("en-CA"),
+        ...f,
+        truckNo:   selectedTruck?.unitNo   || "",
+        trailerNo: selectedTrailer?.unitNo || "",
+        driverName:selectedDriver?.name    || "",
+        portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
+      });
+    } catch (e: any) {
+      setFormErr(e?.message || 'Could not save the eManifest.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const SHIP_TYPES_ACI = [
@@ -265,12 +279,14 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn
             variant="outline"
-            onClick={() => save('draft')}
+            disabled={saving}
+            onClick={() => void save('draft')}
             style={{ fontSize: 11, padding: '8px 14px' }}
           >
-            SAVE DRAFT
+            {saving ? 'SAVING…' : 'SAVE DRAFT'}
           </Btn>
           <Btn
+            disabled={saving}
             onClick={() => void save('submitted')}
             style={{
               fontSize: 11,
@@ -282,7 +298,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
               fontWeight: 600,
             }}
           >
-            <span>SUBMIT</span>
+            <span>{saving ? 'SUBMITTING…' : 'SUBMIT'}</span>
             {Icons.arrowRight({ size: 14, color: '#fff' })}
           </Btn>
         </div>
