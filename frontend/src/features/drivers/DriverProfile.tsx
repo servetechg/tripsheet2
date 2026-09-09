@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS, pagePlain } from '@/lib/theme';
 import { Btn, BackButton, Card, Pill, SectionTitle, StatCard, StatsGrid, Sel, Icons } from '@/components/ui';
+import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
@@ -339,8 +340,8 @@ export function DriverProfile({
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
-          top: 0,
-          zIndex: 100,
+          top: HEADER_HEIGHT,
+          zIndex: 90,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

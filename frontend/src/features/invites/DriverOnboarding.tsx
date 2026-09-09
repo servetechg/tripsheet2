@@ -259,9 +259,16 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             </div>
             <Btn
               onClick={() => setStep(2)}
-              style={{ padding: '14px 40px', fontSize: 14 }}
+              style={{
+                padding: '14px 40px',
+                fontSize: 14,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 10,
+              }}
             >
-              GET STARTED →
+              <span>GET STARTED</span>
+              {Icons.arrowRight({ size: 16, color: '#fff' })}
             </Btn>
           </div>
         )}
@@ -434,8 +441,19 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
 
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <BackButton onClick={() => setStep(1)} />
-              <Btn onClick={goProfileNext} style={{ flex: 1, padding: 14 }}>
-                NEXT: UPLOAD DOCUMENTS →
+              <Btn
+                onClick={goProfileNext}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                }}
+              >
+                <span>NEXT: UPLOAD DOCUMENTS</span>
+                {Icons.arrowRight({ size: 16, color: '#fff' })}
               </Btn>
             </div>
           </div>
@@ -627,8 +645,19 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
               <BackButton onClick={() => setStep(2)} />
-              <Btn onClick={() => setStep(4)} style={{ flex: 1, padding: 14 }}>
-                NEXT: REVIEW CONTRACT →
+              <Btn
+                onClick={() => setStep(4)}
+                style={{
+                  flex: 1,
+                  padding: 14,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                }}
+              >
+                <span>NEXT: REVIEW CONTRACT</span>
+                {Icons.arrowRight({ size: 16, color: '#fff' })}
               </Btn>
             </div>
 

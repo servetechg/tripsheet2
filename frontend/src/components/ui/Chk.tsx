@@ -1,12 +1,23 @@
-import type { InputHTMLAttributes, ReactNode } from 'react';
+import { useEffect, useRef, type InputHTMLAttributes, type ReactNode } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 
 export interface ChkProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label?: ReactNode;
   muted?: boolean;
+  indeterminate?: boolean;
 }
 
-export function Chk({ label, muted, checked, disabled, style, ...p }: ChkProps) {
+export function Chk({ label, muted, checked, indeterminate, disabled, style, ...p }: ChkProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.indeterminate = Boolean(indeterminate && !checked);
+    }
+  }, [indeterminate, checked]);
+
+  const isCheckedOrIndeterminate = Boolean(checked || (indeterminate && !checked));
+
   return (
     <label
       className="ts-chk"
@@ -29,6 +40,7 @@ export function Chk({ label, muted, checked, disabled, style, ...p }: ChkProps) 
         }}
       >
         <input
+          ref={inputRef}
           type="checkbox"
           className="ts-chk-input"
           checked={checked}
@@ -38,23 +50,35 @@ export function Chk({ label, muted, checked, disabled, style, ...p }: ChkProps) 
         <span
           className="ts-chk-box"
           aria-hidden
-          data-checked={checked ? 'true' : 'false'}
+          data-checked={checked ? 'true' : indeterminate ? 'indeterminate' : 'false'}
           style={{
             width: 18,
             height: 18,
             borderRadius: RADIUS.sm,
-            border: `2px solid ${checked ? G.gold : G.border2}`,
-            background: checked ? G.gold : G.card,
+            border: `2px solid ${isCheckedOrIndeterminate ? G.gold : G.border2}`,
+            background: isCheckedOrIndeterminate ? G.gold : G.card,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             transition: 'border-color .15s ease, background .15s ease, box-shadow .15s ease',
-            boxShadow: checked
+            boxShadow: isCheckedOrIndeterminate
               ? 'none'
               : `0 0 0 1px ${G.border} inset`,
           }}
         >
-          {checked && (
+          {indeterminate && !checked ? (
+            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden>
+              <line
+                x1="2.5"
+                y1="6"
+                x2="9.5"
+                y2="6"
+                stroke={G.onGold}
+                strokeWidth="2.2"
+                strokeLinecap="round"
+              />
+            </svg>
+          ) : checked ? (
             <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden>
               <path
                 d="M2.5 6.2 5 8.7 9.5 3.8"
@@ -64,7 +88,7 @@ export function Chk({ label, muted, checked, disabled, style, ...p }: ChkProps) 
                 strokeLinejoin="round"
               />
             </svg>
-          )}
+          ) : null}
         </span>
       </span>
       {label != null && (

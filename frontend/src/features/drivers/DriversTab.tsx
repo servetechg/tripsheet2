@@ -1336,9 +1336,18 @@ export function DriversTab({
                   }}
                 >
                   <div
-                    style={{ fontSize: 10, color: G.gold, letterSpacing: 1 }}
+                    style={{
+                      fontSize: 10,
+                      color: G.gold,
+                      letterSpacing: 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontWeight: 600,
+                    }}
                   >
-                    VIEW PROFILE →
+                    <span>VIEW PROFILE</span>
+                    {Icons.arrowRight({ size: 12, color: 'currentColor' })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {can('drivers.approve') &&
