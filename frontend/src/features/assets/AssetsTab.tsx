@@ -368,11 +368,12 @@ export function AssetsTab({
             placeholder="Optional notes"
           />
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={add} style={{ opacity: busy ? 0.6 : 1 }}>
-              {busy ? 'SAVING…' : 'SAVE ASSET'}
+            <Btn onClick={add} loading={busy} loadingLabel="Saving…">
+              SAVE ASSET
             </Btn>
             <Btn
               variant="outline"
+              disabled={busy}
               onClick={() => {
                 setShow(false);
                 setErr('');

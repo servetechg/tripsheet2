@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpsertContractDto } from './dto/upsert-contract.dto';
 import { SignContractDto } from './dto/sign-contract.dto';
 import { assertPermission, getTenantStore } from '@tripsheet/tenant-runtime';
+import { requireDriverRecordId } from '../drivers/driver-reference';
 
 @Injectable()
 export class ContractsService {
@@ -38,8 +39,14 @@ export class ContractsService {
         ? undefined
         : (dto.payload as Prisma.InputJsonValue);
 
+    const driverId = await requireDriverRecordId(
+      this.prisma,
+      dto.driverId,
+      dto.companyId,
+    );
+
     const fields = {
-      driverId: dto.driverId,
+      driverId,
       companyId: dto.companyId,
       driverName: dto.driverName,
       companyName: dto.companyName,
@@ -78,7 +85,7 @@ export class ContractsService {
 
     // Prefer updating latest contract for this driver when no valid id
     const latest = await this.prisma.contract.findFirst({
-      where: { driverId: dto.driverId },
+      where: { driverId },
       orderBy: { createdAt: 'desc' },
     });
     if (latest) {

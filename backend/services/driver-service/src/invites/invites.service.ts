@@ -394,14 +394,19 @@ export class InvitesService {
           }
         }
 
-        await tx.invite.update({
-          where: { id: invite.id },
+        const completed = await tx.invite.updateMany({
+          where: { token, status: 'pending' },
           data: {
             status: 'completed',
             driverId: driver.id,
             completedAt: new Date().toISOString(),
           },
         });
+        if (completed.count !== 1) {
+          throw new ConflictException(
+            'This invite was already completed, revoked, or regenerated. Request a new invite.',
+          );
+        }
 
         return tx.driver.findUnique({
           where: { id: driver.id },
@@ -474,7 +479,14 @@ export class InvitesService {
             'Driver database schema is updating. Wait a moment and submit again.',
           );
         }
-        throw new BadRequestException(`Database error: ${err.message}`);
+        if (err.code === 'P2025') {
+          throw new ConflictException(
+            'This invite is no longer valid. Ask your admin for a new invite link.',
+          );
+        }
+        throw new BadRequestException(
+          'Could not complete onboarding. Wait a moment and try again, or request a new invite link.',
+        );
       }
       if (err instanceof Prisma.PrismaClientValidationError) {
         throw new BadRequestException(

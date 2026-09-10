@@ -1292,10 +1292,14 @@ export function DispatchTab({
             hint={`${f.notes.length}/500`}
           />
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={save} style={{ opacity: busy ? 0.6 : 1 }}>
-              {busy ? 'Saving…' : editLoad ? 'Save Changes' : 'Assign Load'}
+            <Btn
+              onClick={save}
+              loading={busy}
+              loadingLabel="Saving…"
+            >
+              {editLoad ? 'Save Changes' : 'Assign Load'}
             </Btn>
-            <Btn variant="outline" onClick={resetForm}>
+            <Btn variant="outline" onClick={resetForm} disabled={busy}>
               Cancel
             </Btn>
           </div>

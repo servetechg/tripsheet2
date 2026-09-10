@@ -678,8 +678,12 @@ export function DepartmentsPanel({
               >
                 Cancel
               </Btn>
-              <Btn disabled={busy} onClick={() => void handleSave()}>
-                {busy ? 'Saving...' : editingDept ? 'Save changes' : 'Add department'}
+              <Btn
+                loading={busy}
+                loadingLabel="Saving…"
+                onClick={() => void handleSave()}
+              >
+                {editingDept ? 'Save changes' : 'Add department'}
               </Btn>
             </div>
           </div>

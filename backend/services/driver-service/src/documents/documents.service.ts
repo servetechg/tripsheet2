@@ -5,6 +5,7 @@ import { QualificationsService } from '../qualifications/qualifications.service'
 import { UpsertDocumentDto } from './dto/upsert-document.dto';
 import { getTenantStore } from '@tripsheet/tenant-runtime';
 import { computeQualificationStatus } from '@tripsheet/shared';
+import { requireDriverRecordId } from '../drivers/driver-reference';
 
 @Injectable()
 export class DocumentsService {
@@ -27,12 +28,17 @@ export class DocumentsService {
   }
 
   async upsert(dto: UpsertDocumentDto) {
+    const driverId = await requireDriverRecordId(
+      this.prisma,
+      dto.driverId,
+      dto.companyId,
+    );
     const own = await this.ownDriverId();
-    if (own && dto.driverId !== own) {
+    if (own && driverId !== own) {
       throw new ForbiddenException('Drivers may only manage their own documents');
     }
     const existing = await this.prisma.driverDocument.findFirst({
-      where: { driverId: dto.driverId, type: dto.type },
+      where: { driverId, type: dto.type },
     });
 
     const uploadedAt =
@@ -46,7 +52,7 @@ export class DocumentsService {
     if (dto.fileData?.startsWith('data:')) {
       if (this.files.isConfigured()) {
         const uploaded = await this.files.uploadDataUrl(dto.fileData, {
-          folder: `tripsheet/${dto.companyId}/drivers/${dto.driverId}`,
+          folder: `tripsheet/${dto.companyId}/drivers/${driverId}`,
           publicId: `${dto.type}-${Date.now()}`,
           fileName: dto.fileName,
         });
@@ -90,7 +96,7 @@ export class DocumentsService {
     } else {
       saved = await this.prisma.driverDocument.create({
         data: {
-          driverId: dto.driverId,
+          driverId,
           type: dto.type,
           ...data,
         },
@@ -98,7 +104,7 @@ export class DocumentsService {
     }
 
     await this.qualifications.syncFromDocument({
-      driverId: dto.driverId,
+      driverId,
       companyId: dto.companyId,
       docType: dto.type,
       documentId: saved.id,

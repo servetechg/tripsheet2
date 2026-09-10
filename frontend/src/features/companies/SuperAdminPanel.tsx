@@ -97,6 +97,7 @@ export function SuperAdminPanel({
   const [ok, setOk] = useState('');
   const [err, setErr] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
   const [f, setF] = useState({
     name: '',
     shortName: '',
@@ -136,6 +137,7 @@ export function SuperAdminPanel({
     }
 
     try {
+      setBusy(true);
       if (apiEnabled) {
         const company = (await companiesApi.create({
           name: f.name.trim(),
@@ -205,6 +207,8 @@ export function SuperAdminPanel({
       setTimeout(() => setOk(''), 5000);
     } catch (e: any) {
       setErr(e?.message || 'Failed to create company');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -406,8 +410,14 @@ export function SuperAdminPanel({
             />
           </G2>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={() => void create()}>Create Company</Btn>
-            <Btn variant="outline" onClick={() => setShow(false)}>
+            <Btn
+              onClick={() => void create()}
+              loading={busy}
+              loadingLabel="Creating company…"
+            >
+              Create Company
+            </Btn>
+            <Btn variant="outline" onClick={() => setShow(false)} disabled={busy}>
               Cancel
             </Btn>
           </div>

@@ -52,6 +52,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
   const [err, setErr] = useState('');
   const [profileErr, setProfileErr] = useState('');
   const [uploading, setUploading] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const upd = (k: keyof Profile, v: string) =>
     setProfile((x) => ({ ...x, [k]: v }));
@@ -101,11 +102,13 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
   };
 
   const finish = async () => {
+    if (submitting) return;
     if (!contract?.signedByDriver) {
       setErr('Please sign the contract before submitting.');
       return;
     }
     setErr('');
+    setSubmitting(true);
     try {
       await onComplete(profile, docs, contract);
       setStep(5);
@@ -117,6 +120,8 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
           ? raw
           : 'Failed to submit application.';
       setErr(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -933,13 +938,15 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
             )}
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <BackButton onClick={() => setStep(3)} />
+              <BackButton onClick={() => setStep(3)} disabled={submitting} />
               <Btn
                 onClick={() => void finish()}
+                loading={submitting}
+                loadingLabel="Submitting application…"
+                disabled={!contract.signedByDriver}
                 style={{
                   flex: 1,
                   padding: 14,
-                  opacity: contract.signedByDriver ? 1 : 0.5,
                 }}
               >
                 SUBMIT APPLICATION
