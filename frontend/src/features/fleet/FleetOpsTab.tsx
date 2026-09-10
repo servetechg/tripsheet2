@@ -201,7 +201,7 @@ export function FleetOpsTab({
               </Sel>
             </G2>
             <div style={{ marginTop: 14 }}>
-              <Btn onClick={() => void addMaintenance()}>Save maintenance</Btn>
+              <Btn onClick={() => void addMaintenance()}>Save Maintenance</Btn>
             </div>
           </div>
           {rows.map((r) => (

@@ -1105,13 +1105,6 @@ export function LoginHistoryPanel({ companyId }: { companyId: string }) {
                 {selectedEvent.userAgent || 'No user-agent provided by client.'}
               </div>
             </div>
-
-            {/* Close button */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <Btn variant="outline" onClick={() => setSelectedEvent(null)}>
-                Close
-              </Btn>
-            </div>
           </div>
         </Modal>
       )}

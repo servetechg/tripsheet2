@@ -191,7 +191,7 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
                 selectedId === 'new'
                   ? `1px solid ${G.gold}`
                   : `1px solid ${G.border}`,
-                background: selectedId === 'new' ? G.goldBg : 'transparent',
+              background: selectedId === 'new' ? G.goldBg : 'transparent',
               color: G.text,
               cursor: 'pointer',
               fontSize: 13,
@@ -461,13 +461,13 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
           })}
         </div>
         {canWrite && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, marginBottom: 12 }}>
             <Btn
               loading={busy}
               loadingLabel={selectedId === 'new' ? 'Creating…' : 'Saving…'}
               onClick={() => void save()}
             >
-              {selectedId === 'new' ? 'Create role' : 'Save grants'}
+              {selectedId === 'new' ? 'Create Role' : 'Save Grants'}
             </Btn>
             {selectedId !== 'new' && (
               <Btn

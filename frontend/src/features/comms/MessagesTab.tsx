@@ -38,7 +38,7 @@ export function MessagesTab({
     } catch (e: any) {
       setLoadErr(
         e?.message ||
-          'Messages could not be loaded. The notification service may be offline — run npm run start:dev in /backend.',
+        'Messages could not be loaded. The notification service may be offline — run npm run start:dev in /backend.',
       );
     }
   };
@@ -166,7 +166,7 @@ export function MessagesTab({
           value={f.body}
           onChange={(e: any) => setF({ ...f, body: e.target.value })}
         />
-        <Btn onClick={() => void send()}>Send message</Btn>
+        <Btn onClick={() => void send()}>Send Message</Btn>
         <div style={{ marginTop: 12 }}>
           {msgs.slice(0, 30).map((m) => (
             <div
@@ -184,7 +184,7 @@ export function MessagesTab({
       </Card>
 
       <Card>
-        <SectionTitle>Load comments</SectionTitle>
+        <SectionTitle>Load Comments</SectionTitle>
         <Sel
           label="Load"
           value={loadId}
@@ -202,7 +202,7 @@ export function MessagesTab({
           value={c.body}
           onChange={(e: any) => setC({ body: e.target.value })}
         />
-        <Btn onClick={() => void addComment()}>Add comment</Btn>
+        <Btn onClick={() => void addComment()}>Add Comment</Btn>
         {comments.map((cm) => (
           <div key={cm.id} style={{ fontSize: 13, padding: '6px 0' }}>
             <strong>{cm.userName}</strong>: {cm.body}

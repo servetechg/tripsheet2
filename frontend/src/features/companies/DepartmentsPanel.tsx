@@ -364,7 +364,7 @@ export function DepartmentsPanel({
               }}
             >
               {Icons.plus({ size: 14, color: '#fff' })}
-              Add department
+              Add Department
             </Btn>
           )}
         </div>
