@@ -70,7 +70,7 @@ export function TripSheetForm({ company, user, editSheet, onSave, onBack }: any)
             {hdr.truckNo&&<span style={{ fontSize:10,color:G.muted,marginLeft:8 }}>Truck #{hdr.truckNo}</span>}
           </div>
         </div>
-        <Btn onClick={save} style={{ padding:"9px 18px", opacity:saving?0.6:1 }}>{saving?"SAVING…":"SAVE"}</Btn>
+        <Btn onClick={save} loading={saving} loadingLabel="Saving…" style={{ padding:"9px 18px" }}>SAVE</Btn>
       </div>
 
       <div style={{ padding:"16px 14px 100px",maxWidth:700,margin:"0 auto" }}>

@@ -9,6 +9,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
   const [fileInfo, setFileInfo] = useState<any>(null);
   const [dragging, setDragging] = useState(false);
   const [err,      setErr]      = useState("");
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<any>(null);
 
   const handleFile = (file) => {
@@ -36,9 +37,20 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
     reader.readAsDataURL(file);
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (uploading) return;
     if (!fileInfo) { setErr("Please select a file first."); return; }
-    onUpload(docType.id, { ...fileInfo, expiry, notes });
+    setUploading(true);
+    setErr("");
+    try {
+      await Promise.resolve(
+        onUpload(docType.id, { ...fileInfo, expiry, notes }),
+      );
+    } catch (e: any) {
+      setErr(e?.message || 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const dropZoneBackground = dragging
@@ -136,11 +148,18 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
         <Inp label="Notes (optional)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Renewed Mar 2026, verified original" />
 
         <div style={{ display:"flex",gap:10 }}>
-          <Btn full onClick={submit} style={{ padding:14,opacity:fileInfo?1:0.5, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <Btn
+            full
+            onClick={() => void submit()}
+            loading={uploading}
+            loadingLabel="Uploading…"
+            disabled={!fileInfo}
+            style={{ padding:14, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
+          >
             {Icons.upload({ size: 16, color: G.onGold })}
             UPLOAD DOCUMENT
           </Btn>
-          <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
+          <Btn variant="outline" onClick={onClose} disabled={uploading}>CANCEL</Btn>
         </div>
       </div>
     </div>

@@ -27,21 +27,30 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   const pt = PAY_TYPES.find(p=>p.id===f.payType)||PAY_TYPES[0];
   const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     if (blank(f.payRate)) { setErr("Pay rate is required."); return; }
-    // Do not invent or reuse document ids — parent decides create vs update
-    onSave({
-      ...(existingContract?.id ? { id: existingContract.id } : {}),
-      ...f,
-      driverId:    driver.driverRecordId || driver.id,
-      companyId:   company.id,
-      driverName:  driver.name,
-      companyName: company.name,
-      createdAt:   existingContract?.createdAt || today,
-      updatedAt:   today,
-      signedByAdmin: true,
-    });
+    setSaving(true);
+    setErr("");
+    try {
+      await Promise.resolve(onSave({
+        ...(existingContract?.id ? { id: existingContract.id } : {}),
+        ...f,
+        driverId:    driver.driverRecordId || driver.id,
+        companyId:   company.id,
+        driverName:  driver.name,
+        companyName: company.name,
+        createdAt:   existingContract?.createdAt || today,
+        updatedAt:   today,
+        signedByAdmin: true,
+      }));
+    } catch (e: any) {
+      setErr(e?.message || 'Failed to save wage terms.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -136,11 +145,16 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
         </div>
 
         <div style={{ padding:"14px 20px",borderTop:`1px solid ${G.border}`,display:"flex",gap:10,background:G.inset }}>
-          <Btn onClick={save} style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <Btn
+            onClick={() => void save()}
+            loading={saving}
+            loadingLabel="Saving…"
+            style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
+          >
             {Icons.save({ size: 16, color: G.onGold })}
             SAVE WAGE & TERMS
           </Btn>
-          <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
+          <Btn variant="outline" onClick={onClose} disabled={saving}>CANCEL</Btn>
         </div>
       </div>
     </div>

@@ -73,15 +73,40 @@ Or from `backend/`: `npm run install:all`
 
 ## 4. Prisma migrate & seed
 
-From `backend/` after Postgres is up (`npm run infra:up`):
+### New machine (recommended)
 
-```bash
-npm run migrate:all      # generate client + apply pending migrations on every service
-npm run migrate:status   # show which services are behind
-npm run seed:all         # platform seeds (super admin + plans)
+From `backend/` — one command after cloning the repo:
+
+```powershell
+npm run dev:setup
 ```
 
-`migrate:all` is the command to run on a new PC (or after `git pull` when schemas changed). It uses `prisma migrate deploy` — safe for existing databases; it does **not** reset data.
+This builds shared packages, copies `.env` files, installs dependencies, starts Postgres/Redis, runs migrations, and seeds **only**:
+
+- Super admin: `admin@tripsheet.io` / `admin123`
+- Subscription plans (needed to create companies)
+
+No demo companies, drivers, or tenant databases.
+
+### After `git pull` (schema changed)
+
+```powershell
+npm run migrate:all      # apply pending migrations (does not delete data)
+npm run migrate:status     # show which services are behind
+```
+
+### Clean local dev (fix bad/orphan data)
+
+When dev shows FK errors, half-created drivers, or stale tenant DBs that staging does not have:
+
+```powershell
+npm run dev:stop                    # free ports 3000-3008 and 5173 (Windows)
+npm run dev:reset -- --yes --stop   # wipe Postgres/Redis volumes, migrate, seed platform
+```
+
+Then start again with `npm run start:dev`.
+
+`migrate:all` uses `prisma migrate deploy` — safe for existing databases; it does **not** reset data by itself.
 
 Tenant-specific SQL (per-company DBs) is separate. After services are running:
 
@@ -94,13 +119,22 @@ curl -X POST http://localhost:3002/tenants/schema-migrate-all
 
 From `backend/` (one terminal — recommended):
 
-```bash
-npm install                 # once — installs concurrently
-npm run infra:up            # Postgres + Redis
-powershell -File scripts/copy-env.ps1   # once — create .env files
-npm run install:all         # once — install each Nest app
-npm run migrate:all         # apply schema to all service databases
+```powershell
+npm run dev:setup           # first time only (see section 4)
+npm run dev:stop            # if EADDRINUSE on 3000-3008
 npm run start:dev           # gateway + all services
+```
+
+Manual equivalent:
+
+```powershell
+npm install
+npm run infra:up
+npm run env:copy
+npm run install:all
+npm run migrate:all
+npm run seed:platform
+npm run start:dev
 ```
 
 Color-coded logs: `gateway`, `auth`, `company`, `driver`, `fleet`, `manifest`, `tripsheet`.
@@ -152,13 +186,13 @@ curl http://localhost:3001/health
 curl http://localhost:3002/health
 ```
 
-### Demo users (auth-service)
+### Local login (after `dev:setup` / `dev:reset`)
 
 | Email | Password | Role |
 |-------|----------|------|
 | admin@tripsheet.io | admin123 | superadmin |
-| admin@mkx.ca | mkx123 | company_owner (companyId: c1) |
-| divyam@mkx.ca | driver123 | driver (companyId: c1) |
+
+Create companies and users from the UI as super admin. Optional E2E fixtures (MKX owner/driver): `npm run seed:e2e` with the stack running.
 
 Login via gateway:
 

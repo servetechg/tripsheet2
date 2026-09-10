@@ -462,7 +462,11 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
         </div>
         {canWrite && (
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <Btn disabled={busy} onClick={() => void save()}>
+            <Btn
+              loading={busy}
+              loadingLabel={selectedId === 'new' ? 'Creating…' : 'Saving…'}
+              onClick={() => void save()}
+            >
               {selectedId === 'new' ? 'Create role' : 'Save grants'}
             </Btn>
             {selectedId !== 'new' && (

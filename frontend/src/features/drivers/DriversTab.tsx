@@ -1148,14 +1148,14 @@ export function DriversTab({
             ))}
           </Sel>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={save} style={{ opacity: busy ? 0.6 : 1 }}>
-              {busy
-                ? 'SAVING…'
-                : editDriver
-                  ? 'SAVE CHANGES'
-                  : 'CREATE DRIVER'}
+            <Btn
+              onClick={save}
+              loading={busy}
+              loadingLabel={editDriver ? 'Saving…' : 'Creating…'}
+            >
+              {editDriver ? 'SAVE CHANGES' : 'CREATE DRIVER'}
             </Btn>
-            <Btn variant="outline" onClick={resetForm}>
+            <Btn variant="outline" onClick={resetForm} disabled={busy}>
               CANCEL
             </Btn>
           </div>

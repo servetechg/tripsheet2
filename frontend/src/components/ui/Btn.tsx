@@ -16,16 +16,26 @@ export interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: BtnVariant;
   full?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  /** Shows spinner, disables button, and swaps label when provided */
+  loading?: boolean;
+  loadingLabel?: ReactNode;
   children?: ReactNode;
   style?: CSSProperties;
+}
+
+function BtnSpinner() {
+  return <span className="ts-btn-spinner" aria-hidden="true" />;
 }
 
 export function Btn({
   variant = 'primary',
   full,
   size = 'md',
+  loading = false,
+  loadingLabel,
   children,
   style: sx,
+  disabled,
   ...p
 }: BtnProps) {
   const sizes = {
@@ -112,6 +122,8 @@ export function Btn({
     },
   };
   const isPrimary = variant === 'primary' || variant === 'gold';
+  const label = loading ? (loadingLabel ?? children) : children;
+
   return (
     <button
       className={isPrimary ? 'ts-btn ts-btn-primary' : 'ts-btn'}
@@ -121,12 +133,16 @@ export function Btn({
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 8,
         ...(full ? { width: '100%' } : {}),
         ...sx,
       }}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...p}
     >
-      {children}
+      {loading ? <BtnSpinner /> : null}
+      {label}
     </button>
   );
 }

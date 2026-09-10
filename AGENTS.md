@@ -53,17 +53,19 @@ FleetQuix / TripSheet monorepo. Read this file first; do not re-explore the whol
 
 MKX (`c1`) uses **tenant routing** (`fq_tenant_mkx`). Public routes (invite by-token, complete) must resolve tenant DB — see `driver-service` `invites.service.ts` `locateInvite`. Authenticated routes get tenant context from gateway JWT headers.
 
-## Test accounts (seeded)
+## Test accounts (local dev after `dev:setup` / `dev:reset`)
 
 - Super admin: `admin@tripsheet.io` / `admin123`
-- MKX owner: `admin@mkx.ca` / `mkx123`
-- MKX driver: `divyam@mkx.ca` / `driver123`
+
+Optional E2E tenant (not in default seed): `npm run seed:e2e` → MKX owner/driver.
 
 ## Commands (common)
 
 ```powershell
-cd backend && npm run infra:up       # postgres + redis
-cd backend && npm run migrate:all    # all Prisma service DBs
+cd backend && npm run dev:setup      # new machine: infra + migrate + platform seed
+cd backend && npm run dev:reset -- --yes --stop   # wipe local DBs + re-seed
+cd backend && npm run dev:stop       # free ports before restart (Windows)
+cd backend && npm run migrate:all    # after git pull when schemas changed
 cd backend && npm run start:dev      # all services
 cd frontend && npm run dev
 ```

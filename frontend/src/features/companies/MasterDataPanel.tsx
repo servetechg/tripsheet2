@@ -999,8 +999,12 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Btn onClick={() => void saveRecord()} disabled={busy}>
-              {busy ? 'Saving…' : editingId ? 'Save changes' : 'Add'}
+            <Btn
+              onClick={() => void saveRecord()}
+              loading={busy}
+              loadingLabel="Saving…"
+            >
+              {editingId ? 'Save changes' : 'Add'}
             </Btn>
             {editingId ? (
               <Btn variant="outline" disabled={busy} onClick={resetForm}>

@@ -99,6 +99,22 @@ textarea {
   box-shadow: none;
 }
 
+@keyframes ts-btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.ts-btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: ts-btn-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
 .ts-input:focus,
 .ts-input:focus-visible,
 select.ts-input:focus,
