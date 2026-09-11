@@ -871,6 +871,11 @@ export const driversApi = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
+  unsuspend: (id: string, reason?: string) =>
+    api(`/drivers/${id}/unsuspend`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
   terminate: (id: string, reason?: string) =>
     api(`/drivers/${id}/terminate`, {
       method: 'POST',

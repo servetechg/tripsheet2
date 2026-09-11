@@ -1279,7 +1279,7 @@ export function DriversTab({
                   >
                     {active ? (
                       <Pill color={G.gold}>IN TRANSIT</Pill>
-                    ) : (
+                    ) : lifecycle === 'suspended' ? null : (
                       <AvailabilityBadge status={d.availabilityStatus} />
                     )}
                     <Pill
@@ -1481,6 +1481,41 @@ export function DriversTab({
                           }}
                         >
                           SUSPEND
+                        </button>
+                      )}
+                    {can('drivers.suspend') &&
+                      lifecycle === 'suspended' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const recordId = d.driverRecordId;
+                            if (!recordId) return;
+                            const ok = await confirm({
+                              title: 'Unsuspend driver',
+                              message: `Reactivate ${d.name}? They will be able to log in and be assigned to dispatches.`,
+                              confirmLabel: 'Unsuspend',
+                            });
+                            if (!ok) return;
+                            try {
+                              await driversApi.unsuspend(recordId);
+                              await refreshAll?.();
+                              notify(`${d.name} unsuspended — now active`);
+                            } catch (err: any) {
+                              notify(err?.message || 'Unsuspend failed', 'error');
+                            }
+                          }}
+                          style={{
+                            background: G.success,
+                            border: 'none',
+                            color: '#fff',
+                            borderRadius: 7,
+                            padding: '6px 12px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          UNSUSPEND
                         </button>
                       )}
                     <button

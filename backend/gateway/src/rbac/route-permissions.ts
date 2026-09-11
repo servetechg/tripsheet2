@@ -144,7 +144,7 @@ function rule(
     }
     if (
       m === 'POST' &&
-      /\/(suspend|terminate)$/.test(p)
+      /\/(suspend|unsuspend|terminate)$/.test(p)
     ) {
       return { codes: ['drivers.suspend'] };
     }
