@@ -49,6 +49,11 @@ export class DriversController {
     return this.driversService.suspend(id, body?.reason);
   }
 
+  @Post(':id/unsuspend')
+  unsuspend(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.driversService.unsuspend(id, body?.reason);
+  }
+
   @Post(':id/terminate')
   terminate(@Param('id') id: string, @Body() body: { reason?: string }) {
     return this.driversService.terminate(id, body?.reason);

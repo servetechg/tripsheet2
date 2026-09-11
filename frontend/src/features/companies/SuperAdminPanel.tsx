@@ -19,6 +19,17 @@ const PLAN_FALLBACK = [
   { code: 'enterprise', name: 'Enterprise' },
 ];
 
+const INITIAL_COMPANY_FORM = {
+  name: '',
+  shortName: '',
+  tagline: '',
+  address: '',
+  planCode: 'starter',
+  adminName: '',
+  adminEmail: '',
+  adminPassword: '',
+};
+
 function tenantStatusColor(status?: string) {
   if (status === 'active') return G.success;
   if (status === 'failed') return G.danger;
@@ -98,17 +109,23 @@ export function SuperAdminPanel({
   const [err, setErr] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
-  const [f, setF] = useState({
-    name: '',
-    shortName: '',
-    tagline: '',
-    address: '',
-    planCode: 'starter',
-    adminName: '',
-    adminEmail: '',
-    adminPassword: '',
-  });
+  const [f, setF] = useState(INITIAL_COMPANY_FORM);
   const upd = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
+
+  const resetForm = () => {
+    setF(INITIAL_COMPANY_FORM);
+    setErr('');
+  };
+
+  const closeForm = () => {
+    resetForm();
+    setShow(false);
+  };
+
+  const openForm = () => {
+    resetForm();
+    setShow(true);
+  };
 
   useEffect(() => {
     if (!apiEnabled) return;
@@ -125,6 +142,10 @@ export function SuperAdminPanel({
     }
     if (blank(f.adminName) || blank(f.adminEmail) || blank(f.adminPassword)) {
       setErr('Admin login details required.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.adminEmail.trim())) {
+      setErr('Enter a valid admin email address.');
       return;
     }
     if (
@@ -191,19 +212,9 @@ export function SuperAdminPanel({
           },
         ]);
       }
-      setF({
-        name: '',
-        shortName: '',
-        tagline: '',
-        address: '',
-        planCode: 'starter',
-        adminName: '',
-        adminEmail: '',
-        adminPassword: '',
-      });
-      setShow(false);
-      setErr('');
-      setOk(`✓ "${f.name.trim()}" created — tenant database provisioned (or queued for retry).`);
+      const createdName = f.name.trim();
+      closeForm();
+      setOk(`✓ "${createdName}" created — tenant database provisioned (or queued for retry).`);
       setTimeout(() => setOk(''), 5000);
     } catch (e: any) {
       setErr(e?.message || 'Failed to create company');
@@ -270,12 +281,7 @@ export function SuperAdminPanel({
           </div>
         </div>
         {companies.length > 0 ? (
-          <Btn
-            onClick={() => {
-              setShow(true);
-              setErr('');
-            }}
-          >
+          <Btn onClick={openForm}>
             + New Company
           </Btn>
         ) : null}
@@ -417,7 +423,7 @@ export function SuperAdminPanel({
             >
               Create Company
             </Btn>
-            <Btn variant="outline" onClick={() => setShow(false)} disabled={busy}>
+            <Btn variant="outline" onClick={closeForm} disabled={busy}>
               Cancel
             </Btn>
           </div>
@@ -435,12 +441,7 @@ export function SuperAdminPanel({
           <div style={{ fontSize: 13, color: G.muted, marginTop: 6, marginBottom: 16 }}>
             Create your first tenant to provision a database and admin account.
           </div>
-          <Btn
-            onClick={() => {
-              setShow(true);
-              setErr('');
-            }}
-          >
+          <Btn onClick={openForm}>
             + New Company
           </Btn>
         </Card>

@@ -9,7 +9,6 @@ import {
 import { G, inputBase, labelBase } from '@/lib/theme';
 import { formatPhoneInput, PHONE_INPUT_MAX_LENGTH } from '@/lib/phoneFormat';
 import {
-  PHONE_PLACEHOLDER,
   resolveInputPlaceholder,
   resolveInputType,
 } from '@/lib/inputPlaceholders';
@@ -19,6 +18,8 @@ import { DatePickerInput, type DatePickerMode } from './DatePickerInput';
 export interface InpProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: ReactNode;
   hint?: string;
+  error?: string;
+  required?: boolean;
   style?: CSSProperties;
   inputStyle?: CSSProperties;
   /** Auto-format North American phone numbers as (XXX) XXX-XXXX */
@@ -50,6 +51,8 @@ const passwordToggleBtnStyle: CSSProperties = {
 export function Inp({
   label,
   hint,
+  error,
+  required,
   style: sx,
   inputStyle,
   phone,
@@ -112,6 +115,7 @@ export function Inp({
         {label ? (
           <label htmlFor={inputId} style={labelBase()}>
             {label}
+            {required ? <span style={{ color: G.danger, marginLeft: 4 }}>*</span> : null}
           </label>
         ) : null}
         <DatePickerInput
@@ -123,9 +127,12 @@ export function Inp({
           disabled={disabled}
           min={min != null ? String(min) : undefined}
           max={max != null ? String(max) : undefined}
+          error={Boolean(error)}
           style={inputStyle}
         />
-        {hint ? (
+        {error ? (
+          <div style={{ fontSize: 11, color: G.danger, marginTop: 4 }}>{error}</div>
+        ) : hint ? (
           <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>{hint}</div>
         ) : null}
       </div>
@@ -154,6 +161,12 @@ export function Inp({
       style={{
         ...inputBase(),
         ...(showToggle ? { paddingRight: 44 } : {}),
+        ...(error
+          ? {
+              borderColor: G.danger,
+              boxShadow: `0 0 0 3px ${G.danger}22`,
+            }
+          : {}),
         ...inputStyle,
       }}
       {...inputProps}
@@ -165,6 +178,7 @@ export function Inp({
       {label ? (
         <label htmlFor={inputId} style={labelBase()}>
           {label}
+          {required ? <span style={{ color: G.danger, marginLeft: 4 }}>*</span> : null}
         </label>
       ) : null}
       {showToggle ? (
@@ -184,7 +198,9 @@ export function Inp({
       ) : (
         inputEl
       )}
-      {hint ? (
+      {error ? (
+        <div style={{ fontSize: 11, color: G.danger, marginTop: 4 }}>{error}</div>
+      ) : hint ? (
         <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>{hint}</div>
       ) : null}
     </div>

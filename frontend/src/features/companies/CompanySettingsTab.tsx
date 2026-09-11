@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
-import { useConfirm, usePrompt } from '@/context/ConfirmContext';
+import { useConfirm } from '@/context/ConfirmContext';
 import { useCan } from '@/lib/permissions';
-import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { CustomRolesPanel } from './CustomRolesPanel';
 import { MasterDataPanel } from './MasterDataPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { DepartmentsPanel } from './DepartmentsPanel';
 import { NotificationRulesPanel } from './NotificationRulesPanel';
+import { UsersPanel } from './UsersPanel';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -142,7 +142,6 @@ export function CompanySettingsTab({
 }) {
   const { can } = useCan();
   const confirm = useConfirm();
-  const prompt = usePrompt();
   const [sub, setSub] = useState<Sub>(initialSub || 'profile');
   const [ent, setEnt] = useState<any>(null);
   const [settings, setSettings] = useState<any>(null);
@@ -164,13 +163,6 @@ export function CompanySettingsTab({
   const [newKeyName, setNewKeyName] = useState('Integration key');
   const [revealedKey, setRevealedKey] = useState('');
   const [staff, setStaff] = useState<any[]>([]);
-  const [inviteForm, setInviteForm] = useState({
-    name: '',
-    email: '',
-    role: 'dispatcher',
-  });
-  const [inviteLink, setInviteLink] = useState('');
-  const [inviteBusy, setInviteBusy] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDto[]>([]);
 
@@ -289,409 +281,18 @@ export function CompanySettingsTab({
       </div>
 
       {sub === 'users' && (
-        <Card>
-          <SectionTitle>Users & roles</SectionTitle>
-          <div style={{ color: G.muted, fontSize: 13, marginBottom: 16 }}>
-            Invite staff with a system role. After they join, you can switch
-            them to a custom role from the Roles tab. They receive a link
-            (queued as an email notification) and only that role&apos;s
-            permissions until they sign in again.
-          </div>
-          {can('users.create') && (
-            <>
-              <G2 cols={3}>
-                <Inp
-                  label="Name"
-                  value={inviteForm.name}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                />
-                <Inp
-                  label="Email"
-                  value={inviteForm.email}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                />
-                <Sel
-                  label="Role"
-                  value={inviteForm.role}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, role: e.target.value }))
-                  }
-                >
-                  {[
-                    'dispatcher',
-                    'dispatcher_supervisor',
-                    'general_manager',
-                    'fleet_manager',
-                    'safety_manager',
-                    'accountant',
-                    'hr_manager',
-                    'maintenance_coordinator',
-                  ].map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
-                    </option>
-                  ))}
-                </Sel>
-              </G2>
-              <Btn
-                style={{ marginTop: 12, marginBottom: 12 }}
-                disabled={inviteBusy}
-                onClick={() => {
-                  if (!inviteForm.email.trim() || !inviteForm.name.trim()) {
-                    notify('Name and email are required', 'error');
-                    return;
-                  }
-                  setInviteBusy(true);
-                  void invitesApi
-                    .create(cid, {
-                      kind: 'staff',
-                      role: inviteForm.role,
-                      email: inviteForm.email.trim(),
-                      name: inviteForm.name.trim(),
-                    })
-                    .then((inv) => {
-                      const link = `${window.location.origin}/invite?invite=${encodeURIComponent(inv.token)}`;
-                      setInviteLink(link);
-                      notify(`Invite created for ${inviteForm.role}`);
-                      void refreshAll?.(cid);
-                      void reloadInvites();
-                      return authApi.listUsers(cid).then(setStaff);
-                    })
-                    .catch((err: any) =>
-                      notify(err?.message || 'Invite failed', 'error'),
-                    )
-                    .finally(() => setInviteBusy(false));
-                }}
-              >
-                Invite Staff
-              </Btn>
-              {inviteLink && (
-                <div style={{ marginTop: 12, fontSize: 12, color: G.muted }}>
-                  Share this link: {inviteLink}
-                </div>
-              )}
-            </>
-          )}
-          {pendingInvites.length > 0 && (
-            <>
-              <Divider />
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                Pending invites
-              </div>
-              {pendingInvites.map((inv) => (
-                <div
-                  key={inv.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                    fontSize: 12,
-                    marginBottom: 8,
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span>
-                    {inv.email || '—'} · {inv.kind}/{inv.role} · {inv.status}
-                    {inv.expiresAt ? (
-                      <span style={{ color: G.muted }}>
-                        {' '}
-                        · expires {new Date(inv.expiresAt).toLocaleDateString()}
-                      </span>
-                    ) : null}
-                  </span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {can('users.create') && inv.status === 'pending' && (
-                      <Btn
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          void invitesApi
-                            .revoke(inv.id)
-                            .then(() => reloadInvites())
-                            .then(() => notify('Invite revoked'))
-                            .catch((err: any) =>
-                              notify(err?.message || 'Revoke failed', 'error'),
-                            );
-                        }}
-                      >
-                        Revoke
-                      </Btn>
-                    )}
-                    {can('users.create') && (
-                      <Btn
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          void invitesApi
-                            .regenerate(inv.id)
-                            .then((created) => {
-                              const link = `${window.location.origin}/invite?invite=${encodeURIComponent(created.token)}`;
-                              setInviteLink(link);
-                              return reloadInvites();
-                            })
-                            .then(() => notify('Invite regenerated'))
-                            .catch((err: any) =>
-                              notify(
-                                err?.message || 'Regenerate failed',
-                                'error',
-                              ),
-                            );
-                        }}
-                      >
-                        Resend
-                      </Btn>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-          <Divider />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {staff.map((u) => {
-              const locked =
-                isCompanyOwnerRole(u.role) || isSuperAdminRole(u.role);
-              const value = u.customRoleId
-                ? `custom:${u.customRoleId}`
-                : `sys:${u.role}`;
-              const st = u.status || 'active';
-              const canStatus = can('users.suspend') && !isSuperAdminRole(u.role);
-              return (
-                <div
-                  key={u.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    fontSize: 13,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span>
-                    {u.name} · {u.email}{' '}
-                    <Pill
-                      small
-                      color={
-                        st === 'active'
-                          ? G.success
-                          : st === 'suspended' || st === 'locked'
-                            ? G.danger
-                            : G.muted
-                      }
-                    >
-                      {st}
-                    </Pill>
-                    {u.customRoleName ? (
-                      <span style={{ color: G.muted }}>
-                        {' '}
-                        · {u.customRoleName}
-                      </span>
-                    ) : null}
-                  </span>
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 8,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {can('users.assign_role') && !locked ? (
-                      <Sel
-                        value={value}
-                        style={{ marginBottom: 0, minWidth: 220 }}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const body = v.startsWith('custom:')
-                            ? { customRoleId: v.slice(7) }
-                            : { role: v.slice(4), customRoleId: null };
-                          void authApi
-                            .updateUser(u.id, body)
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() =>
-                              notify(
-                                'Role updated. The user must sign in again to refresh permissions.',
-                              ),
-                            )
-                            .catch((err: any) =>
-                              notify(err?.message || 'Update failed', 'error'),
-                            );
-                        }}
-                      >
-                        <optgroup label="System">
-                          {[
-                            'dispatcher',
-                            'dispatcher_supervisor',
-                            'general_manager',
-                            'fleet_manager',
-                            'safety_manager',
-                            'accountant',
-                            'hr_manager',
-                            'maintenance_coordinator',
-                            'driver',
-                          ].map((r) => (
-                            <option key={r} value={`sys:${r}`}>
-                              {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
-                            </option>
-                          ))}
-                        </optgroup>
-                        {customRoles.length > 0 && (
-                          <optgroup label="Custom">
-                            {customRoles.map((r) => (
-                              <option key={r.id} value={`custom:${r.id}`}>
-                                {r.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {u.customRoleId &&
-                          !customRoles.some((r) => r.id === u.customRoleId) && (
-                            <option value={`custom:${u.customRoleId}`}>
-                              {u.customRoleName || 'Removed custom role'}
-                            </option>
-                          )}
-                      </Sel>
-                    ) : (
-                      <span style={{ color: G.muted }}>
-                        {u.customRoleName ||
-                          ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ||
-                          u.role}
-                      </span>
-                    )}
-                    {canStatus && st === 'active' && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
-                          void authApi
-                            .setUserStatus(u.id, 'suspended')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() =>
-                              notify(
-                                'User suspended. Active sessions are revoked.',
-                              ),
-                            )
-                            .catch((err: any) =>
-                              notify(err?.message || 'Suspend failed', 'error'),
-                            );
-                        }}
-                      >
-                        Suspend
-                      </Btn>
-                    )}
-                    {canStatus && st === 'active' && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
-                          void authApi
-                            .setUserStatus(u.id, 'locked')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() =>
-                              notify(
-                                'User locked. Active sessions are revoked.',
-                              ),
-                            )
-                            .catch((err: any) =>
-                              notify(err?.message || 'Lock failed', 'error'),
-                            );
-                        }}
-                      >
-                        Lock
-                      </Btn>
-                    )}
-                    {canStatus &&
-                      (st === 'locked' ||
-                        (st === 'active' &&
-                          u.lockedUntil &&
-                          new Date(u.lockedUntil).getTime() > Date.now())) && (
-                        <Btn
-                          variant="ghost"
-                          size="sm"
-                          style={{ marginBottom: 0, fontSize: 12 }}
-                          onClick={() => {
-                            void authApi
-                              .unlockUser(u.id)
-                              .then(() => authApi.listUsers(cid).then(setStaff))
-                              .then(() =>
-                                notify(
-                                  'User unlocked. Temporary lockout cleared.',
-                                ),
-                              )
-                              .catch((err: any) =>
-                                notify(
-                                  err?.message || 'Unlock failed',
-                                  'error',
-                                ),
-                              );
-                          }}
-                        >
-                          Unlock
-                        </Btn>
-                      )}
-                    {canStatus &&
-                      (st === 'suspended' || st === 'inactive') && (
-                        <Btn
-                          variant="ghost"
-                          size="sm"
-                          style={{ marginBottom: 0, fontSize: 12 }}
-                          onClick={() => {
-                            void authApi
-                              .setUserStatus(u.id, 'active')
-                              .then(() => authApi.listUsers(cid).then(setStaff))
-                              .then(() => notify('User reactivated'))
-                              .catch((err: any) =>
-                                notify(
-                                  err?.message || 'Reactivate failed',
-                                  'error',
-                                ),
-                              );
-                          }}
-                        >
-                          Reactivate
-                        </Btn>
-                      )}
-                    {canStatus && st !== 'archived' && !locked && (
-                      <Btn
-                        variant="danger"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
-                          void (async () => {
-                            const ok = await confirm({
-                              title: 'Archive user',
-                              message: `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
-                              confirmLabel: 'Archive',
-                              variant: 'danger',
-                            });
-                            if (!ok) return;
-                            void authApi
-                              .setUserStatus(u.id, 'archived')
-                              .then(() => authApi.listUsers(cid).then(setStaff))
-                              .then(() => notify('User archived'))
-                              .catch((err: any) =>
-                                notify(err?.message || 'Archive failed', 'error'),
-                              );
-                          })();
-                        }}
-                      >
-                        Archive
-                      </Btn>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        <UsersPanel
+          cid={cid}
+          company={company}
+          staff={staff}
+          setStaff={setStaff}
+          pendingInvites={pendingInvites}
+          reloadInvites={reloadInvites}
+          customRoles={customRoles}
+          can={can}
+          confirm={confirm}
+          refreshAll={refreshAll}
+        />
       )}
 
       {sub === 'roles' && <CustomRolesPanel companyId={cid} />}

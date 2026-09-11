@@ -170,6 +170,17 @@ export class DriversService {
     return this.setLifecycle(id, 'suspended', 'drivers.suspend', reason);
   }
 
+  async unsuspend(id: string, reason?: string) {
+    assertPermission('drivers.suspend');
+    const driver = await this.ensureExists(id);
+    if (driver.lifecycleStatus !== 'suspended') {
+      throw new BadRequestException(
+        `Driver must be suspended to unsuspend (current: ${driver.lifecycleStatus})`,
+      );
+    }
+    return this.setLifecycle(id, 'active', 'drivers.unsuspend', reason);
+  }
+
   async terminate(id: string, reason?: string) {
     assertPermission('drivers.suspend');
     return this.setLifecycle(id, 'terminated', 'drivers.suspend', reason);

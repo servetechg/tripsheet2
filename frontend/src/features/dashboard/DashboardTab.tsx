@@ -687,11 +687,13 @@ export function DashboardTab({
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
+              justifyContent: 'flex-start',
+              background: G.card,
             }}
           >
             <table
               className="ts-table"
-              style={{ width: '100%', borderCollapse: 'collapse', flex: 1 }}
+              style={{ width: '100%', borderCollapse: 'collapse' }}
             >
               <thead>
                 <tr style={{ background: G.card2 }}>
