@@ -125,6 +125,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const [kind, setKind] = useState<Kind>('brokers');
   const [rows, setRows] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [fetching, setFetching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dupHint, setDupHint] = useState('');
   const [lastCreatedId, setLastCreatedId] = useState('');
@@ -181,10 +182,11 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
     const seq = ++loadSeq.current;
     if (kind === 'import') {
       setRows([]);
+      setFetching(false);
       return;
     }
     try {
-      setBusy(true);
+      setFetching(true);
       let list: any[] = [];
       if (kind === 'locations') list = await companiesApi.locations(companyId);
       else if (kind === 'brokers') list = await companiesApi.brokers(companyId);
@@ -223,7 +225,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       notify(e?.message || 'Failed to load master data', 'error');
       setRows([]);
     } finally {
-      if (seq === loadSeq.current) setBusy(false);
+      if (seq === loadSeq.current) setFetching(false);
     }
   };
 
@@ -1091,7 +1093,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             <Btn
               onClick={() => void saveRecord()}
               loading={busy}
-              loadingLabel="Saving…"
+              loadingLabel={editingId ? 'Saving…' : 'Adding…'}
+              disabled={busy}
             >
               {editingId ? 'Save changes' : 'Add'}
             </Btn>
@@ -1103,7 +1106,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             {!editingId && IO_KINDS.includes(kind as IoKind) && (
               <Btn
                 variant="outline"
-                disabled={busy}
+                disabled={busy || fetching}
                 onClick={() => void exportKind(kind as IoKind)}
               >
                 Export CSV
@@ -1116,10 +1119,10 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
 
       {kind !== 'import' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {busy && !rows.length && (
-            <div style={{ color: G.muted, fontSize: 13 }}>Loading…</div>
+          {fetching && !rows.length && (
+            <div style={{ color: G.muted, fontSize: 13 }}>Loading records…</div>
           )}
-          {!busy && !rows.length && (
+          {!fetching && !rows.length && (
             <div style={{ color: G.muted, fontSize: 13 }}>
               {kind === 'ports'
                 ? 'No ports yet — run schema migrate to seed CA–US ports.'
@@ -1186,7 +1189,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                     <Btn
                       size="sm"
                       variant="outline"
-                      disabled={busy}
+                      disabled={busy || fetching}
                       onClick={() => startEdit(r)}
                     >
                       Edit
@@ -1195,7 +1198,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                       <Btn
                         size="sm"
                         variant="danger"
-                        disabled={busy}
+                        disabled={busy || fetching}
                         onClick={() => void archiveRecord(r.id, title)}
                       >
                         Archive
