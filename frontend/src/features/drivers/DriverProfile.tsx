@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS, pagePlain } from '@/lib/theme';
 import { Btn, BackButton, Card, Pill, SectionTitle, StatCard, StatsGrid, Sel, Icons } from '@/components/ui';
+import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
@@ -339,8 +340,8 @@ export function DriverProfile({
           alignItems: 'center',
           justifyContent: 'space-between',
           position: 'sticky',
-          top: 0,
-          zIndex: 100,
+          top: HEADER_HEIGHT,
+          zIndex: 90,
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -416,6 +417,39 @@ export function DriverProfile({
               }}
             >
               SUSPEND
+            </button>
+          )}
+          {can('drivers.suspend') && lifecycle === 'suspended' && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (!recordId) return;
+                const ok = await confirm({
+                  title: 'Unsuspend driver',
+                  message: `Reactivate ${driver.name}? They will be able to log in and be assigned to dispatches.`,
+                  confirmLabel: 'Unsuspend',
+                });
+                if (!ok) return;
+                try {
+                  await driversApi.unsuspend(recordId);
+                  await refreshAll?.();
+                  notify(`${driver.name} unsuspended — now active`);
+                } catch (e: any) {
+                  notify(e?.message || 'Unsuspend failed', 'error');
+                }
+              }}
+              style={{
+                background: G.success,
+                border: 'none',
+                color: '#fff',
+                borderRadius: 7,
+                padding: '8px 16px',
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              UNSUSPEND
             </button>
           )}
           {can('drivers.wage.edit') && (
@@ -498,7 +532,7 @@ export function DriverProfile({
                   </h1>
                   {active ? (
                     <Pill color={G.gold}>IN TRANSIT</Pill>
-                  ) : (
+                  ) : lifecycle === 'suspended' ? null : (
                     <AvailabilityBadge status={driver.availabilityStatus} />
                   )}
                   <Pill

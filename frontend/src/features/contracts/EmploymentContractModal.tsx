@@ -113,7 +113,35 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
             </div>
             <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>{driver.name} · {company.name}</div>
           </div>
-          <button onClick={onClose} style={{ background:"transparent",border:`1px solid ${G.border}`,color:G.muted,borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16 }}>✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: G.muted,
+              borderRadius: 8,
+              width: 32,
+              height: 32,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              transition: 'color .15s ease, background .15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = G.text;
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = G.muted;
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            {Icons.close({ size: 18 })}
+          </button>
         </div>
 
         {/* Form */}

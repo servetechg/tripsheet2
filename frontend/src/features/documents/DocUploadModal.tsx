@@ -9,6 +9,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
   const [fileInfo, setFileInfo] = useState<any>(null);
   const [dragging, setDragging] = useState(false);
   const [err,      setErr]      = useState("");
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<any>(null);
 
   const handleFile = (file) => {
@@ -36,9 +37,20 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
     reader.readAsDataURL(file);
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (uploading) return;
     if (!fileInfo) { setErr("Please select a file first."); return; }
-    onUpload(docType.id, { ...fileInfo, expiry, notes });
+    setUploading(true);
+    setErr("");
+    try {
+      await Promise.resolve(
+        onUpload(docType.id, { ...fileInfo, expiry, notes }),
+      );
+    } catch (e: any) {
+      setErr(e?.message || 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const dropZoneBackground = dragging
@@ -56,8 +68,32 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
       : G.border;
 
   return (
-    <div style={{ position:"fixed",inset:0,background:G.overlay,zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16 }} onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div style={{ background:G.card,border:`1px solid ${G.border}`,borderRadius:16,padding:24,width:"100%",maxWidth:460,maxHeight:"92vh",overflow:"auto" }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: G.overlay,
+        zIndex: 500,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 16px',
+        overflowY: 'auto',
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: G.card,
+          border: `1px solid ${G.border}`,
+          borderRadius: 16,
+          padding: 24,
+          width: '100%',
+          maxWidth: 460,
+          position: 'relative',
+          overflow: 'visible',
+        }}
+      >
         <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
           <div>
             <div
@@ -75,7 +111,35 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
             </div>
             <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>Select file from your device</div>
           </div>
-          <button onClick={onClose} style={{ background:"transparent",border:`1px solid ${G.border}`,color:G.muted,borderRadius:8,width:34,height:34,cursor:"pointer",fontSize:16 }}>✕</button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: G.muted,
+              borderRadius: 8,
+              width: 32,
+              height: 32,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              transition: 'color .15s ease, background .15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = G.text;
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = G.muted;
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            {Icons.close({ size: 18 })}
+          </button>
         </div>
 
         {err && <div style={{ background:G.errTint,border:`1px solid ${G.danger}44`,borderRadius:8,padding:"10px 14px",fontSize:12,color:G.errText,marginBottom:12 }}>{err}</div>}
@@ -136,11 +200,18 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
         <Inp label="Notes (optional)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Renewed Mar 2026, verified original" />
 
         <div style={{ display:"flex",gap:10 }}>
-          <Btn full onClick={submit} style={{ padding:14,opacity:fileInfo?1:0.5, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <Btn
+            full
+            onClick={() => void submit()}
+            loading={uploading}
+            loadingLabel="Uploading…"
+            disabled={!fileInfo}
+            style={{ padding:14, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
+          >
             {Icons.upload({ size: 16, color: G.onGold })}
             UPLOAD DOCUMENT
           </Btn>
-          <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
+          <Btn variant="outline" onClick={onClose} disabled={uploading}>CANCEL</Btn>
         </div>
       </div>
     </div>

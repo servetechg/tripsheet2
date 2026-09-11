@@ -1,63 +1,16 @@
 import { useEffect, useState } from 'react';
-import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
+import { G, RADIUS } from '@/lib/theme';
+import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { useCan } from '@/lib/permissions';
-import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { CustomRolesPanel } from './CustomRolesPanel';
 import { MasterDataPanel } from './MasterDataPanel';
-
-function LoginHistoryList({ companyId }: { companyId: string }) {
-  const [rows, setRows] = useState<
-    Array<{
-      id: string;
-      email: string;
-      success: boolean;
-      reason: string;
-      ip: string;
-      createdAt: string;
-    }>
-  >([]);
-
-  useEffect(() => {
-    void authApi
-      .loginHistory({ scope: 'company', limit: 40, companyId })
-      .then(setRows)
-      .catch(() => setRows([]));
-  }, [companyId]);
-
-  if (!rows.length) {
-    return (
-      <div style={{ color: G.muted, fontSize: 13 }}>No login events yet.</div>
-    );
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {rows.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 12,
-            fontSize: 12,
-          }}
-        >
-          <span>
-            {r.email} · {r.success ? 'success' : r.reason || 'failed'}
-            {r.ip ? ` · ${r.ip}` : ''}
-          </span>
-          <span style={{ color: G.muted }}>
-            {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
+import { LoginHistoryPanel } from './LoginHistoryPanel';
+import { DepartmentsPanel } from './DepartmentsPanel';
+import { NotificationRulesPanel } from './NotificationRulesPanel';
+import { UsersPanel } from './UsersPanel';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -80,7 +33,7 @@ function SecurityEventsList({ companyId }: { companyId: string }) {
 
   if (!rows.length) {
     return (
-      <div style={{ color: G.muted, fontSize: 13 }}>
+      <div style={{ color: G.muted, fontSize: 13, padding: '12px 0' }}>
         No security events yet. Logins, password changes, lockouts, role
         changes, MFA disable, and invite acceptance are recorded here and
         queued as email notifications when the notification service is
@@ -90,35 +43,71 @@ function SecurityEventsList({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      {rows.map((r) => (
-        <div
-          key={r.id}
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 12,
-            fontSize: 12,
-          }}
-        >
-          <span>
-            <span
-              style={{
-                color: r.severity === 'warning' ? G.danger : G.muted,
-              }}
-            >
-              {r.type.replace('security.', '')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {rows.map((r) => {
+        const isWarn = r.severity === 'warning' || r.severity === 'danger';
+        return (
+          <div
+            key={r.id}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              padding: '10px 14px',
+              borderRadius: RADIUS.md,
+              background: G.card2,
+              border: `1px solid ${G.border}`,
+              fontSize: 12,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '2px 8px',
+                  borderRadius: RADIUS.sm,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  background: isWarn ? 'rgba(248, 113, 113, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                  color: isWarn ? G.danger : G.info,
+                  border: `1px solid ${isWarn ? 'rgba(248, 113, 113, 0.25)' : 'rgba(56, 189, 248, 0.25)'}`,
+                }}
+              >
+                {r.type.replace('security.', '')}
+              </span>
+              <span style={{ color: G.text, fontWeight: 500 }}>
+                {r.message}
+              </span>
+              {r.ip && (
+                <span
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    color: G.muted,
+                    background: G.bg,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  {r.ip === '::1' || r.ip === '127.0.0.1' ? 'localhost' : r.ip}
+                </span>
+              )}
+            </div>
+            <span style={{ color: G.muted, flexShrink: 0, fontSize: 11 }}>
+              {new Date(r.createdAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })}
             </span>
-            {' · '}
-            {r.message.slice(0, 90)}
-            {r.message.length > 90 ? '…' : ''}
-            {r.ip ? ` · ${r.ip}` : ''}
-          </span>
-          <span style={{ color: G.muted, flexShrink: 0 }}>
-            {new Date(r.createdAt).toLocaleString()}
-          </span>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -174,13 +163,6 @@ export function CompanySettingsTab({
   const [newKeyName, setNewKeyName] = useState('Integration key');
   const [revealedKey, setRevealedKey] = useState('');
   const [staff, setStaff] = useState<any[]>([]);
-  const [inviteForm, setInviteForm] = useState({
-    name: '',
-    email: '',
-    role: 'dispatcher',
-  });
-  const [inviteLink, setInviteLink] = useState('');
-  const [inviteBusy, setInviteBusy] = useState(false);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDto[]>([]);
 
@@ -299,409 +281,18 @@ export function CompanySettingsTab({
       </div>
 
       {sub === 'users' && (
-        <Card>
-          <SectionTitle>Users & roles</SectionTitle>
-          <div style={{ color: G.muted, fontSize: 13, marginBottom: 16 }}>
-            Invite staff with a system role. After they join, you can switch
-            them to a custom role from the Roles tab. They receive a link
-            (queued as an email notification) and only that role&apos;s
-            permissions until they sign in again.
-          </div>
-          {can('users.create') && (
-            <>
-              <G2 cols={3}>
-                <Inp
-                  label="Name"
-                  value={inviteForm.name}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, name: e.target.value }))
-                  }
-                />
-                <Inp
-                  label="Email"
-                  value={inviteForm.email}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                />
-                <Sel
-                  label="Role"
-                  value={inviteForm.role}
-                  onChange={(e) =>
-                    setInviteForm((f) => ({ ...f, role: e.target.value }))
-                  }
-                >
-                  {[
-                    'dispatcher',
-                    'dispatcher_supervisor',
-                    'general_manager',
-                    'fleet_manager',
-                    'safety_manager',
-                    'accountant',
-                    'hr_manager',
-                    'maintenance_coordinator',
-                  ].map((r) => (
-                    <option key={r} value={r}>
-                      {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
-                    </option>
-                  ))}
-                </Sel>
-              </G2>
-              <Btn
-                style={{ marginTop: 12 }}
-                disabled={inviteBusy}
-                onClick={() => {
-                  if (!inviteForm.email.trim() || !inviteForm.name.trim()) {
-                    notify('Name and email are required', 'error');
-                    return;
-                  }
-                  setInviteBusy(true);
-                  void invitesApi
-                    .create(cid, {
-                      kind: 'staff',
-                      role: inviteForm.role,
-                      email: inviteForm.email.trim(),
-                      name: inviteForm.name.trim(),
-                    })
-                    .then((inv) => {
-                      const link = `${window.location.origin}/invite?invite=${encodeURIComponent(inv.token)}`;
-                      setInviteLink(link);
-                      notify(`Invite created for ${inviteForm.role}`);
-                      void refreshAll?.(cid);
-                      void reloadInvites();
-                      return authApi.listUsers(cid).then(setStaff);
-                    })
-                    .catch((err: any) =>
-                      notify(err?.message || 'Invite failed', 'error'),
-                    )
-                    .finally(() => setInviteBusy(false));
-                }}
-              >
-                Invite staff
-              </Btn>
-              {inviteLink && (
-                <div style={{ marginTop: 12, fontSize: 12, color: G.muted }}>
-                  Share this link: {inviteLink}
-                </div>
-              )}
-            </>
-          )}
-          {pendingInvites.length > 0 && (
-            <>
-              <Divider />
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
-                Pending invites
-              </div>
-              {pendingInvites.map((inv) => (
-                <div
-                  key={inv.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                    fontSize: 12,
-                    marginBottom: 8,
-                    flexWrap: 'wrap',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span>
-                    {inv.email || '—'} · {inv.kind}/{inv.role} · {inv.status}
-                    {inv.expiresAt ? (
-                      <span style={{ color: G.muted }}>
-                        {' '}
-                        · expires {new Date(inv.expiresAt).toLocaleDateString()}
-                      </span>
-                    ) : null}
-                  </span>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {can('users.create') && inv.status === 'pending' && (
-                      <Btn
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          void invitesApi
-                            .revoke(inv.id)
-                            .then(() => reloadInvites())
-                            .then(() => notify('Invite revoked'))
-                            .catch((err: any) =>
-                              notify(err?.message || 'Revoke failed', 'error'),
-                            );
-                        }}
-                      >
-                        Revoke
-                      </Btn>
-                    )}
-                    {can('users.create') && (
-                      <Btn
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          void invitesApi
-                            .regenerate(inv.id)
-                            .then((created) => {
-                              const link = `${window.location.origin}/invite?invite=${encodeURIComponent(created.token)}`;
-                              setInviteLink(link);
-                              return reloadInvites();
-                            })
-                            .then(() => notify('Invite regenerated'))
-                            .catch((err: any) =>
-                              notify(
-                                err?.message || 'Regenerate failed',
-                                'error',
-                              ),
-                            );
-                        }}
-                      >
-                        Resend
-                      </Btn>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-          <Divider />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {staff.map((u) => {
-              const locked =
-                isCompanyOwnerRole(u.role) || isSuperAdminRole(u.role);
-              const value = u.customRoleId
-                ? `custom:${u.customRoleId}`
-                : `sys:${u.role}`;
-              const st = u.status || 'active';
-              const canStatus = can('users.suspend') && !isSuperAdminRole(u.role);
-              return (
-                <div
-                  key={u.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    fontSize: 13,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <span>
-                    {u.name} · {u.email}{' '}
-                    <Pill
-                      small
-                      color={
-                        st === 'active'
-                          ? G.success
-                          : st === 'suspended' || st === 'locked'
-                            ? G.danger
-                            : G.muted
-                      }
-                    >
-                      {st}
-                    </Pill>
-                    {u.customRoleName ? (
-                      <span style={{ color: G.muted }}>
-                        {' '}
-                        · {u.customRoleName}
-                      </span>
-                    ) : null}
-                  </span>
-                  <div
-                    style={{
-                      display: 'flex',
-                      gap: 8,
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                  {can('users.assign_role') && !locked ? (
-                    <Sel
-                      value={value}
-                      style={{ marginBottom: 0, minWidth: 220 }}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        const body = v.startsWith('custom:')
-                          ? { customRoleId: v.slice(7) }
-                          : { role: v.slice(4), customRoleId: null };
-                        void authApi
-                          .updateUser(u.id, body)
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'Role updated. The user must sign in again to refresh permissions.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Update failed', 'error'),
-                          );
-                      }}
-                    >
-                      <optgroup label="System">
-                        {[
-                          'dispatcher',
-                          'dispatcher_supervisor',
-                          'general_manager',
-                          'fleet_manager',
-                          'safety_manager',
-                          'accountant',
-                          'hr_manager',
-                          'maintenance_coordinator',
-                          'driver',
-                        ].map((r) => (
-                          <option key={r} value={`sys:${r}`}>
-                            {ROLE_LABELS[r as keyof typeof ROLE_LABELS] || r}
-                          </option>
-                        ))}
-                      </optgroup>
-                      {customRoles.length > 0 && (
-                        <optgroup label="Custom">
-                          {customRoles.map((r) => (
-                            <option key={r.id} value={`custom:${r.id}`}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                      {u.customRoleId &&
-                        !customRoles.some((r) => r.id === u.customRoleId) && (
-                          <option value={`custom:${u.customRoleId}`}>
-                            {u.customRoleName || 'Removed custom role'}
-                          </option>
-                        )}
-                    </Sel>
-                  ) : (
-                    <span style={{ color: G.muted }}>
-                      {u.customRoleName ||
-                        ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] ||
-                        u.role}
-                    </span>
-                  )}
-                  {canStatus && st === 'active' && (
-                    <Btn
-                      variant="ghost"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void authApi
-                          .setUserStatus(u.id, 'suspended')
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'User suspended. Active sessions are revoked.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Suspend failed', 'error'),
-                          );
-                      }}
-                    >
-                      Suspend
-                    </Btn>
-                  )}
-                  {canStatus && st === 'active' && (
-                    <Btn
-                      variant="ghost"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void authApi
-                          .setUserStatus(u.id, 'locked')
-                          .then(() => authApi.listUsers(cid).then(setStaff))
-                          .then(() =>
-                            notify(
-                              'User locked. Active sessions are revoked.',
-                            ),
-                          )
-                          .catch((err: any) =>
-                            notify(err?.message || 'Lock failed', 'error'),
-                          );
-                      }}
-                    >
-                      Lock
-                    </Btn>
-                  )}
-                  {canStatus &&
-                    (st === 'locked' ||
-                      (st === 'active' &&
-                        u.lockedUntil &&
-                        new Date(u.lockedUntil).getTime() > Date.now())) && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
-                          void authApi
-                            .unlockUser(u.id)
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() =>
-                              notify(
-                                'User unlocked. Temporary lockout cleared.',
-                              ),
-                            )
-                            .catch((err: any) =>
-                              notify(
-                                err?.message || 'Unlock failed',
-                                'error',
-                              ),
-                            );
-                        }}
-                      >
-                        Unlock
-                      </Btn>
-                    )}
-                  {canStatus &&
-                    (st === 'suspended' || st === 'inactive') && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        style={{ marginBottom: 0, fontSize: 12 }}
-                        onClick={() => {
-                          void authApi
-                            .setUserStatus(u.id, 'active')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() => notify('User reactivated'))
-                            .catch((err: any) =>
-                              notify(
-                                err?.message || 'Reactivate failed',
-                                'error',
-                              ),
-                            );
-                        }}
-                      >
-                        Reactivate
-                      </Btn>
-                    )}
-                  {canStatus && st !== 'archived' && !locked && (
-                    <Btn
-                      variant="danger"
-                      size="sm"
-                      style={{ marginBottom: 0, fontSize: 12 }}
-                      onClick={() => {
-                        void (async () => {
-                          const ok = await confirm({
-                            title: 'Archive user',
-                            message: `Archive ${u.email}? They will not be able to sign in. This is a soft archive (not a permanent delete).`,
-                            confirmLabel: 'Archive',
-                            variant: 'danger',
-                          });
-                          if (!ok) return;
-                          void authApi
-                            .setUserStatus(u.id, 'archived')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
-                            .then(() => notify('User archived'))
-                            .catch((err: any) =>
-                              notify(err?.message || 'Archive failed', 'error'),
-                            );
-                        })();
-                      }}
-                    >
-                      Archive
-                    </Btn>
-                  )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        <UsersPanel
+          cid={cid}
+          company={company}
+          staff={staff}
+          setStaff={setStaff}
+          pendingInvites={pendingInvites}
+          reloadInvites={reloadInvites}
+          customRoles={customRoles}
+          can={can}
+          confirm={confirm}
+          refreshAll={refreshAll}
+        />
       )}
 
       {sub === 'roles' && <CustomRolesPanel companyId={cid} />}
@@ -748,7 +339,7 @@ export function CompanySettingsTab({
                 .catch((err: any) => notify(err?.message || 'Save failed', 'error'));
             }}
           >
-            Save profile
+            Save Profile
           </Btn>
         </Card>
       )}
@@ -842,14 +433,14 @@ export function CompanySettingsTab({
                 );
             }}
           >
-            Save settings
+            Save Settings
           </Btn>
         </Card>
       )}
 
       {sub === 'branches' && (
         <Card>
-          <SectionTitle>Branches / terminals</SectionTitle>
+          <SectionTitle>Branches / Terminals</SectionTitle>
           <G2 cols={3}>
             <Inp
               label="Name"
@@ -882,7 +473,7 @@ export function CompanySettingsTab({
                     );
                 }}
               >
-                Add branch
+                Add Branch
               </Btn>
             </div>
           </G2>
@@ -933,29 +524,12 @@ export function CompanySettingsTab({
       {sub === 'masterdata' && <MasterDataPanel companyId={cid} />}
 
       {sub === 'departments' && (
-        <Card>
-          <SectionTitle>Departments</SectionTitle>
-          {departments.map((d) => (
-            <div key={d.id} style={{ fontSize: 13, padding: '6px 0' }}>
-              <strong>{d.name}</strong>{' '}
-              <code style={{ color: G.muted }}>{d.code}</code>
-            </div>
-          ))}
-          <Btn
-            size="sm"
-            style={{ marginTop: 8 }}
-            onClick={() => {
-              const name = prompt('Department name');
-              if (!name) return;
-              void companiesApi
-                .saveDepartment(cid, { name, code: name.slice(0, 8) })
-                .then(reload)
-                .catch((err: any) => notify(err?.message || 'Failed', 'error'));
-            }}
-          >
-            Add department
-          </Btn>
-        </Card>
+        <DepartmentsPanel
+          companyId={cid}
+          departments={departments}
+          canManage={can('company.edit')}
+          onReload={reload}
+        />
       )}
 
       {sub === 'branding' && branding && (
@@ -1024,7 +598,7 @@ export function CompanySettingsTab({
                 );
             }}
           >
-            Save branding
+            Save Branding
           </Btn>
         </Card>
       )}
@@ -1065,7 +639,7 @@ export function CompanySettingsTab({
                 .catch((err: any) => notify(err?.message || 'Failed', 'error'));
             }}
           >
-            Add document
+            Add Document
           </Btn>
           <div style={{ marginTop: 12 }}>
             {docs.map((d) => (
@@ -1152,7 +726,7 @@ export function CompanySettingsTab({
                   );
               }}
             >
-              Create key
+              Create Key
             </Btn>
           </div>
           {revealedKey && (
@@ -1334,7 +908,10 @@ export function CompanySettingsTab({
           </Btn>
           <Divider />
           <SectionTitle>Login history</SectionTitle>
-          <LoginHistoryList companyId={cid} />
+          <div style={{ color: G.muted, fontSize: 13, marginBottom: 14 }}>
+            Detailed audit log of company authentication events, IPs, clients, and security status.
+          </div>
+          <LoginHistoryPanel companyId={cid} />
           <Divider />
           <SectionTitle>Security events</SectionTitle>
           <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
@@ -1346,48 +923,11 @@ export function CompanySettingsTab({
       )}
 
       {sub === 'notifications' && (
-        <Card>
-          <SectionTitle>Admin notification rules</SectionTitle>
-          <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
-            Includes security.* rules (login, password, role, MFA, invite,
-            lockout) seeded for each company. Delivery remains a queue until
-            SMTP is configured.
-          </div>
-          {rules.map((r) => (
-            <div
-              key={r.id}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                padding: '8px 0',
-                borderBottom: `1px solid ${G.border}`,
-                fontSize: 13,
-              }}
-            >
-              <div>
-                <strong>{r.eventType}</strong> → {r.channel} / {r.target}
-              </div>
-              <label style={{ fontSize: 12 }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(r.enabled)}
-                  onChange={(e) => {
-                    void companiesApi
-                      .saveNotificationRule(cid, {
-                        ...r,
-                        enabled: e.target.checked,
-                      })
-                      .then(reload)
-                      .catch((err: any) =>
-                        notify(err?.message || 'Failed', 'error'),
-                      );
-                  }}
-                />{' '}
-                enabled
-              </label>
-            </div>
-          ))}
-        </Card>
+        <NotificationRulesPanel
+          cid={cid}
+          rules={rules}
+          onReload={reload}
+        />
       )}
 
       {sub === 'plan' && (

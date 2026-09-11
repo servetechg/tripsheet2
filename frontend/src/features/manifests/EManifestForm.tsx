@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
-import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
-import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
+import { G, SPACE, RADIUS, FONT_UI, FONT_MONO } from '@/lib/theme';
+import { Btn, BackButton, Inp, Sel, Icons } from '@/components/ui';
+import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
@@ -14,7 +15,7 @@ import { driverRecordIdOf } from '@/lib/driverIds';
 export function EManifestForm({ type, company, carrier, drivers, trucks, trailers, loads, genCRN, genCCN, editData, onSave, onBack, apiEnabled }: any) {
   const isACI = type === "ACI";
   const PORTS_FALLBACK = isACI ? CA_PORTS : US_PORTS;
-  const carrierCode = isACI ? (carrier.cbsaCarrierCode||"XXXX") : (carrier.scacCode||"XXXX");
+  const carrierCode = isACI ? (carrier?.cbsaCarrierCode||"XXXX") : (carrier?.scacCode||"XXXX");
 
   const emptyShipment = () => ({
     id: uid(),
@@ -126,6 +127,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
   const selectedDriver  = drivers.find(d=>d.id===f.driverId);
 
   const [formErr, setFormErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
   const [borderCheck, setBorderCheck] = useState<{ eligible: boolean; missing: string[]; warnings: string[] } | null>(null);
 
@@ -163,6 +165,12 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
 
   const save = async (status="draft") => {
     if (status==="submitted") {
+      if (carrierCode === "XXXX") {
+        setFormErr(
+          `Add the ${isACI ? 'CBSA carrier code' : 'SCAC code'} in Carrier profile before submitting.`,
+        );
+        return;
+      }
       if (blank(f.driverId)) { setFormErr("Please select a driver."); return; }
       if (blank(f.truckId))  { setFormErr("Please select a truck."); return; }
       if (blank(f.eta))      { setFormErr("ETA date is required before submitting."); return; }
@@ -185,17 +193,24 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       }
     }
     setFormErr("");
-    onSave({
-      id: editData?.id || uid(),
-      type, status,
-      companyId: company.id,
-      createdAt: editData?.createdAt || new Date().toLocaleDateString("en-CA"),
-      ...f,
-      truckNo:   selectedTruck?.unitNo   || "",
-      trailerNo: selectedTrailer?.unitNo || "",
-      driverName:selectedDriver?.name    || "",
-      portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
-    });
+    setSaving(true);
+    try {
+      await onSave({
+        id: editData?.id || uid(),
+        type, status,
+        companyId: company.id,
+        createdAt: editData?.createdAt || new Date().toLocaleDateString("en-CA"),
+        ...f,
+        truckNo:   selectedTruck?.unitNo   || "",
+        trailerNo: selectedTrailer?.unitNo || "",
+        driverName:selectedDriver?.name    || "",
+        portName:  ports.find(p=>p.code===f.portCode)?.name || f.portCode,
+      });
+    } catch (e: any) {
+      setFormErr(e?.message || 'Could not save the eManifest.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const SHIP_TYPES_ACI = [
@@ -218,10 +233,26 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
   const PORTS = ports.length ? ports : PORTS_FALLBACK;
 
   return (
-    <div style={{ ...pagePlain() }}>
+    <div>
       {/* Top bar */}
-      <div style={{ position:"sticky", top:0, zIndex:200, background:G.card, borderBottom:`2px solid ${isACI?G.info:G.purple}`, padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+      <div
+        style={{
+          position: 'sticky',
+          top: HEADER_HEIGHT,
+          zIndex: 90,
+          background: G.card,
+          border: `1px solid ${G.border}`,
+          borderBottom: `2px solid ${isACI ? G.info : G.purple}`,
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderRadius: RADIUS.md,
+          marginBottom: 16,
+          boxShadow: G.shadow,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <BackButton onClick={onBack} />
           <div>
             <span
@@ -240,22 +271,131 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
               })}
               {isACI ? 'ACI eManifest' : 'ACE eManifest'}
             </span>
-            <span style={{ fontSize:10, color:G.muted, marginLeft:8 }}>{isACI?"Canada-bound (CBSA)":"US-bound (CBP)"}</span>
+            <span style={{ fontSize: 10, color: G.muted, marginLeft: 8 }}>
+              {isACI ? 'Canada-bound (CBSA)' : 'US-bound (CBP)'}
+            </span>
           </div>
         </div>
-        <div style={{ display:"flex", gap:8 }}>
-          <Btn variant="outline" onClick={()=>save("draft")} style={{ fontSize:11, padding:"8px 14px" }}>SAVE DRAFT</Btn>
-          <Btn onClick={()=>void save("submitted")} style={{ fontSize:11, padding:"8px 18px", background: isACI?G.info:G.purple }}>SUBMIT →</Btn>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn
+            variant="outline"
+            disabled={saving}
+            onClick={() => void save('draft')}
+            style={{ fontSize: 11, padding: '8px 14px' }}
+          >
+            {saving ? 'SAVING…' : 'SAVE DRAFT'}
+          </Btn>
+          <Btn
+            disabled={saving}
+            onClick={() => void save('submitted')}
+            style={{
+              fontSize: 11,
+              padding: '8px 18px',
+              background: isACI ? G.info : G.purple,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontWeight: 600,
+            }}
+          >
+            <span>{saving ? 'SUBMITTING…' : 'SUBMIT'}</span>
+            {Icons.arrowRight({ size: 14, color: '#fff' })}
+          </Btn>
         </div>
       </div>
 
-      <div style={{ padding:"16px 14px 100px", maxWidth:800, margin:"0 auto" }}>
-
+      <div style={{ padding: '0 0 100px', maxWidth: 800, margin: '0 auto' }}>
         {/* Carrier code banner */}
-        <div style={{ background: isACI?"#0a1a2a":"#1a0a2a", border:`1px solid ${isACI?G.info+"44":"#8b5cf644"}`, borderRadius:10, padding:"10px 16px", marginBottom:16, display:"flex", gap:20, flexWrap:"wrap" }}>
-          <div><span style={{ fontSize:9, color:G.muted, letterSpacing:2 }}>{isACI?"CBSA CARRIER CODE":"SCAC CODE"}</span><div style={{ fontSize:16, fontWeight:900, color: isACI?G.info:G.purple }}>{carrierCode}</div></div>
-          <div><span style={{ fontSize:9, color:G.muted, letterSpacing:2 }}>DIRECTION</span><div style={{ fontSize:13, fontWeight:700, color:G.text }}>{isACI?"USA → Canada":"Canada → USA"}</div></div>
-          <div><span style={{ fontSize:9, color:G.muted, letterSpacing:2 }}>PRE-ARRIVAL</span><div style={{ fontSize:13, fontWeight:700, color:G.gold }}>{carrier.fastLane?"30 min":"1 hour"} before border</div></div>
+        <div
+          style={{
+            background:
+              G.mode === 'light'
+                ? isACI
+                  ? '#EFF6FF'
+                  : '#F5F3FF'
+                : isACI
+                  ? '#0a1a2a'
+                  : '#1a0a2a',
+            border: `1px solid ${
+              G.mode === 'light'
+                ? isACI
+                  ? 'rgba(56, 189, 248, 0.35)'
+                  : 'rgba(167, 139, 250, 0.35)'
+                : isACI
+                  ? G.info + '44'
+                  : '#8b5cf644'
+            }`,
+            borderRadius: 10,
+            padding: '12px 18px',
+            marginBottom: 16,
+            display: 'flex',
+            gap: 24,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <span
+              style={{
+                fontSize: 9,
+                color: G.muted,
+                letterSpacing: 2,
+                fontWeight: 600,
+              }}
+            >
+              {isACI ? 'CBSA CARRIER CODE' : 'SCAC CODE'}
+            </span>
+            <div
+              style={{
+                fontSize: 16,
+                fontWeight: 900,
+                color: isACI ? G.info : G.purple,
+              }}
+            >
+              {carrierCode}
+            </div>
+          </div>
+          <div>
+            <span
+              style={{
+                fontSize: 9,
+                color: G.muted,
+                letterSpacing: 2,
+                fontWeight: 600,
+              }}
+            >
+              DIRECTION
+            </span>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: G.text,
+              }}
+            >
+              {isACI ? 'USA → Canada' : 'Canada → USA'}
+            </div>
+          </div>
+          <div>
+            <span
+              style={{
+                fontSize: 9,
+                color: G.muted,
+                letterSpacing: 2,
+                fontWeight: 600,
+              }}
+            >
+              PRE-ARRIVAL
+            </span>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: G.mode === 'light' ? G.goldDim : G.gold,
+              }}
+            >
+              {carrier.fastLane ? '30 min' : '1 hour'} before border
+            </div>
+          </div>
         </div>
 
         {/* Link to existing load */}

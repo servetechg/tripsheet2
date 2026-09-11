@@ -184,6 +184,12 @@ export const Icons = {
       <polyline points="12 19 5 12 12 5" />
     </Outline>
   ),
+  arrowRight: (p?: IconProps) => (
+    <Outline {...p}>
+      <line x1="5" y1="12" x2="19" y2="12" />
+      <polyline points="12 5 19 12 12 19" />
+    </Outline>
+  ),
   chevronLeft: (p?: IconProps) => (
     <Outline {...p}>
       <polyline points="15 18 9 12 15 6" />
@@ -228,6 +234,11 @@ export const Icons = {
   cancelled: (p?: IconProps) => (
     <Filled {...p}>
       <path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" />
+    </Filled>
+  ),
+  close: (p?: IconProps) => (
+    <Filled {...p}>
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
     </Filled>
   ),
   assigned: (p?: IconProps) => (

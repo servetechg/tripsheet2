@@ -463,10 +463,16 @@ export function DriverDashboard({
                 <Btn
                   size="sm"
                   variant="outline"
-                  style={{ marginTop: 12 }}
+                  style={{
+                    marginTop: 12,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
                   onClick={() => setTab('contract')}
                 >
-                  View contract & wage terms →
+                  <span>View contract & wage terms</span>
+                  {Icons.arrowRight({ size: 14, color: 'currentColor' })}
                 </Btn>
               </Card>
               )}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Divider, SectionTitle, G2 } from '@/components/ui';
+import { G, RADIUS } from '@/lib/theme';
+import { Btn, Card, Inp, Sel, Divider, SectionTitle, G2, Chk } from '@/components/ui';
 import {
   authApi,
   companiesApi,
@@ -191,7 +191,7 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
                 selectedId === 'new'
                   ? `1px solid ${G.gold}`
                   : `1px solid ${G.border}`,
-                background: selectedId === 'new' ? G.goldBg : 'transparent',
+              background: selectedId === 'new' ? G.goldBg : 'transparent',
               color: G.text,
               cursor: 'pointer',
               fontSize: 13,
@@ -289,71 +289,185 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
           </div>
         )}
         <Divider />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, fontWeight: 600, color: G.text }}>
+            Permissions ({checked.size} of {catalog.length} granted)
+          </div>
+          {canWrite && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setChecked(new Set(catalog.map((p) => p.code)))}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: G.gold,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+              >
+                Select all
+              </button>
+              <span style={{ color: G.border }}>|</span>
+              <button
+                type="button"
+                onClick={() => setChecked(new Set())}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: G.muted,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                }}
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {modules.map(([mod, perms]) => {
             const allOn = perms.every((p) => checked.has(p.code));
+            const someOn = perms.some((p) => checked.has(p.code));
+            const selectedCount = perms.filter((p) => checked.has(p.code)).length;
+
             return (
-              <div key={mod}>
-                <label
+              <div
+                key={mod}
+                style={{
+                  background: G.card2,
+                  border: `1px solid ${G.border}`,
+                  borderRadius: RADIUS.md,
+                  padding: '12px 14px',
+                }}
+              >
+                <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 8,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    marginBottom: 8,
-                    textTransform: 'capitalize',
+                    justifyContent: 'space-between',
+                    paddingBottom: 10,
+                    marginBottom: 10,
+                    borderBottom: `1px solid ${G.border}`,
                   }}
                 >
-                  <input
-                    type="checkbox"
+                  <Chk
                     disabled={!canWrite}
                     checked={allOn}
+                    indeterminate={someOn && !allOn}
                     onChange={(e) => toggleModule(mod, e.target.checked)}
+                    label={
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: G.text,
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {mod}
+                      </span>
+                    }
                   />
-                  {mod}
-                </label>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: selectedCount > 0 ? G.gold : G.muted,
+                      background: selectedCount > 0 ? G.goldBg : 'transparent',
+                      padding: '2px 8px',
+                      borderRadius: RADIUS.sm,
+                      border: selectedCount > 0 ? `1px solid ${G.gold}33` : 'none',
+                    }}
+                  >
+                    {selectedCount} / {perms.length} granted
+                  </span>
+                </div>
+
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: 6,
-                    paddingLeft: 8,
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                    gap: 8,
                   }}
                 >
-                  {perms.map((p) => (
-                    <label
-                      key={p.code}
-                      style={{
-                        display: 'flex',
-                        gap: 8,
-                        fontSize: 12,
-                        color: G.text,
-                        alignItems: 'flex-start',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        disabled={!canWrite}
-                        checked={checked.has(p.code)}
-                        onChange={() => toggle(p.code)}
-                        style={{ marginTop: 2 }}
-                      />
-                      <span>
-                        {p.name}
-                        <span style={{ color: G.muted }}> · {p.code}</span>
-                      </span>
-                    </label>
-                  ))}
+                  {perms.map((p) => {
+                    const isGranted = checked.has(p.code);
+                    return (
+                      <div
+                        key={p.code}
+                        onClick={() => canWrite && toggle(p.code)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                          padding: '8px 12px',
+                          borderRadius: RADIUS.sm,
+                          background: isGranted ? G.goldBg : G.card,
+                          border: `1px solid ${isGranted ? G.gold + '44' : G.border}`,
+                          cursor: canWrite ? 'pointer' : 'default',
+                          transition: 'all .15s ease',
+                        }}
+                      >
+                        <Chk
+                          disabled={!canWrite}
+                          checked={isGranted}
+                          onChange={() => toggle(p.code)}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ marginTop: 1 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: isGranted ? 600 : 500,
+                              color: isGranted ? G.text : G.muted2,
+                              lineHeight: 1.35,
+                            }}
+                          >
+                            {p.name}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 10,
+                              color: G.muted,
+                              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                              marginTop: 2,
+                            }}
+                          >
+                            {p.code}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
         </div>
         {canWrite && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <Btn disabled={busy} onClick={() => void save()}>
-              {selectedId === 'new' ? 'Create role' : 'Save grants'}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, marginBottom: 12 }}>
+            <Btn
+              loading={busy}
+              loadingLabel={selectedId === 'new' ? 'Creating…' : 'Saving…'}
+              onClick={() => void save()}
+            >
+              {selectedId === 'new' ? 'Create Role' : 'Save Grants'}
             </Btn>
             {selectedId !== 'new' && (
               <Btn

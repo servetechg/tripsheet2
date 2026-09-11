@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { InvitesService } from './invites.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { CompleteInviteDto } from './dto/complete-invite.dto';
+import { SendInviteDto } from './dto/send-invite.dto';
 
 @Controller('invites')
 export class InvitesController {
@@ -25,6 +26,11 @@ export class InvitesController {
   @Post(':token/complete')
   complete(@Param('token') token: string, @Body() dto: CompleteInviteDto) {
     return this.invitesService.complete(token, dto);
+  }
+
+  @Post(':id/send')
+  send(@Param('id') id: string, @Body() dto: SendInviteDto) {
+    return this.invitesService.sendLink(id, dto);
   }
 
   @Post(':id/revoke')

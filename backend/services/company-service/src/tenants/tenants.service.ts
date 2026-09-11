@@ -28,6 +28,18 @@ export class TenantsService {
     }
   }
 
+  /** Internal: company identity shown on unauthenticated pages (invite onboarding). */
+  async getPublicCompanySummary(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { id: true, name: true, shortName: true },
+    });
+    if (!company) {
+      throw new NotFoundException(`Company ${companyId} not found`);
+    }
+    return company;
+  }
+
   /** Internal: companies whose driver data lives on fq_tenant_* (for public invite lookup). */
   listTenantRoutedCompanyIds() {
     return this.prisma.tenantDatabase.findMany({

@@ -22,7 +22,7 @@ COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../../sha
 COPY backend/services/manifest-service/package*.json ./
 COPY backend/services/manifest-service/prisma ./prisma/
 RUN npm ci --omit=dev \
-  && npm install prisma@6.1.0 --no-save \
+  && npm install prisma@$(node -p "require('@prisma/client/package.json').version") --no-save \
   && npx prisma generate
 COPY --from=builder /repo/backend/services/manifest-service/dist ./dist
 EXPOSE 3005

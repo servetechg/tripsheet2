@@ -265,12 +265,16 @@ function InviteRoute() {
       );
       try {
         const inv = await invitesApi.byToken(inviteToken);
-        const co = await companiesApi.get(inv.companyId);
+        // The invite carries its own company summary: /companies is behind the
+        // RBAC gate, and onboarding runs with no session (often incognito).
+        const co =
+          inv.company ??
+          (await companiesApi.get(inv.companyId).catch(() => null));
         if (!cancelled) {
           setInviteState({
             loading: false,
             invite: inv,
-            company: co,
+            company: co ?? { id: inv.companyId, name: 'your employer' },
             error: false,
           });
         }

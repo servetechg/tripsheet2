@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
+import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
 
 export function LeadSheet({ manifest:m, company, carrier, onBack }: any) {
@@ -37,7 +38,7 @@ ${ref.current.innerHTML}
   return (
     <div style={{ fontFamily:FONT_UI, background:"#c8c8c8", minHeight:"100vh" }}>
       {/* Controls */}
-      <div style={{ background:G.card2, borderBottom:`2px solid ${isACI?G.info:G.purple}`, padding:"12px 16px", display:"flex", gap:12, alignItems:"center", position:"sticky", top:0, zIndex:100 }}>
+      <div style={{ background:G.card2, borderBottom:`2px solid ${isACI?G.info:G.purple}`, padding:"12px 16px", display:"flex", gap:12, alignItems:"center", position:"sticky", top: HEADER_HEIGHT, zIndex: 90 }}>
         <BackButton onClick={onBack} />
         <span style={{ fontSize:11, fontWeight:700, color: isACI?G.info:G.purple, flex:1, letterSpacing:2 }}>{m.type} eMAANIFEST LEAD SHEET</span>
         <Btn onClick={doPrint} style={{ padding:"9px 20px", background: isACI?G.info:G.purple, display:'inline-flex', alignItems:'center', gap:6 }}>

@@ -37,19 +37,13 @@ tripsheet/
 cd shared && npm install && npm run build
 ```
 
-### 2. Backend
-```bash
+### 2. Backend (new machine)
+```powershell
 cd backend
-npm install
-npm run infra:up
-npm run env:copy
-npm run install:all
+npm run dev:setup
 ```
 
-If Postgres was created before Phase 3, create the new DBs once:
-```bash
-npm run dbs:phase3
-```
+This installs deps, starts Postgres/Redis, migrates all service DBs, and seeds super admin + plans only.
 
 Set Cloudinary on `services/driver-service/.env` (optional but recommended):
 ```
@@ -67,17 +61,9 @@ TWILIO_FROM_NUMBER=...
 REDIS_URL=redis://localhost:6379
 ```
 
-Migrate + seed (first time / after schema changes):
-```bash
-cd services/auth-service && npx prisma migrate dev && npm run seed && cd ../..
-cd services/company-service && npx prisma migrate dev && npm run seed && cd ../..
-cd services/driver-service && npx prisma migrate dev && npm run seed && cd ../..
-cd services/fleet-service && npx prisma migrate dev && npm run seed && cd ../..
-cd services/manifest-service && npx prisma migrate dev && npm run seed && cd ../..
-cd services/tripsheet-service && npx prisma migrate dev && cd ../..
-cd services/accounting-service && npx prisma migrate dev && cd ../..
-cd services/notification-service && npx prisma migrate dev && cd ../..
-```
+After `git pull` when schemas changed: `cd backend && npm run migrate:all`
+
+Clean broken local data: `cd backend && npm run dev:reset -- --yes --stop`
 
 Start all Nest apps:
 ```bash

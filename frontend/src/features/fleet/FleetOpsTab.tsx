@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, SectionTitle, Pill } from '@/components/ui';
+import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2 } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { blank } from '@/lib/format';
 import { maintenanceApi, dvirApi, auditApi, companiesApi } from '@/lib/api';
@@ -42,48 +42,38 @@ export function FleetOpsTab({
         dvirApi.list(company.id),
         companiesApi.maintenanceVendors(company.id, true).catch(() => []),
       ]);
-      setRows(m);
-      setDvirs(v);
-      setVendors(Array.isArray(vendorsList) ? vendorsList : []);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to load fleet ops', 'error');
+      setRows(Array.isArray(m) ? m : []);
+      setDvirs(Array.isArray(v) ? v : []);
+      setVendors(vendorsList || []);
+    } catch {
+      notify('Could not load fleet ops', 'error');
     }
   };
 
   useEffect(() => {
     void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [company.id, apiEnabled]);
 
   const addMaintenance = async () => {
-    if (blank(f.assetId) || blank(f.title) || blank(f.performedAt)) {
-      notify('Asset, title, and date are required', 'error');
+    if (blank(f.assetId) || blank(f.title) || blank(f.cost)) {
+      notify('Asset, title, and cost required', 'error');
       return;
     }
-    const asset = assets.find((a: any) => a.id === f.assetId);
-    const vendor = vendors.find((v: any) => v.id === f.vendorId);
     try {
       await maintenanceApi.create({
         companyId: company.id,
-        assetId: f.assetId,
-        unitNo: asset?.unitNo || '',
-        type: f.type,
-        title: f.title,
-        cost: Number(f.cost || 0),
-        performedAt: f.performedAt,
-        nextDueAt: f.nextDueAt || null,
-        vendor: vendor?.name || f.vendor,
-        vendorId: f.vendorId || null,
+        ...f,
+        cost: Number(f.cost),
       });
       await auditApi.create({
         companyId: company.id,
-        actorId: adminUser?.id,
+        actorId: adminUser?.sub || adminUser?.id,
         actorName: adminUser?.name,
-        action: 'maintenance.create',
+        action: 'fleet.maintenance',
         entityType: 'maintenance',
         entityId: f.assetId,
+        meta: { title: f.title, form: f },
       });
-      notify('Maintenance saved');
       setF({
         assetId: '',
         type: 'pm',
@@ -94,6 +84,7 @@ export function FleetOpsTab({
         vendor: '',
         vendorId: '',
       });
+      notify('Maintenance record saved');
       await load();
     } catch (e: any) {
       notify(e?.message || 'Save failed', 'error');
@@ -101,22 +92,16 @@ export function FleetOpsTab({
   };
 
   const addDvir = async () => {
-    if (blank(d.assetId) || blank(d.inspectedAt)) {
-      notify('Asset and inspection date required', 'error');
+    if (blank(d.assetId)) {
+      notify('Asset required for DVIR', 'error');
       return;
     }
-    const asset = assets.find((a: any) => a.id === d.assetId);
-    const driver = drivers.find((x: any) => x.id === d.driverId);
     try {
       await dvirApi.create({
         companyId: company.id,
-        assetId: d.assetId,
-        unitNo: asset?.unitNo || '',
-        driverId: d.driverId || null,
-        driverName: driver?.name || '',
-        inspectedAt: d.inspectedAt,
-        status: d.status,
-        remarks: d.remarks,
+        ...d,
+        unitNo: assets.find((a: any) => a.id === d.assetId)?.unitNo,
+        driverName: drivers.find((dr: any) => dr.id === d.driverId)?.name,
         defects: [],
       });
       notify('DVIR saved');
@@ -152,66 +137,72 @@ export function FleetOpsTab({
 
       {tab === 'maintenance' && (
         <Card>
-          <div style={{ display: 'grid', gap: 10, marginBottom: 16 }}>
-            <Sel
-              label="Asset"
-              value={f.assetId}
-              onChange={(e: any) => setF({ ...f, assetId: e.target.value })}
-            >
-              <option value="">— select —</option>
-              {assets.map((a: any) => (
-                <option key={a.id} value={a.id}>
-                  {a.type} #{a.unitNo}
-                </option>
-              ))}
-            </Sel>
-            <Sel
-              label="Type"
-              value={f.type}
-              onChange={(e: any) => setF({ ...f, type: e.target.value })}
-            >
-              <option value="pm">Preventive (PM)</option>
-              <option value="repair">Repair</option>
-            </Sel>
-            <Inp
-              label="Title"
-              value={f.title}
-              onChange={(e: any) => setF({ ...f, title: e.target.value })}
-            />
-            <Inp
-              label="Cost"
-              value={f.cost}
-              onChange={(e: any) => setF({ ...f, cost: e.target.value })}
-            />
-            <Inp
-              label="Performed"
-              value={f.performedAt}
-              onChange={(e: any) => setF({ ...f, performedAt: e.target.value })}
-              placeholder="YYYY-MM-DD"
-            />
-            <Inp
-              label="Next due"
-              value={f.nextDueAt}
-              onChange={(e: any) => setF({ ...f, nextDueAt: e.target.value })}
-              placeholder="YYYY-MM-DD"
-            />
-            <Sel
-              label="Vendor"
-              value={f.vendorId}
-              onChange={(e: any) => {
-                const id = e.target.value;
-                const v = vendors.find((x: any) => x.id === id);
-                setF({ ...f, vendorId: id, vendor: v?.name || '' });
-              }}
-            >
-              <option value="">— Optional —</option>
-              {vendors.map((v: any) => (
-                <option key={v.id} value={v.id}>
-                  {v.name}
-                </option>
-              ))}
-            </Sel>
-            <Btn onClick={() => void addMaintenance()}>Save maintenance</Btn>
+          <div style={{ marginBottom: 16 }}>
+            <G2 cols={2}>
+              <Sel
+                label="Asset"
+                value={f.assetId}
+                onChange={(e: any) => setF({ ...f, assetId: e.target.value })}
+              >
+                <option value="">— select —</option>
+                {assets.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.type} #{a.unitNo}
+                  </option>
+                ))}
+              </Sel>
+              <Sel
+                label="Type"
+                value={f.type}
+                onChange={(e: any) => setF({ ...f, type: e.target.value })}
+              >
+                <option value="pm">Preventive (PM)</option>
+                <option value="repair">Repair</option>
+              </Sel>
+              <Inp
+                label="Title"
+                value={f.title}
+                onChange={(e: any) => setF({ ...f, title: e.target.value })}
+                placeholder="e.g. Oil change"
+              />
+              <Inp
+                label="Cost"
+                value={f.cost}
+                onChange={(e: any) => setF({ ...f, cost: e.target.value })}
+                placeholder="e.g. 250.00"
+              />
+              <Inp
+                label="Performed"
+                value={f.performedAt}
+                onChange={(e: any) => setF({ ...f, performedAt: e.target.value })}
+                placeholder="YYYY-MM-DD"
+              />
+              <Inp
+                label="Next due"
+                value={f.nextDueAt}
+                onChange={(e: any) => setF({ ...f, nextDueAt: e.target.value })}
+                placeholder="YYYY-MM-DD"
+              />
+              <Sel
+                label="Vendor"
+                value={f.vendorId}
+                onChange={(e: any) => {
+                  const id = e.target.value;
+                  const v = vendors.find((x: any) => x.id === id);
+                  setF({ ...f, vendorId: id, vendor: v?.name || '' });
+                }}
+              >
+                <option value="">— Optional —</option>
+                {vendors.map((v: any) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Sel>
+            </G2>
+            <div style={{ marginTop: 14 }}>
+              <Btn onClick={() => void addMaintenance()}>Save Maintenance</Btn>
+            </div>
           </div>
           {rows.map((r) => (
             <div
@@ -239,51 +230,60 @@ export function FleetOpsTab({
 
       {tab === 'dvir' && (
         <Card>
-          <Sel
-            label="Asset"
-            value={d.assetId}
-            onChange={(e: any) => setD({ ...d, assetId: e.target.value })}
-          >
-            <option value="">— select —</option>
-            {assets.map((a: any) => (
-              <option key={a.id} value={a.id}>
-                {a.type} #{a.unitNo}
-              </option>
-            ))}
-          </Sel>
-          <Sel
-            label="Driver"
-            value={d.driverId}
-            onChange={(e: any) => setD({ ...d, driverId: e.target.value })}
-          >
-            <option value="">— optional —</option>
-            {drivers.map((dr: any) => (
-              <option key={dr.id} value={dr.id}>
-                {dr.name}
-              </option>
-            ))}
-          </Sel>
-          <Inp
-            label="Inspected at"
-            value={d.inspectedAt}
-            onChange={(e: any) => setD({ ...d, inspectedAt: e.target.value })}
-            placeholder="YYYY-MM-DD"
-          />
-          <Sel
-            label="Status"
-            value={d.status}
-            onChange={(e: any) => setD({ ...d, status: e.target.value })}
-          >
-            <option value="satisfactory">Satisfactory</option>
-            <option value="defects">Defects</option>
-            <option value="out_of_service">Out of service</option>
-          </Sel>
-          <Inp
-            label="Remarks"
-            value={d.remarks}
-            onChange={(e: any) => setD({ ...d, remarks: e.target.value })}
-          />
-          <Btn onClick={() => void addDvir()}>Save DVIR</Btn>
+          <div style={{ marginBottom: 16 }}>
+            <G2 cols={2}>
+              <Sel
+                label="Asset"
+                value={d.assetId}
+                onChange={(e: any) => setD({ ...d, assetId: e.target.value })}
+              >
+                <option value="">— select —</option>
+                {assets.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.type} #{a.unitNo}
+                  </option>
+                ))}
+              </Sel>
+              <Sel
+                label="Driver"
+                value={d.driverId}
+                onChange={(e: any) => setD({ ...d, driverId: e.target.value })}
+              >
+                <option value="">— optional —</option>
+                {drivers.map((dr: any) => (
+                  <option key={dr.id} value={dr.id}>
+                    {dr.name}
+                  </option>
+                ))}
+              </Sel>
+              <Inp
+                label="Inspected at"
+                value={d.inspectedAt}
+                onChange={(e: any) => setD({ ...d, inspectedAt: e.target.value })}
+                placeholder="YYYY-MM-DD"
+              />
+              <Sel
+                label="Status"
+                value={d.status}
+                onChange={(e: any) => setD({ ...d, status: e.target.value })}
+              >
+                <option value="satisfactory">Satisfactory</option>
+                <option value="defects">Defects</option>
+                <option value="out_of_service">Out of service</option>
+              </Sel>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Inp
+                  label="Remarks"
+                  value={d.remarks}
+                  onChange={(e: any) => setD({ ...d, remarks: e.target.value })}
+                  placeholder="Optional inspection remarks or defects"
+                />
+              </div>
+            </G2>
+            <div style={{ marginTop: 14 }}>
+              <Btn onClick={() => void addDvir()}>Save DVIR</Btn>
+            </div>
+          </div>
           {dvirs.map((r) => (
             <div
               key={r.id}

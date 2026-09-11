@@ -18,6 +18,12 @@
     "test:drivers:all": "npm run test:drivers && npm run test:drivers:live",
     "test": "npm run test --prefix services/driver-service && npm run test --prefix services/fleet-service && npm run test --prefix services/accounting-service && npm run test --prefix services/notification-service",
     "env:copy": "powershell -NoProfile -File scripts/copy-env.ps1",
+    "dev:setup": "node scripts/dev-setup.mjs",
+    "dev:reset": "node scripts/dev-reset.mjs",
+    "dev:stop": "powershell -NoProfile -File scripts/dev-stop.ps1",
+    "migrate:all": "node scripts/migrate-all.mjs",
+    "migrate:status": "node scripts/migrate-all.mjs --status",
+    "seed:platform": "node scripts/seed-platform.mjs",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down",
     "infra:logs": "docker compose logs -f postgres redis",
@@ -35,7 +41,7 @@
     "start:notification": "npm run start:dev --prefix services/notification-service",
     "build:all": "npm run build --prefix gateway && npm run build --prefix services/auth-service && npm run build --prefix services/company-service && npm run build --prefix services/driver-service && npm run build --prefix services/fleet-service && npm run build --prefix services/manifest-service && npm run build --prefix services/tripsheet-service && npm run build --prefix services/accounting-service && npm run build --prefix services/notification-service",
     "seed:e2e": "node scripts/seed-e2e.mjs",
-    "seed:all": "npm run prisma:generate --prefix services/auth-service && npm run prisma:generate --prefix services/company-service && cd services/auth-service && npx prisma db seed && cd ../company-service && npx prisma db seed"
+    "seed:all": "npm run seed:platform"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

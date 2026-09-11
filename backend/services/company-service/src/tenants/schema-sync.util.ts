@@ -66,19 +66,25 @@ function prismaDbPush(
 }
 
 async function schemaHasRows(admin: Client, schema: string): Promise<boolean> {
-  const r = await admin.query<{ n: string }>(
-    `SELECT COALESCE(SUM(n_live_tup), 0)::text AS n
-     FROM pg_stat_user_tables
-     WHERE schemaname = $1`,
+  const tables = await admin.query<{ tablename: string }>(
+    `SELECT tablename FROM pg_tables WHERE schemaname = $1`,
     [schema],
   );
-  return Number(r.rows[0]?.n || 0) > 0;
+  for (const { tablename } of tables.rows) {
+    const r = await admin.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM ${quoteIdent(schema)}.${quoteIdent(tablename)} LIMIT 1
+       ) AS exists`,
+    );
+    if (r.rows[0]?.exists) return true;
+  }
+  return false;
 }
 
 const SCHEMA_PROBE_TABLE: Record<string, string> = {
   driver: 'Driver',
   fleet: 'Load',
-  manifest: 'EManifest',
+  manifest: 'Manifest',
   tripsheet: 'TripSheet',
   accounting: 'LedgerAccount',
   notification: 'NotificationLog',
@@ -88,16 +94,8 @@ async function resetEmptyOpsSchema(
   admin: Client,
   schema: string,
 ): Promise<boolean> {
-  const probe = SCHEMA_PROBE_TABLE[schema];
-  if (!probe) return false;
-  try {
-    const r = await admin.query<{ n: string }>(
-      `SELECT COUNT(*)::text AS n FROM ${quoteIdent(schema)}.${quoteIdent(probe)}`,
-    );
-    if (Number(r.rows[0]?.n || 0) !== 0) {
-      return false;
-    }
-  } catch {
+  if (!SCHEMA_PROBE_TABLE[schema]) return false;
+  if (await schemaHasRows(admin, schema)) {
     return false;
   }
   await admin.query(`DROP SCHEMA IF EXISTS ${quoteIdent(schema)} CASCADE`);

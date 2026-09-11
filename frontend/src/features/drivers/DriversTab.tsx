@@ -7,7 +7,7 @@ import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
-import { invitesApi, authApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
+import { invitesApi, authApi, driversApi, companiesApi } from '@/lib/api';
 import {
   AVAILABILITY_LABELS,
   DRIVER_AVAILABILITY_STATUSES,
@@ -41,34 +41,78 @@ export function DriversTab({
   const [show, setShow] = useState(false);
   const [editDriver, setEditDriver] = useState<any>(null);
   const [generatedLink, setGeneratedLink] = useState<any>(null);
+  const [generatedInviteId, setGeneratedInviteId] = useState<string | null>(
+    null,
+  );
   const [invitePhone, setInvitePhone] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sending, setSending] = useState<'email' | 'sms' | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const showInviteLink = (invite: any) => {
+    setGeneratedInviteId(invite?.id ?? null);
+    setInviteEmail(invite?.email || '');
+    setGeneratedLink(
+      `${window.location.origin}/invite?invite=${encodeURIComponent(invite.token)}`,
+    );
+  };
 
   const createInvite = async () => {
     try {
       if (apiEnabled) {
         const invite = await invitesApi.create(company.id);
-        const token = invite.token;
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink(invite);
         await refreshAll?.();
       } else {
-        const token = uid() + uid();
         const invite = {
           id: uid(),
-          token,
+          token: uid() + uid(),
           companyId: company.id,
           status: 'pending',
           createdAt: new Date().toLocaleDateString('en-CA'),
         };
         setInvites((p: any[]) => [...p, invite]);
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink(invite);
       }
     } catch (e: any) {
       notify(e?.message || 'Failed to create invite', 'error');
+    }
+  };
+
+  /** Server builds the link and dispatches it, so the origin stays correct. */
+  const sendInvite = async (channel: 'email' | 'sms') => {
+    const to = (channel === 'email' ? inviteEmail : invitePhone).trim();
+    if (!to) {
+      notify(
+        channel === 'email' ? 'Enter an email address' : 'Enter a phone number',
+        'error',
+      );
+      return;
+    }
+    if (!generatedInviteId) {
+      notify('Regenerate this invite before sending', 'error');
+      return;
+    }
+    setSending(channel);
+    try {
+      const res = await invitesApi.send(generatedInviteId, { channel, to });
+      if (res.status === 'failed') {
+        notify(
+          `Provider rejected the ${channel === 'email' ? 'email' : 'SMS'} — check delivery settings`,
+          'error',
+        );
+      } else if (res.status === 'queued' || res.status === 'simulated') {
+        notify(
+          `Invite logged for ${to} — ${channel === 'email' ? 'SMTP' : 'Twilio'} is not configured yet`,
+        );
+      } else {
+        notify(`Invite sent to ${to}`);
+      }
+      await refreshAll?.();
+    } catch (e: any) {
+      notify(e?.message || `Could not send invite by ${channel}`, 'error');
+    } finally {
+      setSending(null);
     }
   };
 
@@ -184,9 +228,7 @@ export function DriversTab({
         const next = await invitesApi.regenerate(inv.id);
         await refreshAll?.();
         if (next?.token) {
-          setGeneratedLink(
-            `${window.location.origin}/invite?invite=${encodeURIComponent(next.token)}`,
-          );
+          showInviteLink(next);
         }
       } else {
         const token = uid();
@@ -195,9 +237,7 @@ export function DriversTab({
             i.id === inv.id ? { ...i, token, status: 'pending', createdAt: new Date().toLocaleDateString('en-CA') } : i,
           ),
         );
-        setGeneratedLink(
-          `${window.location.origin}/invite?invite=${encodeURIComponent(token)}`,
-        );
+        showInviteLink({ ...inv, token });
       }
       notify('Invite regenerated');
     } catch (e: any) {
@@ -606,6 +646,7 @@ export function DriversTab({
           <div
             style={{
               background: G.strip,
+              border: `1px solid ${G.border}`,
               borderRadius: 8,
               padding: '10px 14px',
               marginBottom: 10,
@@ -618,10 +659,11 @@ export function DriversTab({
             <div
               style={{
                 flex: 1,
-                fontSize: 11,
-                color: G.gold,
+                fontSize: 12,
+                color: G.mode === 'light' ? G.goldDim : G.gold,
                 wordBreak: 'break-all',
                 fontFamily: 'monospace',
+                fontWeight: 600,
               }}
             >
               {generatedLink}
@@ -649,48 +691,83 @@ export function DriversTab({
               COPY
             </button>
           </div>
-          {apiEnabled && (
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                marginBottom: 10,
-                flexWrap: 'wrap',
-                alignItems: 'flex-end',
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 160 }}>
-                <Inp
-                  label="SMS invite to phone"
-                  phone
-                  value={invitePhone}
-                  onChange={(e) => setInvitePhone(e.target.value)}
-                  placeholder="(403) 555-0100"
-                />
-              </div>
-              <Btn
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  if (!invitePhone.trim()) {
-                    notify('Enter a phone number', 'error');
-                    return;
-                  }
-                  try {
-                    await notificationsApi.sendSms({
-                      to: invitePhone.trim(),
-                      body: `${company.name || 'TripSheet'}: complete onboarding ${generatedLink}`,
-                      companyId: company.id,
-                      meta: { type: 'invite' },
-                    });
-                    notify('Invite SMS queued');
-                  } catch (e: any) {
-                    notify(e?.message || 'SMS failed', 'error');
-                  }
+          {apiEnabled && generatedInviteId && (
+            <div style={{ marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: G.muted,
+                  marginBottom: 6,
                 }}
               >
-                Send SMS
-              </Btn>
+                Send the link directly instead of sharing it manually.
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  marginBottom: 8,
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-end',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Inp
+                    label="Email invite to"
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    placeholder="driver@example.com"
+                    style={{ marginBottom: 0 }}
+                  />
+                </div>
+                <Btn
+                  size="md"
+                  disabled={sending !== null}
+                  onClick={() => void sendInvite('email')}
+                  style={{
+                    height: 42,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0 16px',
+                  }}
+                >
+                  {sending === 'email' ? 'Sending…' : 'Send email'}
+                </Btn>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-end',
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <Inp
+                    label="SMS invite to phone"
+                    phone
+                    value={invitePhone}
+                    onChange={(e) => setInvitePhone(e.target.value)}
+                    placeholder="(403) 555-0100"
+                    style={{ marginBottom: 0 }}
+                  />
+                </div>
+                <Btn
+                  size="md"
+                  variant="outline"
+                  disabled={sending !== null}
+                  onClick={() => void sendInvite('sms')}
+                  style={{
+                    height: 42,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0 16px',
+                  }}
+                >
+                  {sending === 'sms' ? 'Sending…' : 'Send SMS'}
+                </Btn>
+              </div>
             </div>
           )}
           <div style={{ fontSize: 11, color: G.muted }}>
@@ -700,7 +777,9 @@ export function DriversTab({
           <button
             onClick={() => {
               setGeneratedLink(null);
+              setGeneratedInviteId(null);
               setInvitePhone('');
+              setInviteEmail('');
             }}
             style={{
               background: 'transparent',
@@ -815,7 +894,7 @@ export function DriversTab({
                   <button
                     onClick={() => {
                       navigator.clipboard?.writeText(link);
-                      setGeneratedLink(link);
+                      showInviteLink(inv);
                     }}
                     style={{
                       background: 'transparent',
@@ -1085,14 +1164,14 @@ export function DriversTab({
             ))}
           </Sel>
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={save} style={{ opacity: busy ? 0.6 : 1 }}>
-              {busy
-                ? 'SAVING…'
-                : editDriver
-                  ? 'SAVE CHANGES'
-                  : 'CREATE DRIVER'}
+            <Btn
+              onClick={save}
+              loading={busy}
+              loadingLabel={editDriver ? 'Saving…' : 'Creating…'}
+            >
+              {editDriver ? 'SAVE CHANGES' : 'CREATE DRIVER'}
             </Btn>
-            <Btn variant="outline" onClick={resetForm}>
+            <Btn variant="outline" onClick={resetForm} disabled={busy}>
               CANCEL
             </Btn>
           </div>
@@ -1200,7 +1279,7 @@ export function DriversTab({
                   >
                     {active ? (
                       <Pill color={G.gold}>IN TRANSIT</Pill>
-                    ) : (
+                    ) : lifecycle === 'suspended' ? null : (
                       <AvailabilityBadge status={d.availabilityStatus} />
                     )}
                     <Pill
@@ -1336,9 +1415,18 @@ export function DriversTab({
                   }}
                 >
                   <div
-                    style={{ fontSize: 10, color: G.gold, letterSpacing: 1 }}
+                    style={{
+                      fontSize: 10,
+                      color: G.gold,
+                      letterSpacing: 1,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontWeight: 600,
+                    }}
                   >
-                    VIEW PROFILE →
+                    <span>VIEW PROFILE</span>
+                    {Icons.arrowRight({ size: 12, color: 'currentColor' })}
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {can('drivers.approve') &&
@@ -1393,6 +1481,41 @@ export function DriversTab({
                           }}
                         >
                           SUSPEND
+                        </button>
+                      )}
+                    {can('drivers.suspend') &&
+                      lifecycle === 'suspended' && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const recordId = d.driverRecordId;
+                            if (!recordId) return;
+                            const ok = await confirm({
+                              title: 'Unsuspend driver',
+                              message: `Reactivate ${d.name}? They will be able to log in and be assigned to dispatches.`,
+                              confirmLabel: 'Unsuspend',
+                            });
+                            if (!ok) return;
+                            try {
+                              await driversApi.unsuspend(recordId);
+                              await refreshAll?.();
+                              notify(`${d.name} unsuspended — now active`);
+                            } catch (err: any) {
+                              notify(err?.message || 'Unsuspend failed', 'error');
+                            }
+                          }}
+                          style={{
+                            background: G.success,
+                            border: 'none',
+                            color: '#fff',
+                            borderRadius: 7,
+                            padding: '6px 12px',
+                            fontSize: 11,
+                            cursor: 'pointer',
+                            fontWeight: 700,
+                          }}
+                        >
+                          UNSUSPEND
                         </button>
                       )}
                     <button
