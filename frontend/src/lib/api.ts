@@ -46,7 +46,7 @@ async function tryRefreshAccessToken(): Promise<boolean> {
   return refreshInFlight;
 }
 
-export async function api<T>(
+export async function api<T = any>(
   path: string,
   options: RequestInit & { skipAuthRefresh?: boolean } = {},
 ): Promise<T> {
@@ -853,9 +853,9 @@ export const driversApi = {
     api<any[]>(`/drivers?companyId=${encodeURIComponent(companyId)}`),
   get: (id: string) => api<any>(`/drivers/${id}`),
   create: (body: unknown) =>
-    api('/drivers', { method: 'POST', body: JSON.stringify(body) }),
+    api<any>('/drivers', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: unknown) =>
-    api(`/drivers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    api<any>(`/drivers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   remove: (id: string) => api(`/drivers/${id}`, { method: 'DELETE' }),
   dispatchReady: (id: string) =>
     api<{

@@ -33,7 +33,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     paps: !isACI,
     pars: isACI,
   });
-  const [f, setF] = useState({
+  const [initialF] = useState(() => ({
     crn:         editData?.crn         || genCRN(carrierCode, type),
     portCode:    editData?.portCode    || (isACI ? "0407" : "3505"),
     eta:         editData?.eta         || "",
@@ -51,7 +51,13 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
     shipments:   editData?.shipments   || [emptyShipment()],
     notes:       editData?.notes       || "",
     tripLoadId:  editData?.tripLoadId  || "",
-  });
+  }));
+  const [f, setF] = useState(initialF);
+
+  const isDirty = useMemo(() => {
+    if (!editData) return true;
+    return JSON.stringify(f) !== JSON.stringify(initialF);
+  }, [editData, f, initialF]);
 
   useEffect(() => {
     if (!company?.id) {
@@ -279,14 +285,14 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn
             variant="outline"
-            disabled={saving}
+            disabled={saving || !isDirty}
             onClick={() => void save('draft')}
             style={{ fontSize: 11, padding: '8px 14px' }}
           >
             {saving ? 'SAVING…' : 'SAVE DRAFT'}
           </Btn>
           <Btn
-            disabled={saving}
+            disabled={saving || !isDirty}
             onClick={() => void save('submitted')}
             style={{
               fontSize: 11,
