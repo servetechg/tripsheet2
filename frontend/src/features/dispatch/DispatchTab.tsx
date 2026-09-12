@@ -82,6 +82,7 @@ export function DispatchTab({
   const confirm = useConfirm();
   const [show, setShow] = useState(false);
   const [editLoad, setEditLoad] = useState<any>(null);
+  const [initialF, setInitialF] = useState<any>(null);
   const [docErr, setDocErr] = useState('');
   const [fieldErr, setFieldErr] = useState<FormErrors>({});
   const [busy, setBusy] = useState(false);
@@ -247,13 +248,14 @@ export function DispatchTab({
   const resetForm = () => {
     setF(emptyForm);
     setEditLoad(null);
+    setInitialF(null);
     setShow(false);
     setDocErr('');
     setFieldErr({});
   };
   const openEdit = (l: any) => {
     const stops = Array.isArray(l.stops) ? l.stops : [];
-    setF({
+    const init = {
       driverId: l.driverId || '',
       truckId: l.truckId || '',
       trailerId: l.trailerId || '',
@@ -286,7 +288,9 @@ export function DispatchTab({
       miles: l.miles != null ? String(l.miles) : '',
       stop1: stops[0]?.location || stops[0] || '',
       stop2: stops[1]?.location || stops[1] || '',
-    });
+    };
+    setF(init);
+    setInitialF(init);
     setFieldErr({});
     setEditLoad(l);
     setShow(true);
@@ -1296,6 +1300,7 @@ export function DispatchTab({
               onClick={save}
               loading={busy}
               loadingLabel="Saving…"
+              disabled={busy || (Boolean(editLoad) && !(initialF && Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])))}
             >
               {editLoad ? 'Save Changes' : 'Assign Load'}
             </Btn>

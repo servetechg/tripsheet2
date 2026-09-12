@@ -169,6 +169,21 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             allUsers.map((u) => ({
               ...u,
               companyId: u.companyId ?? null,
+              driverRecordId:
+                (u as any).driverRecordId ||
+                (u as any).driverId ||
+                null,
+              active:
+                u.status !== 'suspended' &&
+                u.status !== 'archived' &&
+                (u as any).active !== false,
+              lifecycleStatus:
+                (u as any).lifecycleStatus ||
+                (u.status === 'suspended'
+                  ? 'suspended'
+                  : u.status === 'archived'
+                    ? 'archived'
+                    : 'active'),
             })),
           );
         } catch {

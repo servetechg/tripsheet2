@@ -7,7 +7,7 @@ import { DRIVER_DOC_TYPES, PAY_TYPES, DISPATCH_REQUIRED_DOCS, DOC_STATUS_COLOR }
 
 export function EmploymentContractModal({ driver, company, existingContract, onSave, onClose }: any) {
   const today = new Date().toLocaleDateString("en-CA");
-  const [f, setF] = useState({
+  const [initialF] = useState(() => ({
     startDate:     existingContract?.startDate     || today,
     payType:       existingContract?.payType       || "per_mile",
     payRate:       existingContract?.payRate       || "",
@@ -24,7 +24,11 @@ export function EmploymentContractModal({ driver, company, existingContract, onS
     notes:         existingContract?.notes         || "",
     signedByAdmin:  existingContract?.signedByAdmin  || false,
     signedByDriver: existingContract?.signedByDriver || false,
-  });
+  }));
+  const [f, setF] = useState(initialF);
+  const isDirty = existingContract
+    ? Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])
+    : !blank(f.payRate);
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   const pt = PAY_TYPES.find(p=>p.id===f.payType) || PAY_TYPES[0];
 
@@ -218,7 +222,7 @@ ${f.notes?`<h2>ADDITIONAL TERMS</h2><p style="font-size:9pt;line-height:1.8;colo
 
         {/* Footer */}
         <div style={{ padding:"14px 20px",borderTop:`1px solid ${G.border}`,display:"flex",gap:10,background:G.inset,flexShrink:0 }}>
-          <Btn onClick={save} style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+          <Btn onClick={save} disabled={!isDirty} style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}>
             {Icons.save({ size: 16, color: G.onGold })}
             SAVE CONTRACT
           </Btn>

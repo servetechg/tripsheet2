@@ -73,7 +73,7 @@ export function MessagesTab({
         entityType: 'message',
         entityId: f.toUserId || '',
       });
-      setF({ ...f, body: '' });
+      setF({ toUserId: '', body: '', threadType: 'driver' });
       notify('Message sent');
       await refresh();
     } catch (e: any) {
@@ -96,6 +96,8 @@ export function MessagesTab({
         body: c.body,
       });
       setC({ body: '' });
+      setLoadId('');
+      notify('Comment added');
       await refresh();
     } catch (e: any) {
       notify(e?.message || 'Comment failed', 'error');
@@ -115,6 +117,7 @@ export function MessagesTab({
         meta: { type: 'manual' },
       });
       notify('SMS queued');
+      setSmsTo('');
       setSmsBody('');
     } catch (e: any) {
       notify(e?.message || 'SMS failed', 'error');

@@ -681,6 +681,13 @@ export function DepartmentsPanel({
               <Btn
                 loading={busy}
                 loadingLabel="Saving…"
+                disabled={
+                  busy ||
+                  (editingDept
+                    ? deptName.trim() === (editingDept.name || '').trim() &&
+                      deptCode.trim() === (editingDept.code || '').trim()
+                    : !deptName.trim())
+                }
                 onClick={() => void handleSave()}
               >
                 {editingDept ? 'Save changes' : 'Add department'}

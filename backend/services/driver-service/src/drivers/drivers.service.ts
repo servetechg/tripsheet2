@@ -64,7 +64,7 @@ export class DriversService {
   }
 
   async findOne(id: string) {
-    const driver = await this.prisma.driver.findUnique({
+    let driver = await this.prisma.driver.findUnique({
       where: { id },
       include: {
         documents: true,
@@ -72,6 +72,18 @@ export class DriversService {
         qualifications: true,
       },
     });
+    if (!driver) {
+      driver = await this.prisma.driver.findFirst({
+        where: {
+          OR: [{ userId: id }, { email: id }],
+        },
+        include: {
+          documents: true,
+          contracts: true,
+          qualifications: true,
+        },
+      });
+    }
     if (!driver) {
       throw new NotFoundException(`Driver ${id} not found`);
     }
@@ -220,16 +232,24 @@ export class DriversService {
   }
 
   private async driverWithCompliance(id: string) {
-    const driver = await this.prisma.driver.findUnique({
+    let driver = await this.prisma.driver.findUnique({
       where: { id },
       include: { qualifications: true },
     });
+    if (!driver) {
+      driver = await this.prisma.driver.findFirst({
+        where: {
+          OR: [{ userId: id }, { email: id }],
+        },
+        include: { qualifications: true },
+      });
+    }
     if (!driver) {
       throw new NotFoundException(`Driver ${id} not found`);
     }
     // Same query path as GET /documents (tenant-safe)
     const documents = await this.documentsService.findAll({
-      driverId: id,
+      driverId: driver.id,
       companyId: driver.companyId,
     });
     return { ...driver, documents };
@@ -351,7 +371,7 @@ export class DriversService {
   ) {
     const existing = await this.ensureExists(id);
     const driver = await this.prisma.driver.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         lifecycleStatus: status,
         active: syncActiveFromLifecycle(status),
@@ -554,7 +574,14 @@ export class DriversService {
   }
 
   private async ensureExists(id: string) {
-    const driver = await this.prisma.driver.findUnique({ where: { id } });
+    let driver = await this.prisma.driver.findUnique({ where: { id } });
+    if (!driver) {
+      driver = await this.prisma.driver.findFirst({
+        where: {
+          OR: [{ userId: id }, { email: id }],
+        },
+      });
+    }
     if (!driver) {
       throw new NotFoundException(`Driver ${id} not found`);
     }

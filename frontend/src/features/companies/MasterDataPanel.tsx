@@ -137,12 +137,14 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [ioReport, setIoReport] = useState<any>(null);
   const [form, setForm] = useState<Record<string, string>>({ ...EMPTY_FORM });
+  const [initialForm, setInitialForm] = useState<Record<string, string> | null>(null);
   const csvFileId = useId();
   const csvTextId = useId();
 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM });
     setEditingId(null);
+    setInitialForm(null);
   };
 
   const startEdit = (r: any) => {
@@ -150,7 +152,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
     setDupHint('');
     setDups([]);
     setLastCreatedId('');
-    setForm({
+    const formVals = {
       ...EMPTY_FORM,
       name: r.name || '',
       mc: r.mc || '',
@@ -175,7 +177,9 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       brand: r.brand || '',
       kind: r.kind || 'expense_category',
       notes: r.notes || '',
-    });
+    };
+    setForm(formVals);
+    setInitialForm(formVals);
   };
 
   const load = async () => {
@@ -1094,7 +1098,17 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               onClick={() => void saveRecord()}
               loading={busy}
               loadingLabel={editingId ? 'Saving…' : 'Adding…'}
-              disabled={busy}
+              disabled={
+                busy ||
+                fetching ||
+                (Boolean(editingId) &&
+                  !(
+                    initialForm &&
+                    Object.keys(initialForm).some(
+                      (k) => (form[k] ?? '') !== (initialForm[k] ?? '')
+                    )
+                  ))
+              }
             >
               {editingId ? 'Save changes' : 'Add'}
             </Btn>
