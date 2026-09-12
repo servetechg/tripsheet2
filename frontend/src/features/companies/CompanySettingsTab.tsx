@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { G, RADIUS } from '@/lib/theme';
+import { G, RADIUS, FONT_MONO } from '@/lib/theme';
 import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
@@ -162,6 +162,7 @@ export function CompanySettingsTab({
   const [newDoc, setNewDoc] = useState({ name: '', type: 'policy', fileUrl: '' });
   const [newKeyName, setNewKeyName] = useState('Integration key');
   const [revealedKey, setRevealedKey] = useState('');
+  const [copiedKey, setCopiedKey] = useState(false);
   const [staff, setStaff] = useState<any[]>([]);
   const [pendingInvites, setPendingInvites] = useState<any[]>([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDto[]>([]);
@@ -466,10 +467,11 @@ export function CompanySettingsTab({
                     .saveBranch(cid, newBranch)
                     .then(() => {
                       setNewBranch({ name: '', address: '' });
+                      notify('Branch added successfully');
                       return reload();
                     })
                     .catch((err: any) =>
-                      notify(err?.message || 'Failed', 'error'),
+                      notify(err?.message || 'Failed to add branch', 'error'),
                     );
                 }}
               >
@@ -505,9 +507,12 @@ export function CompanySettingsTab({
                       onClick={() => {
                         void companiesApi
                           .deleteBranch(cid, b.id)
-                          .then(reload)
+                          .then(() => {
+                            notify('Branch deactivated');
+                            return reload();
+                          })
                           .catch((err: any) =>
-                            notify(err?.message || 'Failed', 'error'),
+                            notify(err?.message || 'Failed to deactivate branch', 'error'),
                           );
                       }}
                     >
@@ -718,6 +723,7 @@ export function CompanySettingsTab({
                   .createApiKey(cid, { name: newKeyName, scopes: ['read'] })
                   .then((res: any) => {
                     setRevealedKey(res.apiKey || '');
+                    setCopiedKey(false);
                     notify('API key created — copy it now');
                     return reload();
                   })
@@ -732,15 +738,67 @@ export function CompanySettingsTab({
           {revealedKey && (
             <div
               style={{
-                marginTop: 8,
-                padding: 8,
-                background: G.card2 || '#f5f5f5',
-                fontFamily: 'monospace',
-                fontSize: 12,
-                wordBreak: 'break-all',
+                marginTop: 10,
+                padding: '12px 14px',
+                background: G.goldBg,
+                border: `1px solid ${G.gold}55`,
+                borderRadius: RADIUS.md || 8,
               }}
             >
-              {revealedKey}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 8,
+                  marginBottom: 8,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div style={{ fontSize: 11, fontWeight: 700, color: G.gold }}>
+                  SECRET API KEY (Shown only once — copy and store safely)
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(revealedKey);
+                    setCopiedKey(true);
+                    notify('API key copied to clipboard');
+                    setTimeout(() => setCopiedKey(false), 3000);
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '5px 12px',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    borderRadius: 6,
+                    background: G.card,
+                    border: `1px solid ${copiedKey ? G.success : G.border}`,
+                    color: copiedKey ? G.success : G.text,
+                    cursor: 'pointer',
+                    transition: 'all .15s',
+                  }}
+                >
+                  {copiedKey ? '✓ Copied!' : '📋 Copy Secret'}
+                </button>
+              </div>
+              <div
+                style={{
+                  fontFamily: FONT_MONO,
+                  fontSize: 12,
+                  wordBreak: 'break-all',
+                  background: G.card,
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  border: `1px solid ${G.border}`,
+                  userSelect: 'all',
+                  color: G.text,
+                }}
+              >
+                {revealedKey}
+              </div>
             </div>
           )}
           {keys.map((k) => (
@@ -767,9 +825,12 @@ export function CompanySettingsTab({
                   onClick={() => {
                     void companiesApi
                       .revokeApiKey(cid, k.id)
-                      .then(reload)
+                      .then(() => {
+                        notify('API key revoked');
+                        return reload();
+                      })
                       .catch((err: any) =>
-                        notify(err?.message || 'Failed', 'error'),
+                        notify(err?.message || 'Failed to revoke key', 'error'),
                       );
                   }}
                 >

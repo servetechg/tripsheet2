@@ -34,7 +34,7 @@ export function buildTenantUrl(admin: PgAdminConn, dbName: string): string {
 }
 
 export function quoteIdent(name: string): string {
-  if (!/^[a-zA-Z0-9_]+$/.test(name)) {
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
     throw new Error(`Invalid identifier: ${name}`);
   }
   return `"${name}"`;

@@ -166,7 +166,7 @@ export function ComplianceTab({
       setBusy(true);
       await notificationsApi.sendSms({
         to: String(adminPhone),
-        body: `${company.shortName || 'TripSheet'}: ${assetAlerts.length} asset + ${docAlerts.length} doc expiries by ${cutoff} (today ${today}).`,
+        body: `${company.shortName || 'FleetQuix'}: ${assetAlerts.length} asset + ${docAlerts.length} doc expiries by ${cutoff} (today ${today}).`,
         companyId: company.id,
         meta: { type: 'expiry_reminder' },
       });

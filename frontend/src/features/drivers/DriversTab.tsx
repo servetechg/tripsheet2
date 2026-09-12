@@ -432,8 +432,11 @@ export function DriversTab({
         ]);
       }
       resetForm();
+      notify(editDriver ? 'Driver profile updated' : 'Driver created successfully');
     } catch (e: any) {
-      setErr(e?.message || 'Failed to save driver');
+      const msg = e?.message || 'Failed to save driver';
+      setErr(msg);
+      notify(msg, 'error');
     } finally {
       setBusy(false);
     }
