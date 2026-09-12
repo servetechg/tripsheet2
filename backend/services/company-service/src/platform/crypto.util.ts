@@ -37,17 +37,20 @@ export function decryptSecret(
   return Buffer.concat([decipher.update(data), decipher.final()]).toString('utf8');
 }
 
-/** Normalize shortName → tenant slug (a-z0-9) */
-export function toTenantSlug(shortName: string): string {
-  const slug = shortName
+/** Normalize shortName or slug → URL-compliant kebab-case tenant slug (a-z0-9-) */
+export function toTenantSlug(raw: string): string {
+  const slug = raw
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '')
+    .replace(/[^a-z0-9\s-_]+/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 32);
   if (!slug) throw new Error('Invalid tenant slug');
   return slug;
 }
 
 export function tenantDbName(slug: string): string {
-  return `fq_tenant_${slug}`;
+  return `fq_tenant_${slug.replace(/-/g, '_')}`;
 }

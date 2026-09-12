@@ -1,7 +1,7 @@
 import type { CSSProperties, ImgHTMLAttributes } from 'react';
 
 export const BRAND = {
-  name: 'Fleetquix',
+  name: 'FleetQuix',
   logo: '/images/logo.png',
   favicon: '/images/favicon.png',
 } as const;

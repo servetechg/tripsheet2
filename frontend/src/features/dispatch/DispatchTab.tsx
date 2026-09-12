@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { G, FONT_MONO, RADIUS } from '@/lib/theme';
+import { G, FONT_MONO, RADIUS, labelBase } from '@/lib/theme';
 import {
   Btn,
   Card,
@@ -530,7 +530,7 @@ export function DispatchTab({
             try {
               await notificationsApi.sendSms({
                 to: String(driver.phone),
-                body: `${company.shortName || 'TripSheet'}: new load ${body.origin} → ${body.destination}`,
+                body: `${company.shortName || 'FleetQuix'}: new load ${body.origin} → ${body.destination}`,
                 companyId: company.id,
                 meta: { type: 'load_assigned', driverId: body.driverId },
               });
@@ -722,212 +722,158 @@ export function DispatchTab({
           <SectionTitle>{editLoad ? 'Edit Load' : 'Assign New Load'}</SectionTitle>
           <Err msg={docErr} />
 
-          <div style={{ marginBottom: 14 }}>
-            <label
-              style={{
-                display: 'block',
-                fontSize: 10,
-                letterSpacing: 2,
-                color: G.muted,
-                marginBottom: 8,
-                textTransform: 'uppercase',
-                fontWeight: 600,
-              }}
-            >
-              Driver *
-            </label>
-            {fieldErr.driverId && (
-              <div style={{ fontSize: 11, color: G.danger, marginBottom: 8 }}>
-                {fieldErr.driverId}
+          <G2 cols={2}>
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 6,
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
+                <label style={labelBase()}>Driver *</label>
+                <Chk
+                  checked={showAllDrivers}
+                  onChange={(e) => setShowAllDrivers(e.target.checked)}
+                  label="Show all"
+                  muted
+                  style={{ marginBottom: 0 }}
+                />
               </div>
-            )}
-            <Chk
-              checked={showAllDrivers}
-              onChange={(e) => setShowAllDrivers(e.target.checked)}
-              label="Show all drivers (default: available + active only)"
-              muted
-              style={{ marginBottom: 10 }}
-            />
-            <div
-              role="radiogroup"
-              aria-label="Select driver"
-              style={{ display: 'flex', flexDirection: 'column', gap: 6 }}
-            >
-              {visibleDrivers.length === 0 && (
-                <div style={{ fontSize: 11, color: G.muted, padding: 10 }}>
-                  No drivers match filter. Enable &quot;Show all drivers&quot; to see everyone.
+              {fieldErr.driverId && (
+                <div style={{ fontSize: 11, color: G.danger, marginBottom: 6 }}>
+                  {fieldErr.driverId}
                 </div>
               )}
-              {visibleDrivers.map((d: any) => {
-                const missing = checkDriverDocs(d.id);
-                const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
-                const avail = d.availabilityStatus || 'available';
-                const driverActive = lifecycleAllowsDispatch(lifecycle);
-                const availOk = availabilityAllowsDispatch(avail);
-                const canDispatch = missing.length === 0 && driverActive && availOk;
-                const onLoad = loads.find(
-                  (l: any) =>
-                    l.driverId === d.id &&
-                    ['assigned', 'in_transit'].includes(l.status),
-                );
-                const selected = f.driverId === d.id;
-                const selectable = canDispatch && !onLoad;
-                return (
+              <Sel
+                value={f.driverId}
+                onChange={(e: any) => upd('driverId', e.target.value)}
+                style={{ marginBottom: 0 }}
+              >
+                <option value="">— Select driver —</option>
+                {visibleDrivers.map((d: any) => {
+                  const missing = checkDriverDocs(d.id);
+                  const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+                  const avail = d.availabilityStatus || 'available';
+                  const driverActive = lifecycleAllowsDispatch(lifecycle);
+                  const availOk = availabilityAllowsDispatch(avail);
+                  const canDispatch = missing.length === 0 && driverActive && availOk;
+                  const onLoad = loads.find(
+                    (l: any) =>
+                      l.driverId === d.id &&
+                      ['assigned', 'in_transit'].includes(l.status),
+                  );
+                  const statusSuffix = !canDispatch
+                    ? !driverActive
+                      ? ` (⚠ ${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle})`
+                      : !availOk
+                        ? ` (⚠ ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail})`
+                        : ' (⚠ Missing docs)'
+                    : onLoad
+                      ? ' (⏳ On active load)'
+                      : ' (✓ Ready)';
+                  return (
+                    <option key={d.id} value={d.id}>
+                      {d.name}{statusSuffix}
+                    </option>
+                  );
+                })}
+              </Sel>
+            </div>
+            <div>
+              <FieldInp
+                label="Trip No."
+                value={f.tripNo}
+                onChange={(e: any) =>
+                  upd(
+                    'tripNo',
+                    e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
+                  )
+                }
+                placeholder="e.g. 34320"
+                maxLength={32}
+                error={fieldErr.tripNo}
+                hint="Letters, numbers, - _ /"
+                style={{ marginBottom: 0 }}
+              />
+            </div>
+          </G2>
+
+          {(() => {
+            const selectedDriver = drivers.find((d: any) => d.id === f.driverId);
+            if (!selectedDriver) return null;
+            const missing = checkDriverDocs(selectedDriver.id);
+            const lifecycle = selectedDriver.lifecycleStatus || (selectedDriver.active === false ? 'suspended' : 'active');
+            const avail = selectedDriver.availabilityStatus || 'available';
+            const driverActive = lifecycleAllowsDispatch(lifecycle);
+            const availOk = availabilityAllowsDispatch(avail);
+            const canDispatch = missing.length === 0 && driverActive && availOk;
+            const onLoad = loads.find(
+              (l: any) =>
+                l.driverId === selectedDriver.id &&
+                ['assigned', 'in_transit'].includes(l.status),
+            );
+            const isReady = canDispatch && !onLoad;
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  marginBottom: 14,
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  background: isReady ? `${G.success}15` : `${G.danger}15`,
+                  border: `1px solid ${isReady ? G.success + '40' : G.danger + '40'}`,
+                  fontSize: 12,
+                }}
+              >
+                <span style={{ fontSize: 16, lineHeight: 1, marginTop: 1 }}>
+                  {isReady ? '✓' : '⚠'}
+                </span>
+                <div style={{ flex: 1 }}>
                   <div
-                    key={d.id}
-                    role="radio"
-                    aria-checked={selected}
-                    aria-disabled={!selectable}
-                    className="ts-driver-pick"
-                    data-selectable={selectable ? 'true' : 'false'}
-                    onClick={() => {
-                      if (selectable) upd('driverId', d.id);
-                    }}
-                    title={
-                      !canDispatch
-                        ? !driverActive
-                          ? `Driver is ${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle}`
-                          : !availOk
-                            ? `Driver is ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail}`
-                            : 'Missing required documents'
-                        : undefined
-                    }
                     style={{
+                      fontWeight: 600,
+                      color: isReady ? G.success : G.danger,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 12,
-                      background: selected
-                        ? G.goldBg
-                        : canDispatch
-                          ? G.card2
-                          : G.dangerBg,
-                      border: `1px solid ${
-                        selected
-                          ? G.gold
-                          : canDispatch
-                            ? G.border2
-                            : G.danger + '33'
-                      }`,
-                      borderRadius: 9,
-                      padding: '10px 14px',
-                      cursor: selectable ? 'pointer' : 'not-allowed',
-                      opacity: onLoad ? 0.5 : 1,
-                      transition: 'all .15s',
+                      gap: 6,
                     }}
                   >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 18,
-                        height: 18,
-                        borderRadius: RADIUS.pill,
-                        border: `2px solid ${
-                          selected
-                            ? G.gold
-                            : selectable
-                              ? G.border2
-                              : G.border
-                        }`,
-                        background: selected ? G.gold : G.card,
-                        flexShrink: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: selected
-                          ? 'none'
-                          : selectable
-                            ? `0 0 0 1px ${G.border} inset`
-                            : 'none',
-                      }}
-                    >
-                      {selected && (
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: RADIUS.pill,
-                            background: G.onGold,
-                          }}
-                        />
-                      )}
-                    </span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: canDispatch ? G.text : G.danger,
-                        }}
-                      >
-                        {d.name}
-                      </div>
-                      {!canDispatch && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: G.danger,
-                            marginTop: 2,
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          {Icons.alert({ size: 12, color: G.danger })}
-                          {!driverActive
-                            ? `${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle} — cannot assign`
-                            : !availOk
-                              ? `${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail} — cannot assign`
-                              : `Missing: ${missing
-                                .map(
-                                  (id: string) =>
-                                    DRIVER_DOC_TYPES.find((x) => x.id === id)
-                                      ?.label || id,
-                                )
-                                .join(', ')}`}
-                        </div>
-                      )}
-                      {canDispatch && onLoad && (
-                        <div
-                          style={{ fontSize: 10, color: G.gold, marginTop: 2 }}
-                        >
-                          Already on active load {onLoad.id}
-                        </div>
-                      )}
-                      {canDispatch && !onLoad && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: G.success,
-                            marginTop: 2,
-                          }}
-                        >
-                          ✓ Ready to dispatch
-                        </div>
-                      )}
-                    </div>
+                    {isReady
+                      ? 'Ready for dispatch'
+                      : !driverActive
+                        ? `Driver is ${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle} — Cannot assign`
+                        : !availOk
+                          ? `Driver is ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail} — Cannot assign`
+                          : onLoad
+                            ? `Already assigned to active load ${onLoad.id}`
+                            : `Missing required documents`}
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <G2 cols={2}>
-            <FieldInp
-              label="Trip No."
-              value={f.tripNo}
-              onChange={(e: any) =>
-                upd(
-                  'tripNo',
-                  e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
-                )
-              }
-              placeholder="e.g. 34320"
-              maxLength={32}
-              error={fieldErr.tripNo}
-              hint="Letters, numbers, - _ /"
-            />
-            <div />
-          </G2>
+                  {!isReady && missing.length > 0 && (
+                    <div style={{ fontSize: 11, color: G.danger, marginTop: 2 }}>
+                      Missing:{' '}
+                      {missing
+                        .map(
+                          (id: string) =>
+                            DRIVER_DOC_TYPES.find((x) => x.id === id)?.label || id,
+                        )
+                        .join(', ')}
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                    {selectedDriver.name}
+                    {selectedDriver.phone ? ` · ${selectedDriver.phone}` : ''}
+                    {selectedDriver.licenseNo ? ` · License: ${selectedDriver.licenseNo}` : ''}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           <G2 cols={2}>
             <Sel
               label="Broker"

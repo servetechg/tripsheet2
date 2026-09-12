@@ -19,9 +19,30 @@ const PLAN_FALLBACK = [
   { code: 'enterprise', name: 'Enterprise' },
 ];
 
+export function toKebabSlug(str: string): string {
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-_]+/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+}
+
+export function formatSlugInput(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-_]+/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .slice(0, 32);
+}
+
 const INITIAL_COMPANY_FORM = {
   name: '',
   shortName: '',
+  slug: '',
   tagline: '',
   address: '',
   planCode: 'starter',
@@ -109,11 +130,28 @@ export function SuperAdminPanel({
   const [err, setErr] = useState('');
   const [plans, setPlans] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [f, setF] = useState(INITIAL_COMPANY_FORM);
   const upd = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
 
+  const handleNameChange = (val: string) => {
+    setF((prev) => {
+      const next = { ...prev, name: val };
+      if (!slugManuallyEdited) {
+        next.slug = toKebabSlug(val);
+      }
+      return next;
+    });
+  };
+
+  const handleSlugChange = (val: string) => {
+    setSlugManuallyEdited(true);
+    setF((prev) => ({ ...prev, slug: formatSlugInput(val) }));
+  };
+
   const resetForm = () => {
     setF(INITIAL_COMPANY_FORM);
+    setSlugManuallyEdited(false);
     setErr('');
   };
 
@@ -136,8 +174,9 @@ export function SuperAdminPanel({
   }, [apiEnabled]);
 
   const create = async () => {
-    if (blank(f.name) || blank(f.shortName)) {
-      setErr('Company name and short name required.');
+    const derivedSlug = toKebabSlug(f.slug || f.shortName || f.name);
+    if (blank(f.name) || blank(derivedSlug)) {
+      setErr('Company name and slug required.');
       return;
     }
     if (blank(f.adminName) || blank(f.adminEmail) || blank(f.adminPassword)) {
@@ -159,10 +198,12 @@ export function SuperAdminPanel({
 
     try {
       setBusy(true);
+      const shortCode = (f.shortName || derivedSlug.slice(0, 6)).trim().toUpperCase();
       if (apiEnabled) {
         const company = (await companiesApi.create({
           name: f.name.trim(),
-          shortName: f.shortName.trim().toUpperCase(),
+          shortName: shortCode,
+          slug: derivedSlug,
           tagline: f.tagline.trim(),
           address: f.address.trim(),
           planCode: f.planCode || 'starter',
@@ -181,13 +222,13 @@ export function SuperAdminPanel({
         );
       } else {
         const cid = uid();
-        const slug = f.shortName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        const slug = derivedSlug;
         setCompanies((p: any[]) => [
           ...p,
           {
             id: cid,
             name: f.name.trim(),
-            shortName: f.shortName.trim().toUpperCase(),
+            shortName: shortCode,
             slug,
             tagline: f.tagline.trim(),
             address: f.address.trim(),
@@ -195,7 +236,7 @@ export function SuperAdminPanel({
             status: 'active',
             plan: { code: f.planCode },
             tenantDatabase: {
-              dbName: `fq_tenant_${slug}`,
+              dbName: `fq_tenant_${slug.replace(/-/g, '_')}`,
               status: 'pending_provision',
             },
           },
@@ -245,7 +286,7 @@ export function SuperAdminPanel({
 
   return (
     <AppShell
-      logo="TS"
+      logo="FQ"
       subtitle="Super Admin"
       tabs={TABS}
       activeTab={currentTab}
@@ -334,16 +375,23 @@ export function SuperAdminPanel({
           <SectionTitle>Create Company + Admin Account</SectionTitle>
           <Err msg={err} />
           <Divider label="Company Details" />
-          <G2 cols={2}>
+          <G2 cols={3}>
             <Inp
               label="Company Full Name *"
               value={f.name}
-              onChange={(e) => upd('name', e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g. Denali Transport Inc."
+            />
+            <Inp
+              label="Slug (URL identifier) *"
+              value={f.slug}
+              onChange={(e) => handleSlugChange(e.target.value)}
+              placeholder="e.g. denali-transport"
+              hint="Auto-formatted into URL-safe kebab-case"
             />
             <div>
               <Inp
-                label="Short Name (on trip sheet) *"
+                label="Short Name (trip sheet)"
                 value={f.shortName}
                 onChange={(e) =>
                   upd('shortName', e.target.value.toUpperCase().slice(0, 6))
@@ -392,7 +440,7 @@ export function SuperAdminPanel({
             Tenant DB name will be{' '}
             <code>
               fq_tenant_
-              {(f.shortName || '…').toLowerCase().replace(/[^a-z0-9]/g, '') || '…'}
+              {toKebabSlug(f.slug || f.shortName || f.name).replace(/-/g, '_') || '…'}
             </code>{' '}
             (created automatically on save).
           </div>

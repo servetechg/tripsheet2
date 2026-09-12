@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
+import { notify } from '@/components/feedback/Toast';
 
 export function DocUploadModal({ docType, onUpload, onClose }: any) {
-  const [expiry,   setExpiry]   = useState("");
-  const [notes,    setNotes]    = useState("");
-  const [preview,  setPreview]  = useState<any>(null);
+  const [expiry, setExpiry] = useState("");
+  const [notes, setNotes] = useState("");
+  const [preview, setPreview] = useState<any>(null);
   const [fileInfo, setFileInfo] = useState<any>(null);
   const [dragging, setDragging] = useState(false);
-  const [err,      setErr]      = useState("");
+  const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<any>(null);
 
@@ -18,7 +19,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
       setErr('File too large. Max 2MB per document.');
       return;
     }
-    const ok = ["application/pdf","image/jpeg","image/png","image/webp"];
+    const ok = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
     if (!ok.includes(file.type)) { setErr("Only PDF, JPG, PNG or WEBP accepted."); return; }
     setErr("");
     const reader = new FileReader();
@@ -46,8 +47,11 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
       await Promise.resolve(
         onUpload(docType.id, { ...fileInfo, expiry, notes }),
       );
+      notify(`${docType?.label || fileInfo.name || 'Document'} uploaded successfully`);
     } catch (e: any) {
-      setErr(e?.message || 'Upload failed.');
+      const msg = e?.message || 'Upload failed.';
+      setErr(msg);
+      notify(msg, 'error');
     } finally {
       setUploading(false);
     }
@@ -94,7 +98,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
           overflow: 'visible',
         }}
       >
-        <div style={{ display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
             <div
               style={{
@@ -109,7 +113,7 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
               {Icons.docs({ size: 16, color: G.text })}
               {docType.label}
             </div>
-            <div style={{ fontSize:11,color:G.muted,marginTop:2 }}>Select file from your device</div>
+            <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>Select file from your device</div>
           </div>
           <button
             type="button"
@@ -142,12 +146,12 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
           </button>
         </div>
 
-        {err && <div style={{ background:G.errTint,border:`1px solid ${G.danger}44`,borderRadius:8,padding:"10px 14px",fontSize:12,color:G.errText,marginBottom:12 }}>{err}</div>}
+        {err && <div style={{ background: G.errTint, border: `1px solid ${G.danger}44`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: G.errText, marginBottom: 12 }}>{err}</div>}
 
         <div
-          onDragOver={e=>{ e.preventDefault(); setDragging(true); }}
-          onDragLeave={()=>setDragging(false)}
-          onDrop={e=>{ e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
+          onDragOver={e => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]); }}
           style={{
             border: `2px dashed ${dropZoneBorder}`,
             borderRadius: RADIUS.lg,
@@ -167,20 +171,20 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
           {fileInfo ? (
             <>
               {fileInfo.fileType.startsWith("image/")
-                ? <img src={fileInfo.data} alt="preview" style={{ maxWidth:"100%",maxHeight:180,borderRadius:8,objectFit:"contain" }} />
+                ? <img src={fileInfo.data} alt="preview" style={{ maxWidth: "100%", maxHeight: 180, borderRadius: 8, objectFit: "contain" }} />
                 : <div>{Icons.docs({ size: 48, color: G.muted })}</div>}
-              <div style={{ fontSize:12,color:G.success,fontWeight:700 }}>✓ {fileInfo.name}</div>
+              <div style={{ fontSize: 12, color: G.success, fontWeight: 700 }}>✓ {fileInfo.name}</div>
               <div style={{ fontSize: 11, color: G.muted }}>
                 {fileInfo.displaySize ||
                   `${(Number(fileInfo.size) / 1024).toFixed(1)} KB`}
               </div>
-              <button onClick={()=>fileRef.current?.click()} style={{ background:"transparent",border:`1px solid ${G.muted}`,color:G.muted,borderRadius:6,padding:"5px 12px",fontSize:11,cursor:"pointer",marginTop:4 }}>Change file</button>
+              <button onClick={() => fileRef.current?.click()} style={{ background: "transparent", border: `1px solid ${G.muted}`, color: G.muted, borderRadius: 6, padding: "5px 12px", fontSize: 11, cursor: "pointer", marginTop: 4 }}>Change file</button>
             </>
           ) : (
             <>
               <div>{Icons.upload({ size: 36, color: G.muted })}</div>
-              <div style={{ fontSize:13,color:G.muted }}>Drag & drop here, or</div>
-              <button onClick={()=>fileRef.current?.click()} style={{ background:G.gold,color:G.onGold,border:"none",borderRadius:8,padding:"10px 24px",fontSize:13,fontWeight:800,cursor:"pointer",letterSpacing:1, display:'inline-flex', alignItems:'center', gap:6 }}>
+              <div style={{ fontSize: 13, color: G.muted }}>Drag & drop here, or</div>
+              <button onClick={() => fileRef.current?.click()} style={{ background: G.gold, color: G.onGold, border: "none", borderRadius: 8, padding: "10px 24px", fontSize: 13, fontWeight: 800, cursor: "pointer", letterSpacing: 1, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 {Icons.upload({ size: 16, color: G.onGold })}
                 BROWSE FILES
               </button>
@@ -192,21 +196,21 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
         </div>
 
         <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp"
-          style={{ position:"absolute",width:1,height:1,opacity:0,pointerEvents:"none" }}
-          onChange={e=>{ const file = e.target.files?.[0]; if(file) handleFile(file); e.target.value=""; }}
+          style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
+          onChange={e => { const file = e.target.files?.[0]; if (file) handleFile(file); e.target.value = ""; }}
         />
 
-        <Inp label="Expiry Date (if applicable)" value={expiry} onChange={e=>setExpiry(e.target.value)} type="date" />
-        <Inp label="Notes (optional)" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="e.g. Renewed Mar 2026, verified original" />
+        <Inp label="Expiry Date (if applicable)" value={expiry} onChange={e => setExpiry(e.target.value)} type="date" />
+        <Inp label="Notes (optional)" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. Renewed Mar 2026, verified original" />
 
-        <div style={{ display:"flex",gap:10 }}>
+        <div style={{ display: "flex", gap: 10 }}>
           <Btn
             full
             onClick={() => void submit()}
             loading={uploading}
             loadingLabel="Uploading…"
             disabled={!fileInfo}
-            style={{ padding:14, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
+            style={{ padding: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           >
             {Icons.upload({ size: 16, color: G.onGold })}
             UPLOAD DOCUMENT
