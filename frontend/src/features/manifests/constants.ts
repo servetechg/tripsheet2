@@ -26,16 +26,14 @@ export const CA_PORTS = [
 ];
 
 export const US_PORTS = [
+  { code: '0712', name: 'Champlain, NY' },
+  { code: '0901', name: 'Buffalo, NY' },
+  { code: '3301', name: 'Portal, ND' },
   { code: '3401', name: 'Blaine, WA' },
   { code: '3404', name: 'Sumas, WA' },
   { code: '3505', name: 'Sweetgrass, MT' },
-  { code: '3301', name: 'Portal, ND' },
   { code: '3601', name: 'Pembina, ND' },
   { code: '3801', name: 'Noyes, MN' },
   { code: '3901', name: 'Port Huron, MI' },
   { code: '3902', name: 'Detroit, MI' },
-  { code: '0901', name: 'Buffalo, NY' },
-  { code: '0712', name: 'Champlain, NY' },
-  { code: '2304', name: 'Laredo, TX' },
-  { code: '2506', name: 'Otay Mesa, CA' },
 ];

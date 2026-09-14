@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO } from '@/lib/theme';
-import { Btn, BackButton, Inp, Sel, Icons } from '@/components/ui';
+import { Btn, BackButton, Inp, Sel, Icons, AddressAutocomplete } from '@/components/ui';
 import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
@@ -75,9 +75,12 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
       })
       .then((list) => {
         if (Array.isArray(list) && list.length) {
-          setPorts(list);
+          const sorted = [...list].sort((a: any, b: any) =>
+            (a.code || '').localeCompare(b.code || ''),
+          );
+          setPorts(sorted);
           const match =
-            list.find((p: any) => p.code === f.portCode) || list[0];
+            sorted.find((p: any) => p.code === f.portCode) || sorted[0];
           if (match) {
             setPortCaps({ paps: Boolean(match.paps), pars: Boolean(match.pars) });
           }
@@ -526,7 +529,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:12 }}>
             <Inp label="Date of Birth" value={f.driverDOB} onChange={e=>upd("driverDOB",e.target.value)} placeholder="YYYY-MM-DD" type="date" />
             <Sel label="Citizenship" value={f.driverCitizenship} onChange={e=>upd("driverCitizenship",e.target.value)}>
-              {["CA","US","IN","MX","Other"].map(c=><option key={c}>{c}</option>)}
+              {["CA","US"].map(c=><option key={c}>{c}</option>)}
             </Sel>
             <Inp label="Passport / PR / FAST Card #" value={f.driverPassport} onChange={e=>upd("driverPassport",e.target.value)} placeholder="Doc number" />
           </div>
@@ -586,27 +589,96 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
                 </Sel>
               </div>
               {/* Shipper */}
-              <div style={{ fontSize:9, letterSpacing:2, color:G.muted, marginBottom:8, paddingBottom:6, borderBottom:`1px solid ${G.border}` }}>SHIPPER (ORIGIN)</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.muted, marginBottom:10, paddingBottom:6, borderBottom:`1px solid ${G.border}`, fontWeight:700 }}>SHIPPER (ORIGIN)</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:10 }}>
                 <Inp label="Shipper Name *" value={s.shipperName} onChange={e=>updShip(s.id,"shipperName",e.target.value)} placeholder="Company name" />
-                <Inp label="Shipper Address" value={s.shipperAddress} onChange={e=>updShip(s.id,"shipperAddress",e.target.value)} placeholder="Street address" />
+                <AddressAutocomplete
+                  label="Shipper Address"
+                  value={s.shipperAddress}
+                  onChange={val => updShip(s.id, "shipperAddress", val)}
+                  onSelectAddress={addr => {
+                    const streetLine = addr.address_line1 || (addr.street ? `${addr.housenumber ? addr.housenumber + ' ' : ''}${addr.street}` : addr.formatted);
+                    updShip(s.id, "shipperAddress", streetLine);
+                    if (addr.city || addr.state_code) {
+                      const cityState = [addr.city, addr.state_code].filter(Boolean).join(', ');
+                      updShip(s.id, "shipperCity", cityState);
+                    }
+                    if (addr.country_code) {
+                      const cc = addr.country_code.toUpperCase();
+                      if (cc === 'US' || cc === 'CA') {
+                        updShip(s.id, "shipperCountry", cc);
+                      }
+                    }
+                  }}
+                  placeholder="Street address (or type city/state below)"
+                />
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <Inp label="Shipper City / State" value={s.shipperCity} onChange={e=>updShip(s.id,"shipperCity",e.target.value)} placeholder="e.g. Detroit, MI" />
+                <AddressAutocomplete
+                  label="Shipper City / State"
+                  value={s.shipperCity}
+                  onChange={val => updShip(s.id, "shipperCity", val)}
+                  onSelectAddress={addr => {
+                    const cityState = [addr.city, addr.state_code].filter(Boolean).join(', ') || addr.formatted;
+                    updShip(s.id, "shipperCity", cityState);
+                    if (addr.country_code) {
+                      const cc = addr.country_code.toUpperCase();
+                      if (cc === 'US' || cc === 'CA') {
+                        updShip(s.id, "shipperCountry", cc);
+                      }
+                    }
+                  }}
+                  placeholder="Search city, state… e.g. Dallas, TX"
+                />
                 <Sel label="Shipper Country" value={s.shipperCountry} onChange={e=>updShip(s.id,"shipperCountry",e.target.value)}>
-                  <option value="US">United States</option><option value="CA">Canada</option><option value="MX">Mexico</option>
+                  <option value="US">United States</option><option value="CA">Canada</option>
                 </Sel>
               </div>
+
               {/* Consignee */}
-              <div style={{ fontSize:9, letterSpacing:2, color:G.muted, marginBottom:8, paddingBottom:6, borderBottom:`1px solid ${G.border}` }}>CONSIGNEE (DESTINATION)</div>
-              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
+              <div style={{ fontSize:9, letterSpacing:2, color:G.muted, marginTop:14, marginBottom:10, paddingBottom:6, borderBottom:`1px solid ${G.border}`, fontWeight:700 }}>CONSIGNEE (DESTINATION)</div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:10 }}>
                 <Inp label="Consignee Name *" value={s.consigneeName} onChange={e=>updShip(s.id,"consigneeName",e.target.value)} placeholder="Company name" />
-                <Inp label="Consignee Address" value={s.consigneeAddress} onChange={e=>updShip(s.id,"consigneeAddress",e.target.value)} placeholder="Street address" />
+                <AddressAutocomplete
+                  label="Consignee Address"
+                  value={s.consigneeAddress}
+                  onChange={val => updShip(s.id, "consigneeAddress", val)}
+                  onSelectAddress={addr => {
+                    const streetLine = addr.address_line1 || (addr.street ? `${addr.housenumber ? addr.housenumber + ' ' : ''}${addr.street}` : addr.formatted);
+                    updShip(s.id, "consigneeAddress", streetLine);
+                    if (addr.city || addr.state_code) {
+                      const cityState = [addr.city, addr.state_code].filter(Boolean).join(', ');
+                      updShip(s.id, "consigneeCity", cityState);
+                    }
+                    if (addr.country_code) {
+                      const cc = addr.country_code.toUpperCase();
+                      if (cc === 'US' || cc === 'CA') {
+                        updShip(s.id, "consigneeCountry", cc);
+                      }
+                    }
+                  }}
+                  placeholder="Street address (or type city/state below)"
+                />
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12 }}>
-                <Inp label="Consignee City / Province" value={s.consigneeCity} onChange={e=>updShip(s.id,"consigneeCity",e.target.value)} placeholder={isACI?"e.g. Calgary, AB":"e.g. Detroit, MI"} />
+                <AddressAutocomplete
+                  label="Consignee City / Province"
+                  value={s.consigneeCity}
+                  onChange={val => updShip(s.id, "consigneeCity", val)}
+                  onSelectAddress={addr => {
+                    const cityState = [addr.city, addr.state_code].filter(Boolean).join(', ') || addr.formatted;
+                    updShip(s.id, "consigneeCity", cityState);
+                    if (addr.country_code) {
+                      const cc = addr.country_code.toUpperCase();
+                      if (cc === 'US' || cc === 'CA') {
+                        updShip(s.id, "consigneeCountry", cc);
+                      }
+                    }
+                  }}
+                  placeholder={isACI ? "Search city, province… e.g. Calgary, AB" : "Search city, state… e.g. Detroit, MI"}
+                />
                 <Sel label="Consignee Country" value={s.consigneeCountry} onChange={e=>updShip(s.id,"consigneeCountry",e.target.value)}>
-                  <option value="CA">Canada</option><option value="US">United States</option><option value="MX">Mexico</option>
+                  <option value="CA">Canada</option><option value="US">United States</option>
                 </Sel>
               </div>
             </div>

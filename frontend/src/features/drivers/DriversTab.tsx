@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons, Modal } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, G2, StatCard, StatsGrid, Icons, Modal, AddressAutocomplete } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
@@ -1219,7 +1219,7 @@ export function DriversTab({
               setF((x) => ({ ...x, citizenship: e.target.value }))
             }
           >
-            {['CA', 'US', 'IN', 'MX', 'Other'].map((c) => (
+            {['CA', 'US'].map((c) => (
               <option key={c}>{c}</option>
             ))}
           </Sel>
@@ -1242,13 +1242,13 @@ export function DriversTab({
             placeholder="Optional"
           />
         </G2>
-        <Inp
+        <AddressAutocomplete
           label="Home Address"
           value={f.address}
-          onChange={(e: any) =>
-            setF((x) => ({ ...x, address: e.target.value }))
+          onChange={(val) =>
+            setF((x) => ({ ...x, address: val }))
           }
-          placeholder="Full address"
+          placeholder="Full address (US & Canada)"
         />
         <div
           style={{

@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { G, FONT_MONO, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons } from '@/components/ui';
-import { Modal } from '@/components/ui/Modal';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons, AddressAutocomplete, Modal } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank } from '@/lib/format';
@@ -511,10 +510,10 @@ export function SuperAdminPanel({
               value={f.tagline}
               onChange={(e) => upd('tagline', e.target.value)}
             />
-            <Inp
+            <AddressAutocomplete
               label="Address"
               value={f.address}
-              onChange={(e) => upd('address', e.target.value)}
+              onChange={(val) => upd('address', val)}
             />
           </G2>
           <Sel
@@ -622,10 +621,10 @@ export function SuperAdminPanel({
             value={editForm.tagline}
             onChange={(e) => updEdit('tagline', e.target.value)}
           />
-          <Inp
+          <AddressAutocomplete
             label="Address"
             value={editForm.address}
-            onChange={(e) => updEdit('address', e.target.value)}
+            onChange={(val) => updEdit('address', val)}
           />
         </G2>
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
