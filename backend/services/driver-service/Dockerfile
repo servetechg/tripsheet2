@@ -15,6 +15,7 @@ RUN apk add --no-cache openssl
 WORKDIR /repo/backend/services/driver-service
 COPY --from=shared-builder /repo/shared ../../../shared
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../../shared/tenant-runtime
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/driver-service/package*.json ./
 COPY backend/services/driver-service/prisma ./prisma/
 RUN npm ci && npx prisma generate
@@ -27,6 +28,7 @@ WORKDIR /repo/backend/services/driver-service
 ENV NODE_ENV=production
 COPY --from=shared-builder /repo/shared ../../../shared
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../../shared/tenant-runtime
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/driver-service/package*.json ./
 COPY backend/services/driver-service/prisma ./prisma/
 RUN npm ci --omit=dev \

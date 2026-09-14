@@ -7,6 +7,7 @@ RUN cd backend/shared/tenant-runtime && npm ci && npm run build
 FROM node:20-alpine AS builder
 WORKDIR /repo/backend/gateway
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../shared/tenant-runtime
+COPY backend/shared/env-config ../shared/env-config
 COPY backend/gateway/package*.json ./
 RUN npm ci
 COPY backend/gateway ./
@@ -17,6 +18,7 @@ RUN apk add --no-cache wget
 WORKDIR /repo/backend/gateway
 ENV NODE_ENV=production
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../shared/tenant-runtime
+COPY backend/shared/env-config ../shared/env-config
 COPY backend/gateway/package*.json ./
 RUN npm ci --omit=dev
 COPY --from=builder /repo/backend/gateway/dist ./dist

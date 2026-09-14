@@ -1,6 +1,7 @@
 FROM node:20-alpine AS builder
 RUN apk add --no-cache python3 make g++ openssl
 WORKDIR /repo/backend/services/auth-service
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/auth-service/package*.json ./
 COPY backend/services/auth-service/prisma ./prisma/
 RUN npm ci
@@ -12,6 +13,7 @@ FROM node:20-alpine AS runner
 RUN apk add --no-cache openssl wget
 WORKDIR /repo/backend/services/auth-service
 ENV NODE_ENV=production
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/auth-service/package*.json ./
 COPY backend/services/auth-service/prisma ./prisma/
 RUN npm ci --omit=dev \

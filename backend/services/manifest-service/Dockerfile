@@ -8,6 +8,7 @@ FROM node:20-alpine AS builder
 RUN apk add --no-cache openssl
 WORKDIR /repo/backend/services/manifest-service
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../../shared/tenant-runtime
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/manifest-service/package*.json ./
 COPY backend/services/manifest-service/prisma ./prisma/
 RUN npm ci && npx prisma generate
@@ -19,6 +20,7 @@ RUN apk add --no-cache openssl wget
 WORKDIR /repo/backend/services/manifest-service
 ENV NODE_ENV=production
 COPY --from=tenant-runtime-builder /repo/backend/shared/tenant-runtime ../../shared/tenant-runtime
+COPY backend/shared/env-config ../../shared/env-config
 COPY backend/services/manifest-service/package*.json ./
 COPY backend/services/manifest-service/prisma ./prisma/
 RUN npm ci --omit=dev \
