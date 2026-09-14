@@ -181,16 +181,26 @@ export function DriversTab({
 
   const rosterDrivers = useMemo(() => {
     const byKey = new Map<string, any>();
+    const put = (d: any) => {
+      const email = String(d.email || '').toLowerCase();
+      for (const [k, row] of byKey) {
+        if (email && String(row.email || '').toLowerCase() === email) {
+          const keepCurrent =
+            Boolean(d.driverRecordId) && !row.driverRecordId;
+          if (keepCurrent) byKey.delete(k);
+          else if (row.driverRecordId && !d.driverRecordId) return;
+        }
+      }
+      byKey.set(String(d.driverRecordId || d.id), d);
+    };
     for (const d of drivers) {
       if (!includeArchived && (d.lifecycleStatus || 'active') === 'archived') {
         continue;
       }
-      byKey.set(String(d.driverRecordId || d.id), d);
+      put(d);
     }
     if (includeArchived) {
-      for (const d of archivedExtra) {
-        byKey.set(String(d.driverRecordId || d.id), d);
-      }
+      for (const d of archivedExtra) put(d);
     }
     return Array.from(byKey.values());
   }, [drivers, archivedExtra, includeArchived]);

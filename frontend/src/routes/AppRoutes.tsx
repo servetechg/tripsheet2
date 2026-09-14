@@ -513,8 +513,7 @@ function CompanyWorkspace() {
   }
 
   if (!company || !companyIsActive(company)) {
-    const archived =
-      company && (company.active === false || company.status === 'suspended');
+    const archived = Boolean(company && !companyIsActive(company));
     return (
       <div style={{ ...pageCentered() }}>
         <div
@@ -631,8 +630,7 @@ function DriverWorkspace() {
   }
 
   if (!company || !companyIsActive(company)) {
-    const archived =
-      company && (company.active === false || company.status === 'suspended');
+    const archived = Boolean(company && !companyIsActive(company));
     return (
       <div style={{ ...pageCentered() }}>
         <div

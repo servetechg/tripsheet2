@@ -11,7 +11,7 @@ import {
 } from 'react';
 import type { Company, Asset, Load, CarrierProfile, TripSheet, Invite } from '@tripsheet/shared';
 import type { Role } from '@tripsheet/shared';
-import { isCompanyOwnerRole } from '@tripsheet/shared';
+import { isCompanyOwnerRole, isDriverRole } from '@tripsheet/shared';
 import {
   pingApi,
   checkBackendServices,
@@ -211,7 +211,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
                   ? 'archived'
                   : 'active'),
           }));
-          setUsers(authUsers);
+          const scopeLoadsDrivers =
+            Boolean(companyId && companyId !== 'all');
+          setUsers(
+            scopeLoadsDrivers
+              ? authUsers.filter((u) => !isDriverRole(u.role))
+              : authUsers,
+          );
         } catch {
           // list users may fail if token invalid — ignore here
         }
@@ -298,17 +304,28 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             (u) => isCompanyOwnerRole(u.role) && u.companyId === companyId,
           );
           const prevDrivers = prev.filter(
-            (u) => u.role === 'driver' && u.companyId === companyId,
+            (u) =>
+              isDriverRole(u.role) &&
+              u.companyId === companyId &&
+              Boolean(u.driverRecordId),
           );
           const byKey = new Map<string, AppUser>();
-          for (const d of prevDrivers) {
-            const key = d.driverRecordId || d.id;
-            if (key) byKey.set(key, d);
-          }
-          for (const d of driverUsers) {
-            const key = d.driverRecordId || d.id;
-            if (key) byKey.set(key, d);
-          }
+          const byEmail = new Map<string, string>();
+
+          const putDriver = (d: AppUser) => {
+            const key = String(d.driverRecordId || d.id);
+            if (!key) return;
+            const email = d.email?.toLowerCase();
+            if (email && byEmail.has(email)) {
+              byKey.delete(byEmail.get(email)!);
+            }
+            byKey.set(key, d);
+            if (email) byEmail.set(email, key);
+          };
+
+          for (const d of prevDrivers) putDriver(d);
+          for (const d of driverUsers) putDriver(d);
+
           return [...supers, ...admins, ...Array.from(byKey.values())];
         });
 
