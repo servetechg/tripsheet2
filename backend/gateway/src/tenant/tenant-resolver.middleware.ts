@@ -32,9 +32,21 @@ const PUBLIC_PATHS: RegExp[] = [
   /^\/api\/auth\/mfa\/enroll-login\/confirm$/,
   /^\/api\/auth\/forgot-password$/,
   /^\/api\/auth\/reset-password$/,
+  /^\/api\/auth\/confirm-email-change$/,
   /^\/api\/invites\/by-token\//,
   /^\/api\/invites\/[^/]+\/complete$/,
 ];
+
+/** Auth-service uses platform auth_db — tenant registry must not block these routes. */
+const PLATFORM_AUTH_PATHS: RegExp[] = [/^\/api\/auth(\/|$)/];
+
+function normalizeGatewayPath(raw: string) {
+  return raw.split('?')[0].replace(/\/+$/, '') || '/';
+}
+
+function isPlatformAuthPath(path: string) {
+  return PLATFORM_AUTH_PATHS.some((re) => re.test(path));
+}
 
 @Injectable()
 export class TenantResolverMiddleware implements NestMiddleware {
@@ -47,14 +59,16 @@ export class TenantResolverMiddleware implements NestMiddleware {
   ) {}
 
   async use(req: Request, _res: Response, next: NextFunction) {
-    const path = (req.originalUrl || req.url || req.path || '')
-      .split('?')[0]
-      .replace(/\/+$/, '') || '/';
+    const path = normalizeGatewayPath(
+      req.originalUrl || req.url || req.path || '',
+    );
 
     if (PUBLIC_PATHS.some((re) => re.test(path))) {
       next();
       return;
     }
+
+    const platformAuth = isPlatformAuthPath(path);
 
     const auth = req.headers.authorization;
     if (!auth?.startsWith('Bearer ')) {
@@ -110,25 +124,33 @@ export class TenantResolverMiddleware implements NestMiddleware {
     let dbName = '';
 
     if (role !== 'superadmin') {
-      if (!companyId) {
+      if (!companyId && !platformAuth) {
         throw new ForbiddenException('Token missing companyId');
       }
-      const info = await this.tenants.resolve(companyId);
-      if (!info) {
-        this.logger.warn(`No tenant registry row for ${companyId}`);
-        throw new ForbiddenException('Company tenant is not registered');
+      if (companyId) {
+        const info = await this.tenants.resolve(companyId);
+        if (info) {
+          if (
+            !platformAuth &&
+            (info.companyStatus === 'suspended' || info.status === 'suspended')
+          ) {
+            throw new ForbiddenException('Company suspended');
+          }
+          if (!platformAuth && info.status !== 'active') {
+            throw new ForbiddenException(
+              'Company tenant database is not ready yet. Try again after provisioning completes.',
+            );
+          }
+          if (info.status === 'active') {
+            tenantKey = info.tenantKey || tenantKey;
+            tenantStatus = info.status;
+            dbName = info.dbName;
+          }
+        } else if (!platformAuth) {
+          this.logger.warn(`No tenant registry row for ${companyId}`);
+          throw new ForbiddenException('Company tenant is not registered');
+        }
       }
-      if (info.companyStatus === 'suspended' || info.status === 'suspended') {
-        throw new ForbiddenException('Company suspended');
-      }
-      if (info.status !== 'active') {
-        throw new ForbiddenException(
-          'Company tenant database is not ready yet. Try again after provisioning completes.',
-        );
-      }
-      tenantKey = info.tenantKey || tenantKey;
-      tenantStatus = info.status;
-      dbName = info.dbName;
     } else if (companyId) {
       const info = await this.tenants.resolve(companyId);
       if (info?.status === 'active') {

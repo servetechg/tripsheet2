@@ -217,7 +217,13 @@ export class InvitesService {
     const log = (await res.json().catch(() => null)) as {
       status?: string;
     } | null;
-    return { channel, to, status: log?.status || 'queued' };
+    const status = log?.status || 'queued';
+    if (status === 'failed') {
+      throw new BadRequestException(
+        'Email delivery failed — verify SMTP settings in backend/.env and restart notification-service.',
+      );
+    }
+    return { channel, to, status };
   }
 
   async complete(token: string, dto: CompleteInviteDto) {

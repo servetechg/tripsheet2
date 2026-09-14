@@ -137,6 +137,10 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [ioReport, setIoReport] = useState<any>(null);
   const [form, setForm] = useState<Record<string, string>>({ ...EMPTY_FORM });
+  const [recordFilter, setRecordFilter] = useState<
+    'all' | 'active' | 'inactive' | 'blocked'
+  >('all');
+  const [recordSearch, setRecordSearch] = useState('');
   const [initialForm, setInitialForm] = useState<Record<string, string> | null>(null);
   const csvFileId = useId();
   const csvTextId = useId();
@@ -238,6 +242,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
     setDupHint('');
     setDups([]);
     setLastCreatedId('');
+    setRecordFilter('all');
+    setRecordSearch('');
     resetForm();
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -648,6 +654,23 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       setBusy(false);
     }
   };
+
+  const visibleRows = rows.filter((r) => {
+    const st = String(r.status || 'active').toLowerCase();
+    if (recordFilter === 'active') {
+      if (st !== 'active' && st !== 'watch') return false;
+    } else if (recordFilter === 'inactive') {
+      if (st !== 'inactive') return false;
+    } else if (recordFilter === 'blocked') {
+      if (st !== 'blacklisted' && st !== 'suspended') return false;
+    }
+    if (recordSearch.trim()) {
+      const q = recordSearch.trim().toLowerCase();
+      const hay = `${rowTitle(kind, r)} ${rowMeta(kind, r)}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
 
   const statusOpts =
     kind === 'locations' ||
@@ -1133,6 +1156,34 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
 
       {kind !== 'import' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              flexWrap: 'wrap',
+              alignItems: 'flex-end',
+              marginBottom: 8,
+            }}
+          >
+            <Inp
+              label="Search records"
+              value={recordSearch}
+              onChange={(e) => setRecordSearch(e.target.value)}
+              placeholder="Name, MC, email…"
+              style={{ marginBottom: 0, minWidth: 200, flex: '1 1 200px' }}
+            />
+            <Sel
+              label="Show"
+              value={recordFilter}
+              onChange={(e: any) => setRecordFilter(e.target.value)}
+              style={{ marginBottom: 0, minWidth: 160 }}
+            >
+              <option value="all">All records</option>
+              <option value="active">Active / watch</option>
+              <option value="inactive">Archived (inactive)</option>
+              <option value="blocked">Blocked / suspended</option>
+            </Sel>
+          </div>
           {fetching && !rows.length && (
             <div style={{ color: G.muted, fontSize: 13 }}>Loading records…</div>
           )}
@@ -1143,7 +1194,12 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                 : 'No records yet.'}
             </div>
           )}
-          {rows.map((r) => {
+          {!fetching && rows.length > 0 && visibleRows.length === 0 && (
+            <div style={{ color: G.muted, fontSize: 13 }}>
+              No records match your search or filter.
+            </div>
+          )}
+          {visibleRows.map((r) => {
             const title = rowTitle(kind, r);
             const meta = rowMeta(kind, r);
             const isEditing = editingId === r.id;

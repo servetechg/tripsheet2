@@ -20,7 +20,7 @@ import { TrainingModule } from './training/training.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     TenantRuntimeModule.forRoot({ enforceScope: true }),
     PrismaModule,
     AuthSyncModule,

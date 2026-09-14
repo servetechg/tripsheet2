@@ -11,7 +11,7 @@ import { TripSheetsModule } from './trip-sheets/trip-sheets.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     TenantRuntimeModule.forRoot({ enforceScope: true }),
     PrismaModule,
     TripSheetsModule,

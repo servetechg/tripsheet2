@@ -1,4 +1,9 @@
-﻿import { NestFactory } from '@nestjs/core';
+﻿import path from 'path';
+import { preloadServiceEnvFromDir } from '../../../shared/env-config/preload-env.mjs';
+
+preloadServiceEnvFromDir(path.join(__dirname, '..'));
+
+import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';

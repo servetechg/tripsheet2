@@ -15,6 +15,7 @@ import { useSession } from '@/context/SessionContext';
 import { LoginScreen } from '@/features/auth/LoginScreen';
 import { ForgotPasswordScreen } from '@/features/auth/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '@/features/auth/ResetPasswordScreen';
+import { ConfirmEmailChangeScreen } from '@/features/auth/ConfirmEmailChangeScreen';
 import { SuperAdminPanel } from '@/features/companies/SuperAdminPanel';
 import { CompanyAdminPanel } from '@/features/admin/CompanyAdminPanel';
 import { DriverDashboard } from '@/features/drivers/DriverDashboard';
@@ -469,13 +470,18 @@ function SuperAdminRoute() {
   );
 }
 
+function companyIsActive(company: { active?: boolean; status?: string }) {
+  return company.active !== false && company.status !== 'suspended';
+}
+
 function CompanyWorkspace() {
   const data = useAppData();
-  const { user, logout, themeMode, toggleTheme } = useSession();
+  const { user, logout, themeMode, toggleTheme, bootstrapping } = useSession();
   const { tab: rawTab } = useParams();
   const navigate = useNavigate();
   const { canTab } = useCan();
   const tab = isCompanyAdminTab(rawTab) && canTab(rawTab || '') ? rawTab : 'dashboard';
+  const [companyHydrated, setCompanyHydrated] = useState(false);
 
   useEffect(() => {
     if (!isCompanyAdminTab(rawTab) || !canTab(rawTab || '')) {
@@ -484,25 +490,31 @@ function CompanyWorkspace() {
   }, [rawTab, navigate, canTab]);
 
   useEffect(() => {
-    if (user?.companyId) void data.refreshAll(user.companyId);
+    if (bootstrapping || !user?.companyId) {
+      setCompanyHydrated(Boolean(bootstrapping === false && !user?.companyId));
+      return;
+    }
+    setCompanyHydrated(false);
+    void data.refreshAll(user.companyId).finally(() => setCompanyHydrated(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.companyId]);
+  }, [user?.id, user?.companyId, bootstrapping]);
 
+  if (bootstrapping) return <BootSplash label="Restoring session…" />;
   if (!user) return null;
-
-  if (data.loading && data.companies.length === 0) {
-    return <BootSplash label="Loading company…" />;
-  }
 
   const freshSession =
     data.users.find((u) => u.id === user.id) || (user as AppUser);
   const company = data.companies.find((c) => c.id === freshSession.companyId);
+  const waitingForCompany =
+    Boolean(freshSession.companyId) && !companyHydrated;
 
-  if (!company && data.loading) {
+  if (waitingForCompany) {
     return <BootSplash label="Loading company…" />;
   }
 
-  if (!company || !company.active) {
+  if (!company || !companyIsActive(company)) {
+    const archived =
+      company && (company.active === false || company.status === 'suspended');
     return (
       <div style={{ ...pageCentered() }}>
         <div
@@ -519,7 +531,9 @@ function CompanyWorkspace() {
             {Icons.alert({ size: 36, color: G.danger })}
           </div>
           <div style={{ color: G.muted, marginBottom: 20 }}>
-            Company inactive or not assigned. Contact your administrator.
+            {archived
+              ? 'This company has been archived. Contact your platform administrator to restore access.'
+              : 'Company not assigned to your account. Contact your administrator.'}
           </div>
           <Btn
             full
@@ -579,10 +593,11 @@ function CompanyWorkspace() {
 
 function DriverWorkspace() {
   const data = useAppData();
-  const { user, logout, themeMode, toggleTheme } = useSession();
+  const { user, logout, themeMode, toggleTheme, bootstrapping } = useSession();
   const { tab: rawTab } = useParams();
   const navigate = useNavigate();
   const tab = isDriverTab(rawTab) ? rawTab : 'sheets';
+  const [companyHydrated, setCompanyHydrated] = useState(false);
 
   useEffect(() => {
     if (!isDriverTab(rawTab)) {
@@ -591,25 +606,33 @@ function DriverWorkspace() {
   }, [rawTab, navigate]);
 
   useEffect(() => {
-    if (user?.companyId) void data.refreshAll(user.companyId, 'driver');
+    if (bootstrapping || !user?.companyId) {
+      setCompanyHydrated(Boolean(bootstrapping === false && !user?.companyId));
+      return;
+    }
+    setCompanyHydrated(false);
+    void data.refreshAll(user.companyId, 'driver').finally(() =>
+      setCompanyHydrated(true),
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, user?.companyId]);
+  }, [user?.id, user?.companyId, bootstrapping]);
 
+  if (bootstrapping) return <BootSplash label="Restoring session…" />;
   if (!user) return null;
-
-  if (data.loading && data.companies.length === 0) {
-    return <BootSplash label="Loading…" />;
-  }
 
   const freshSession =
     data.users.find((u) => u.id === user.id) || (user as AppUser);
   const company = data.companies.find((c) => c.id === freshSession.companyId);
+  const waitingForCompany =
+    Boolean(freshSession.companyId) && !companyHydrated;
 
-  if (!company && data.loading) {
+  if (waitingForCompany) {
     return <BootSplash label="Loading company…" />;
   }
 
-  if (!company || !company.active) {
+  if (!company || !companyIsActive(company)) {
+    const archived =
+      company && (company.active === false || company.status === 'suspended');
     return (
       <div style={{ ...pageCentered() }}>
         <div
@@ -626,7 +649,9 @@ function DriverWorkspace() {
             {Icons.alert({ size: 36, color: G.danger })}
           </div>
           <div style={{ color: G.muted, marginBottom: 20 }}>
-            Company inactive or not assigned. Contact your administrator.
+            {archived
+              ? 'This company has been archived. Contact your platform administrator to restore access.'
+              : 'Company not assigned to your account. Contact your administrator.'}
           </div>
           <Btn
             full
@@ -698,6 +723,7 @@ export function AppRoutes() {
         <Route path={PATHS.login} element={<LoginRoute />} />
         <Route path={PATHS.forgotPassword} element={<ForgotPasswordScreen />} />
         <Route path={PATHS.resetPassword} element={<ResetPasswordScreen />} />
+        <Route path={PATHS.confirmEmailChange} element={<ConfirmEmailChangeScreen />} />
         <Route path={PATHS.invite} element={<InviteRoute />} />
         <Route
           path={PATHS.workspace}

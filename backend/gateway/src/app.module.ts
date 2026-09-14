@@ -7,7 +7,7 @@ import { TenantModule } from './tenant/tenant.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     HttpModule.register({
       timeout: 120000,
       maxRedirects: 3,

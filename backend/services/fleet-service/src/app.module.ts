@@ -14,7 +14,7 @@ import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     TenantRuntimeModule.forRoot({ enforceScope: true }),
     PrismaModule,
     AssetsModule,

@@ -605,6 +605,248 @@ export class AuthService {
     }
   }
 
+  /**
+   * Request email change — validates uniqueness, notifies old + new addresses.
+   * Change completes only after the new address confirms via link.
+   */
+  async requestEmailChange(
+    userId: string,
+    newEmailRaw: string,
+    actor?: { id?: string; email?: string; role?: string },
+  ) {
+    const newEmail = newEmailRaw.toLowerCase().trim();
+    if (!newEmail) throw new BadRequestException('New email is required');
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    if (user.status === 'archived') {
+      throw new BadRequestException('Cannot change email on an archived account');
+    }
+    if (user.email.toLowerCase() === newEmail) {
+      throw new BadRequestException('New email is the same as the current email');
+    }
+
+    const taken = await this.prisma.user.findUnique({ where: { email: newEmail } });
+    if (taken) {
+      throw new ConflictException('Email already in use by another account');
+    }
+
+    await this.prisma.emailChangeToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const raw = randomBytes(32).toString('hex');
+    const tokenHash = this.hashResetToken(raw);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await this.prisma.emailChangeToken.create({
+      data: { userId: user.id, newEmail, tokenHash, expiresAt },
+    });
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { pendingEmail: newEmail },
+    });
+
+    void this.queueEmailChangeNotifications(user, newEmail, raw);
+
+    await this.auditAuth(user.companyId, {
+      actorId: actor?.id,
+      actorName: actor?.email || '',
+      action: 'user.email_change_requested',
+      entityId: user.id,
+      meta: { from: user.email, to: newEmail },
+    });
+
+    const origin = this.publicAppOrigin();
+    const confirmUrl = `${origin.replace(/\/$/, '')}/confirm-email-change?token=${encodeURIComponent(raw)}`;
+    return {
+      ok: true,
+      message:
+        'Confirmation email sent to the new address. The current address was notified. The change takes effect after confirmation.',
+      pendingEmail: newEmail,
+      ...(this.shouldExposeResetUrl() ? { confirmUrl } : {}),
+    };
+  }
+
+  async confirmEmailChange(token: string, meta: RequestMeta = {}) {
+    const tokenHash = this.hashResetToken(token.trim());
+    const row = await this.prisma.emailChangeToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+    if (!row || row.usedAt || row.expiresAt.getTime() <= Date.now()) {
+      throw new BadRequestException('Email change link is invalid or expired');
+    }
+
+    const user = row.user;
+    const newEmail = row.newEmail.toLowerCase();
+    const taken = await this.prisma.user.findFirst({
+      where: { email: newEmail, id: { not: user.id } },
+    });
+    if (taken) {
+      throw new ConflictException('Email is no longer available');
+    }
+
+    const oldEmail = user.email;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.emailChangeToken.update({
+        where: { id: row.id },
+        data: { usedAt: new Date() },
+      });
+      await tx.emailChangeToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          email: newEmail,
+          pendingEmail: null,
+          tokenVersion: { increment: 1 },
+        },
+      });
+    });
+
+    await this.revokeAllSessionsForUser(user.id, 'email_changed');
+    void this.syncDriverEmail(user.id, newEmail);
+
+    await this.auditAuth(user.companyId, {
+      actorId: user.id,
+      actorName: oldEmail,
+      action: 'user.email_changed',
+      entityId: user.id,
+      meta: { from: oldEmail, to: newEmail, ip: meta.ip },
+    });
+
+    void this.queueEmailChangeCompleted(oldEmail, newEmail, user.companyId, user.id);
+
+    return {
+      ok: true,
+      message: 'Email updated. Sign in with your new email address.',
+      email: newEmail,
+    };
+  }
+
+  async cancelEmailChange(
+    userId: string,
+    actor?: { id?: string; email?: string; role?: string },
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.emailChangeToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pendingEmail: null },
+    });
+    await this.auditAuth(user.companyId, {
+      actorId: actor?.id,
+      actorName: actor?.email || '',
+      action: 'user.email_change_cancelled',
+      entityId: user.id,
+    });
+    return { ok: true, message: 'Pending email change cancelled.' };
+  }
+
+  private async queueEmailChangeNotifications(
+    user: User,
+    newEmail: string,
+    rawToken: string,
+  ) {
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    if (!notifyUrl) return;
+    const origin = this.publicAppOrigin();
+    const link = `${origin.replace(/\/$/, '')}/confirm-email-change?token=${encodeURIComponent(rawToken)}`;
+    const base = notifyUrl.replace(/\/$/, '');
+    const post = async (to: string, subject: string, body: string) => {
+      try {
+        await fetch(`${base}/notifications/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId: user.companyId || null,
+            channel: 'email',
+            to,
+            body,
+            status: 'queued',
+            meta: { type: 'email_change', subject, userId: user.id },
+          }),
+        });
+      } catch (e) {
+        this.logger.warn(`email change notify failed for ${to}: ${String(e)}`);
+      }
+    };
+    await post(
+      newEmail,
+      'Confirm your new FleetQuix email',
+      `Confirm your new FleetQuix login email (link expires in 24 hours):\n\n${link}\n\nIf you did not request this change, ignore this email.`,
+    );
+    await post(
+      user.email,
+      'FleetQuix email change requested',
+      `A request was made to change the login email for your FleetQuix account from ${user.email} to ${newEmail}.\n\nThe change takes effect only after the new address confirms. If you did not request this, contact your administrator immediately.`,
+    );
+  }
+
+  private async queueEmailChangeCompleted(
+    oldEmail: string,
+    newEmail: string,
+    companyId: string | null,
+    userId: string,
+  ) {
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    if (!notifyUrl) return;
+    const base = notifyUrl.replace(/\/$/, '');
+    const body = `Your FleetQuix login email was changed from ${oldEmail} to ${newEmail}.\n\nIf you did not authorize this, contact your administrator immediately.`;
+    for (const to of [oldEmail, newEmail]) {
+      try {
+        await fetch(`${base}/notifications/log`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            companyId,
+            channel: 'email',
+            to,
+            body,
+            status: 'queued',
+            meta: { type: 'email_change_completed', subject: 'FleetQuix email updated', userId },
+          }),
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  private async syncDriverEmail(userId: string, email: string) {
+    const driverUrl =
+      this.config.get<string>('DRIVER_SERVICE_URL') || 'http://localhost:3003';
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${driverUrl.replace(/\/$/, '')}/internal/users/${encodeURIComponent(userId)}/email`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-api-key': key,
+          },
+          body: JSON.stringify({ email }),
+        },
+      );
+      if (!res.ok) {
+        this.logger.warn(
+          `driver email sync failed for user ${userId}: ${res.status}`,
+        );
+      }
+    } catch (e) {
+      this.logger.warn(`driver email sync error for user ${userId}: ${String(e)}`);
+    }
+  }
+
   async listLoginHistory(
     actor: JwtActor | undefined,
     opts: { userId?: string; limit?: number },
@@ -1666,6 +1908,7 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      pendingEmail: user.pendingEmail || null,
       name: user.name,
       role: user.role,
       companyId: user.companyId,

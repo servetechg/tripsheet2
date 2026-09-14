@@ -66,7 +66,8 @@ export async function api<T = any>(
       path.startsWith('/auth/mfa/challenge') ||
       path.startsWith('/auth/mfa/enroll-login') ||
       path.startsWith('/auth/forgot-password') ||
-      path.startsWith('/auth/reset-password');
+      path.startsWith('/auth/reset-password') ||
+      path.startsWith('/auth/confirm-email-change');
     if (res.status === 401 && !skipAuthRefresh && !isAuthPath) {
       const ok = await tryRefreshAccessToken();
       if (ok) {
@@ -201,6 +202,7 @@ export type LoginResult =
 export type AuthUserDto = {
   id: string;
   email: string;
+  pendingEmail?: string | null;
   name: string;
   role: string;
   companyId: string | null;
@@ -336,6 +338,21 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ token, newPassword }),
     }),
+  confirmEmailChange: (token: string) =>
+    api<{ ok: boolean; message?: string; email?: string }>(
+      '/auth/confirm-email-change',
+      { method: 'POST', body: JSON.stringify({ token }) },
+    ),
+  requestEmailChange: (userId: string, newEmail: string) =>
+    api<{ ok: boolean; message?: string; pendingEmail?: string; confirmUrl?: string }>(
+      `/auth/users/${encodeURIComponent(userId)}/request-email-change`,
+      { method: 'POST', body: JSON.stringify({ newEmail }) },
+    ),
+  cancelEmailChange: (userId: string) =>
+    api<{ ok: boolean; message?: string }>(
+      `/auth/users/${encodeURIComponent(userId)}/cancel-email-change`,
+      { method: 'POST', body: '{}' },
+    ),
   loginHistory: (opts?: {
     userId?: string;
     scope?: 'company';
@@ -385,11 +402,11 @@ export const authApi = {
       }>
     >(`/auth/security-events${suffix}`);
   },
-  listUsers: (companyId?: string) =>
+  listUsers: (companyId?: string, includeArchived = false) =>
     api<AuthUserDto[]>(
       companyId
-        ? `/auth/users?companyId=${encodeURIComponent(companyId)}`
-        : '/auth/users',
+        ? `/auth/users?companyId=${encodeURIComponent(companyId)}${includeArchived ? '&includeArchived=1' : ''}`
+        : `/auth/users${includeArchived ? '?includeArchived=1' : ''}`,
     ),
   createUser: (body: {
     email: string;
@@ -849,8 +866,10 @@ export const tenantsApi = {
 };
 
 export const driversApi = {
-  list: (companyId: string) =>
-    api<any[]>(`/drivers?companyId=${encodeURIComponent(companyId)}`),
+  list: (companyId: string, includeArchived = false) =>
+    api<any[]>(
+      `/drivers?companyId=${encodeURIComponent(companyId)}${includeArchived ? '&includeArchived=1' : ''}`,
+    ),
   get: (id: string) => api<any>(`/drivers/${id}`),
   create: (body: unknown) =>
     api<any>('/drivers', { method: 'POST', body: JSON.stringify(body) }),
@@ -883,6 +902,8 @@ export const driversApi = {
     }),
   archive: (id: string) =>
     api(`/drivers/${id}/archive`, { method: 'POST', body: '{}' }),
+  restore: (id: string) =>
+    api(`/drivers/${id}/restore`, { method: 'POST', body: '{}' }),
   qualifications: (driverId: string) =>
     api<any[]>(`/drivers/${encodeURIComponent(driverId)}/qualifications`),
   createQualification: (driverId: string, body: unknown) =>

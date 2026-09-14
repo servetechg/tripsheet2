@@ -6,6 +6,7 @@ export const PATHS = {
   login: '/login',
   forgotPassword: '/forgot-password',
   resetPassword: '/reset-password',
+  confirmEmailChange: '/confirm-email-change',
   invite: '/invite',
   admin: '/admin',
   app: '/app',

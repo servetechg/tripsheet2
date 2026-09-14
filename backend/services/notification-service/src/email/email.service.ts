@@ -25,7 +25,9 @@ export class EmailService {
       this.transporter = nodemailer.createTransport({
         host: this.config.get<string>('SMTP_HOST')!,
         port: Number(this.config.get<string>('SMTP_PORT') || 587),
-        secure: this.config.get<string>('SMTP_SECURE') === 'true',
+        secure:
+          this.config.get<string>('SMTP_SECURE') === 'true' ||
+          Number(this.config.get<string>('SMTP_PORT') || 0) === 465,
         auth: {
           user: this.config.get<string>('SMTP_USER')!,
           pass: this.config.get<string>('SMTP_PASS')!,
@@ -105,6 +107,10 @@ export class EmailService {
         return 'Your FleetQuix password was changed';
       case 'security.login':
         return 'New sign-in to FleetQuix';
+      case 'email_change':
+        return 'Confirm your new FleetQuix email';
+      case 'email_change_completed':
+        return 'Your FleetQuix email was updated';
       default:
         return body.length > 60 ? `${body.slice(0, 57)}…` : body || 'FleetQuix notification';
     }

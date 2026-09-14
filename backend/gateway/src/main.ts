@@ -1,3 +1,8 @@
+import path from 'path';
+import { preloadServiceEnvFromDir } from '../../shared/env-config/preload-env.mjs';
+
+preloadServiceEnvFromDir(path.join(__dirname, '..'));
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';

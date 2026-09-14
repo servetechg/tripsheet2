@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons } from '@/components/ui';
+import { Modal } from '@/components/ui/Modal';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank } from '@/lib/format';
@@ -12,6 +13,7 @@ import { isCompanyOwnerRole } from '@tripsheet/shared';
 import { notify } from '@/components/feedback/Toast';
 import { TenantIssueAlert, tenantNeedsAttention } from '@/components/feedback/TenantIssueAlert';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
+import { useConfirm } from '@/context/ConfirmContext';
 
 const PLAN_FALLBACK = [
   { code: 'starter', name: 'Starter' },
@@ -132,7 +134,22 @@ export function SuperAdminPanel({
   const [busy, setBusy] = useState(false);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [f, setF] = useState(INITIAL_COMPANY_FORM);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    shortName: '',
+    tagline: '',
+    address: '',
+  });
+  const [showArchived, setShowArchived] = useState(false);
+  const confirm = useConfirm();
   const upd = (k: string, v: string) => setF((x) => ({ ...x, [k]: v }));
+  const updEdit = (k: string, v: string) =>
+    setEditForm((x) => ({ ...x, [k]: v }));
+
+  const visibleCompanies = companies.filter((c: any) =>
+    showArchived ? true : c.active !== false,
+  );
 
   const handleNameChange = (val: string) => {
     setF((prev) => {
@@ -264,18 +281,88 @@ export function SuperAdminPanel({
     }
   };
 
-  const toggleCo = async (id: string) => {
+  const openEdit = (c: any) => {
+    setEditId(c.id);
+    setEditForm({
+      name: c.name || '',
+      shortName: c.shortName || '',
+      tagline: c.tagline || '',
+      address: c.address || '',
+    });
+    setErr('');
+  };
+
+  const closeEdit = () => {
+    setEditId(null);
+    setErr('');
+  };
+
+  const saveEdit = async () => {
+    if (!editId) return;
+    if (blank(editForm.name) || blank(editForm.shortName)) {
+      setErr('Company name and short name are required.');
+      return;
+    }
+    try {
+      setBusy(true);
+      const updated = (await companiesApi.update(editId, {
+        name: editForm.name.trim(),
+        shortName: editForm.shortName.trim().toUpperCase(),
+        tagline: editForm.tagline.trim(),
+        address: editForm.address.trim(),
+      })) as any;
+      setCompanies((prev: any[]) =>
+        prev.map((c) =>
+          c.id === editId
+            ? {
+                ...c,
+                name: updated.name ?? editForm.name.trim(),
+                shortName: updated.shortName ?? editForm.shortName.trim().toUpperCase(),
+                tagline: updated.tagline ?? editForm.tagline.trim(),
+                address: updated.address ?? editForm.address.trim(),
+              }
+            : c,
+        ),
+      );
+      notify('Company updated.');
+      closeEdit();
+    } catch (e: any) {
+      setErr(e?.message || 'Update failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleCo = async (c: any) => {
+    const id = c.id;
+    const archiving = c.active !== false;
+    const ok = await confirm(
+      archiving
+        ? {
+            title: 'Archive company',
+            message: `Archive "${c.name}"? Users will not be able to sign in and tenant access is suspended until you restore the company.`,
+            confirmLabel: 'Archive',
+            variant: 'danger',
+          }
+        : {
+            title: 'Restore company',
+            message: `Restore "${c.name}"? This re-enables sign-in and tenant provisioning for this company.`,
+            confirmLabel: 'Restore',
+          },
+    );
+    if (!ok) return;
     if (apiEnabled) {
       try {
         await companiesApi.toggleActive(id);
         await refreshAll?.('all');
+        notify(archiving ? 'Company archived.' : 'Company restored.');
       } catch (e: any) {
         notify(e?.message || 'Toggle failed', 'error');
       }
       return;
     }
     setCompanies((p: any[]) =>
-      p.map((c) => (c.id === id ? { ...c, active: !c.active } : c)),
+      p.map((co) => (co.id === id ? { ...co, active: !co.active } : co)),
     );
   };
 
@@ -321,11 +408,28 @@ export function SuperAdminPanel({
             Manage tenants, plans, and database routing
           </div>
         </div>
-        {companies.length > 0 ? (
-          <Btn onClick={openForm}>
-            + New Company
-          </Btn>
-        ) : null}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              color: G.muted,
+              cursor: 'pointer',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showArchived}
+              onChange={(e) => setShowArchived(e.target.checked)}
+            />
+            Show archived
+          </label>
+          {companies.length > 0 ? (
+            <Btn onClick={openForm}>+ New Company</Btn>
+          ) : null}
+        </div>
       </div>
 
       <div
@@ -495,7 +599,46 @@ export function SuperAdminPanel({
         </Card>
       ) : null}
 
-      {companies.map((c: any) => {
+      <Modal open={Boolean(editId)} onClose={closeEdit} title="Edit company">
+        <Err msg={err} />
+        <G2 cols={2}>
+          <Inp
+            label="Company full name *"
+            value={editForm.name}
+            onChange={(e) => updEdit('name', e.target.value)}
+          />
+          <Inp
+            label="Short name *"
+            value={editForm.shortName}
+            onChange={(e) =>
+              updEdit('shortName', e.target.value.toUpperCase().slice(0, 6))
+            }
+            maxLength={6}
+          />
+        </G2>
+        <G2 cols={2}>
+          <Inp
+            label="Tagline"
+            value={editForm.tagline}
+            onChange={(e) => updEdit('tagline', e.target.value)}
+          />
+          <Inp
+            label="Address"
+            value={editForm.address}
+            onChange={(e) => updEdit('address', e.target.value)}
+          />
+        </G2>
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <Btn onClick={() => void saveEdit()} loading={busy} loadingLabel="Saving…">
+            Save changes
+          </Btn>
+          <Btn variant="outline" onClick={closeEdit} disabled={busy}>
+            Cancel
+          </Btn>
+        </div>
+      </Modal>
+
+      {visibleCompanies.map((c: any) => {
         const admin = users.find(
           (u: any) => isCompanyOwnerRole(u.role) && u.companyId === c.id,
         );
@@ -723,6 +866,9 @@ export function SuperAdminPanel({
                     {tenantStatus === 'failed' ? 'Retry provision' : 'Provision DB'}
                   </Btn>
                 )}
+                <Btn size="sm" variant="outline" onClick={() => openEdit(c)}>
+                  Edit
+                </Btn>
                 <Btn
                   size="sm"
                   variant={c.active ? 'outline' : 'success'}
@@ -731,9 +877,9 @@ export function SuperAdminPanel({
                       ? { color: G.danger, borderColor: `${G.danger}44` }
                       : undefined
                   }
-                  onClick={() => void toggleCo(c.id)}
+                  onClick={() => void toggleCo(c)}
                 >
-                  {c.active ? 'Disable company' : 'Enable company'}
+                  {c.active ? 'Archive' : 'Restore'}
                 </Btn>
               </div>
             </div>

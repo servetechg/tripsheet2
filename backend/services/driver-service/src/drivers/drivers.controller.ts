@@ -20,8 +20,12 @@ export class DriversController {
   findAll(
     @Query('companyId') companyId?: string,
     @Query('userId') userId?: string,
+    @Query('includeArchived') includeArchived?: string,
   ) {
-    return this.driversService.findAll(companyId, userId);
+    return this.driversService.findAll(companyId, userId, {
+      includeArchived:
+        includeArchived === '1' || includeArchived === 'true',
+    });
   }
 
   @Get(':id/dispatch-ready')
@@ -62,6 +66,11 @@ export class DriversController {
   @Post(':id/archive')
   archive(@Param('id') id: string) {
     return this.driversService.archive(id);
+  }
+
+  @Post(':id/restore')
+  restore(@Param('id') id: string) {
+    return this.driversService.restore(id);
   }
 
   @Get(':id')

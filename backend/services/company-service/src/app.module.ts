@@ -11,7 +11,7 @@ import { OrgModule } from './org/org.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     PrismaModule,
     PlansModule,
     TenantsModule,
