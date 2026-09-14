@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { blank } from '@/lib/format';
@@ -19,6 +19,7 @@ import { AvailabilityBadge } from './DriverProfileChapter6Panels';
 import { DriverProfile } from './DriverProfile';
 import { matchesDriverRef } from '@/lib/driverIds';
 import { useCan } from '@/lib/permissions';
+import { EmailChangeModal } from '@/components/account/EmailChangeModal';
 
 export function DriversTab({
   company,
@@ -48,6 +49,9 @@ export function DriversTab({
   const [inviteEmail, setInviteEmail] = useState('');
   const [sending, setSending] = useState<'email' | 'sms' | null>(null);
   const [busy, setBusy] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [archivedExtra, setArchivedExtra] = useState<any[]>([]);
 
   const showInviteLink = (invite: any) => {
     setGeneratedInviteId(invite?.id ?? null);
@@ -145,6 +149,50 @@ export function DriversTab({
   });
   const [searchQ, setSearchQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+
+  useEffect(() => {
+    if (!apiEnabled || !includeArchived || !company?.id) {
+      setArchivedExtra([]);
+      return;
+    }
+    void driversApi
+      .list(company.id, true)
+      .then((list) => {
+        const extra = (list || [])
+          .filter((d: any) => d.lifecycleStatus === 'archived')
+          .map((d: any) => ({
+            id: d.userId || d.id,
+            driverRecordId: d.id,
+            name: d.name,
+            email: d.email,
+            role: 'driver',
+            companyId: d.companyId,
+            lifecycleStatus: d.lifecycleStatus,
+            phone: d.phone,
+            licenseNo: d.licenseNo,
+            branchId: d.branchId,
+            availabilityStatus: d.availabilityStatus,
+          }));
+        setArchivedExtra(extra);
+      })
+      .catch(() => setArchivedExtra([]));
+  }, [apiEnabled, includeArchived, company?.id]);
+
+  const rosterDrivers = useMemo(() => {
+    const byKey = new Map<string, any>();
+    for (const d of drivers) {
+      if (!includeArchived && (d.lifecycleStatus || 'active') === 'archived') {
+        continue;
+      }
+      byKey.set(String(d.driverRecordId || d.id), d);
+    }
+    if (includeArchived) {
+      for (const d of archivedExtra) {
+        byKey.set(String(d.driverRecordId || d.id), d);
+      }
+    }
+    return Array.from(byKey.values());
+  }, [drivers, archivedExtra, includeArchived]);
   const [branchFilter, setBranchFilter] = useState('all');
   const [docFilter, setDocFilter] = useState('all');
   const [branches, setBranches] = useState<any[]>([]);
@@ -313,7 +361,6 @@ export function DriversTab({
           if (recordId) {
             await driversApi.update(recordId, {
               name: f.name.trim(),
-              email: f.email.trim().toLowerCase(),
               phone: f.phone,
               dob: f.dob,
               licenseNo: f.licenseNo,
@@ -450,7 +497,19 @@ export function DriversTab({
     }
   };
 
-  const filteredDrivers = drivers.filter((d: any) => {
+  const restoreDriver = async (d: any) => {
+    const recordId = d.driverRecordId;
+    if (!recordId || !apiEnabled) return;
+    try {
+      await driversApi.restore(recordId);
+      await refreshAll?.();
+      notify(`${d.name} restored to active roster.`, 'success');
+    } catch (e: any) {
+      notify(e?.message || 'Restore failed', 'error');
+    }
+  };
+
+  const filteredDrivers = rosterDrivers.filter((d: any) => {
     const q = searchQ.trim().toLowerCase();
     if (q) {
       const hay = `${d.name} ${d.email} ${d.licenseNo || ''} ${d.employeeNumber || ''} ${d.fastCard || ''} ${d.branchId || ''}`.toLowerCase();
@@ -620,7 +679,25 @@ export function DriversTab({
           <option value="active">Active</option>
           <option value="suspended">Suspended</option>
           <option value="terminated">Terminated</option>
+          <option value="archived">Archived</option>
         </Sel>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 12,
+            color: G.muted,
+            marginTop: 22,
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={includeArchived}
+            onChange={(e) => setIncludeArchived(e.target.checked)}
+          />
+          Include archived in roster
+        </label>
       </div>
 
       {generatedLink && (
@@ -978,14 +1055,40 @@ export function DriversTab({
               }
               placeholder="Driver full name"
             />
-            <Inp
-              label="Email *"
-              value={f.email}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, email: e.target.value }))
-              }
-              placeholder="driver@company.com"
-            />
+            {editDriver ? (
+              <div>
+                <Inp
+                  label="Email"
+                  value={f.email}
+                  disabled
+                  placeholder="driver@company.com"
+                />
+                {editDriver.id ? (
+                  <Btn
+                    size="sm"
+                    variant="outline"
+                    style={{ marginTop: 6 }}
+                    onClick={() => setEmailModalOpen(true)}
+                  >
+                    Change email…
+                  </Btn>
+                ) : null}
+                {editDriver.pendingEmail ? (
+                  <div style={{ fontSize: 11, color: G.gold, marginTop: 4 }}>
+                    Pending: {editDriver.pendingEmail}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <Inp
+                label="Email *"
+                value={f.email}
+                onChange={(e: any) =>
+                  setF((x) => ({ ...x, email: e.target.value }))
+                }
+                placeholder="driver@company.com"
+              />
+            )}
           </G2>
           <G2 cols={2}>
             <Inp
@@ -1541,27 +1644,48 @@ export function DriversTab({
                       {Icons.edit({ size: 16, color: G.gold })}
                       EDIT
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeDriver(d);
-                      }}
-                      style={{
-                        background: 'transparent',
-                        border: `1px solid ${G.danger}`,
-                        color: G.danger,
-                        borderRadius: 7,
-                        padding: '6px 12px',
-                        fontSize: 11,
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      {Icons.trash({ size: 16, color: G.danger })}
-                    </button>
+                    {lifecycle === 'archived' && can('drivers.archive') ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void restoreDriver(d);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${G.success}`,
+                          color: G.success,
+                          borderRadius: 7,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                        }}
+                      >
+                        RESTORE
+                      </button>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeDriver(d);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${G.danger}`,
+                          color: G.danger,
+                          borderRadius: 7,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          fontWeight: 700,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        {Icons.trash({ size: 16, color: G.danger })}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1569,6 +1693,19 @@ export function DriversTab({
           );
         })
       )}
+      {editDriver?.id ? (
+        <EmailChangeModal
+          open={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          userId={editDriver.id}
+          currentEmail={f.email}
+          pendingEmail={editDriver.pendingEmail}
+          onSuccess={() => {
+            void refreshAll?.();
+            setEmailModalOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -19,6 +19,10 @@ import {
   ResetPasswordDto,
 } from './dto/forgot-password.dto';
 import {
+  ConfirmEmailChangeDto,
+  RequestEmailChangeDto,
+} from './dto/email-change.dto';
+import {
   LogoutDto,
   PatchSessionDto,
   RefreshTokenDto,
@@ -129,6 +133,11 @@ export class AuthController {
   @Post('reset-password')
   resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
     return this.authService.resetPassword(dto, requestMeta(req));
+  }
+
+  @Post('confirm-email-change')
+  confirmEmailChange(@Body() dto: ConfirmEmailChangeDto, @Req() req: Request) {
+    return this.authService.confirmEmailChange(dto.token, requestMeta(req));
   }
 
   @Get('me')
@@ -331,6 +340,35 @@ export class AuthController {
   ) {
     assertActorHas(req.user, 'users.suspend');
     return this.authService.unlockUser(id, {
+      id: req.user?.sub,
+      email: req.user?.email,
+      role: req.user?.role,
+    });
+  }
+
+  @Post('users/:id/request-email-change')
+  @UseGuards(JwtAuthGuard)
+  requestEmailChange(
+    @Req() req: Request & { user?: JwtActor },
+    @Param('id') id: string,
+    @Body() dto: RequestEmailChangeDto,
+  ) {
+    assertActorHas(req.user, 'users.edit');
+    return this.authService.requestEmailChange(id, dto.newEmail, {
+      id: req.user?.sub,
+      email: req.user?.email,
+      role: req.user?.role,
+    });
+  }
+
+  @Post('users/:id/cancel-email-change')
+  @UseGuards(JwtAuthGuard)
+  cancelEmailChange(
+    @Req() req: Request & { user?: JwtActor },
+    @Param('id') id: string,
+  ) {
+    assertActorHas(req.user, 'users.edit');
+    return this.authService.cancelEmailChange(id, {
       id: req.user?.sub,
       email: req.user?.email,
       role: req.user?.role,

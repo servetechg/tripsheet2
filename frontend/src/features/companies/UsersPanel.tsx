@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Icons, G2, StatsGrid, StatCard } from '@/components/ui';
 import { authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { useConfirm, type ConfirmOptions } from '@/context/ConfirmContext';
+import { EmailChangeModal } from '@/components/account/EmailChangeModal';
 
 interface UsersPanelProps {
   cid: string;
@@ -91,8 +92,24 @@ export function UsersPanel({
   const [inviteBusy, setInviteBusy] = useState(false);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'active' | 'suspended' | 'archived'
+  >('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [editUser, setEditUser] = useState<any>(null);
+  const [editName, setEditName] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+
+  const reloadStaff = useCallback(async () => {
+    const rows = await authApi.listUsers(cid, includeArchived);
+    setStaff(rows);
+  }, [cid, includeArchived, setStaff]);
+
+  useEffect(() => {
+    void reloadStaff();
+  }, [reloadStaff]);
 
   const activeStaffCount = useMemo(
     () => staff.filter((u) => (u.status || 'active') === 'active').length,
@@ -111,6 +128,8 @@ export function UsersPanel({
         const st = u.status || 'active';
         return st === 'suspended' || st === 'locked' || st === 'inactive';
       });
+    } else if (statusFilter === 'archived') {
+      list = list.filter((u) => (u.status || 'active') === 'archived');
     }
 
     if (roleFilter !== 'all') {
@@ -162,8 +181,7 @@ export function UsersPanel({
       setInviteForm({ name: '', email: '', role: 'dispatcher' });
       void refreshAll?.(cid);
       void reloadInvites();
-      const updatedStaff = await authApi.listUsers(cid);
-      setStaff(updatedStaff);
+      await reloadStaff();
     } catch (err: any) {
       notify(err?.message || 'Invite failed', 'error');
     } finally {
@@ -738,6 +756,30 @@ export function UsersPanel({
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  setStatusFilter('archived');
+                  setIncludeArchived(true);
+                }}
+                style={{
+                  height: '100%',
+                  background: statusFilter === 'archived' ? G.gold : 'transparent',
+                  color: statusFilter === 'archived' ? G.onGold : G.muted,
+                  border: 'none',
+                  padding: '0 12px',
+                  borderRadius: RADIUS.sm - 2,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all .15s ease',
+                }}
+              >
+                Archived
+              </button>
+              <button
+                type="button"
                 onClick={() => setStatusFilter('suspended')}
                 style={{
                   height: '100%',
@@ -928,7 +970,7 @@ export function UsersPanel({
                             : { role: v.slice(4), customRoleId: null };
                           void authApi
                             .updateUser(u.id, body)
-                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => reloadStaff())
                             .then(() =>
                               notify(
                                 'Role updated. The user must sign in again to refresh permissions.',
@@ -972,6 +1014,19 @@ export function UsersPanel({
 
                   {/* Right: Security & Management Action Buttons */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {can('users.edit') && !locked && (
+                      <Btn
+                        variant="outline"
+                        size="sm"
+                        style={{ height: 32, fontSize: 12 }}
+                        onClick={() => {
+                          setEditUser(u);
+                          setEditName(u.name || '');
+                        }}
+                      >
+                        Edit
+                      </Btn>
+                    )}
                     {canStatus && st === 'active' && (
                       <Btn
                         variant="outline"
@@ -980,7 +1035,7 @@ export function UsersPanel({
                         onClick={() => {
                           void authApi
                             .setUserStatus(u.id, 'suspended')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => reloadStaff())
                             .then(() => notify('User suspended. Active sessions are revoked.'))
                             .catch((err: any) => notify(err?.message || 'Suspend failed', 'error'));
                         }}
@@ -997,7 +1052,7 @@ export function UsersPanel({
                         onClick={() => {
                           void authApi
                             .setUserStatus(u.id, 'locked')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => reloadStaff())
                             .then(() => notify('User locked. Active sessions are revoked.'))
                             .catch((err: any) => notify(err?.message || 'Lock failed', 'error'));
                         }}
@@ -1018,7 +1073,7 @@ export function UsersPanel({
                           onClick={() => {
                             void authApi
                               .unlockUser(u.id)
-                              .then(() => authApi.listUsers(cid).then(setStaff))
+                              .then(() => reloadStaff())
                               .then(() => notify('User unlocked. Temporary lockout cleared.', 'success'))
                               .catch((err: any) => notify(err?.message || 'Unlock failed', 'error'));
                           }}
@@ -1027,7 +1082,8 @@ export function UsersPanel({
                         </Btn>
                       )}
 
-                    {canStatus && (st === 'suspended' || st === 'inactive') && (
+                    {canStatus &&
+                      (st === 'suspended' || st === 'inactive' || st === 'archived') && (
                       <Btn
                         variant="outline"
                         size="sm"
@@ -1035,7 +1091,7 @@ export function UsersPanel({
                         onClick={() => {
                           void authApi
                             .setUserStatus(u.id, 'active')
-                            .then(() => authApi.listUsers(cid).then(setStaff))
+                            .then(() => reloadStaff())
                             .then(() => notify('User reactivated', 'success'))
                             .catch((err: any) => notify(err?.message || 'Reactivate failed', 'error'));
                         }}
@@ -1060,7 +1116,7 @@ export function UsersPanel({
                             if (!ok) return;
                             void authApi
                               .setUserStatus(u.id, 'archived')
-                              .then(() => authApi.listUsers(cid).then(setStaff))
+                              .then(() => reloadStaff())
                               .then(() => notify('User archived'))
                               .catch((err: any) => notify(err?.message || 'Archive failed', 'error'));
                           })();
@@ -1076,6 +1132,82 @@ export function UsersPanel({
           </div>
         )}
       </Card>
+
+      {editUser ? (
+        <Card style={{ marginTop: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div style={{ fontSize: 14, fontWeight: 700 }}>Edit team member</div>
+            <Btn variant="ghost" size="sm" onClick={() => setEditUser(null)}>
+              Close
+            </Btn>
+          </div>
+          <G2 cols={2}>
+            <Inp
+              label="Full name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+            />
+            <div>
+              <Inp label="Email" value={editUser.email} disabled />
+              <Btn
+                size="sm"
+                variant="outline"
+                style={{ marginTop: 6 }}
+                onClick={() => setEmailModalOpen(true)}
+              >
+                Change email…
+              </Btn>
+              {editUser.pendingEmail ? (
+                <div style={{ fontSize: 11, color: G.gold, marginTop: 4 }}>
+                  Pending: {editUser.pendingEmail}
+                </div>
+              ) : null}
+            </div>
+          </G2>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <Btn
+              loading={editBusy}
+              loadingLabel="Saving…"
+              onClick={() => {
+                void (async () => {
+                  setEditBusy(true);
+                  try {
+                    await authApi.updateUser(editUser.id, { name: editName.trim() });
+                    await reloadStaff();
+                    notify('Profile updated', 'success');
+                    setEditUser(null);
+                  } catch (err: any) {
+                    notify(err?.message || 'Save failed', 'error');
+                  } finally {
+                    setEditBusy(false);
+                  }
+                })();
+              }}
+            >
+              Save name
+            </Btn>
+          </div>
+        </Card>
+      ) : null}
+
+      {editUser ? (
+        <EmailChangeModal
+          open={emailModalOpen}
+          onClose={() => setEmailModalOpen(false)}
+          userId={editUser.id}
+          currentEmail={editUser.email}
+          pendingEmail={editUser.pendingEmail}
+          onSuccess={() => {
+            void reloadStaff().then(() => {
+              setEmailModalOpen(false);
+              authApi.listUsers(cid, true).then((rows) => {
+                const fresh = rows.find((r) => r.id === editUser.id);
+                if (fresh) setEditUser(fresh);
+              });
+            });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

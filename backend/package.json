@@ -18,6 +18,8 @@
     "test:drivers:all": "npm run test:drivers && npm run test:drivers:live",
     "test": "npm run test --prefix services/driver-service && npm run test --prefix services/fleet-service && npm run test --prefix services/accounting-service && npm run test --prefix services/notification-service",
     "env:copy": "powershell -NoProfile -File scripts/copy-env.ps1",
+    "env:sync": "node scripts/sync-shared-env.mjs",
+    "env:check": "node scripts/check-env.mjs",
     "dev:setup": "node scripts/dev-setup.mjs",
     "dev:reset": "node scripts/dev-reset.mjs",
     "dev:stop": "powershell -NoProfile -File scripts/dev-stop.ps1",

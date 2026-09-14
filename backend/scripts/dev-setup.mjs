@@ -45,6 +45,14 @@ function run(cwd, cmd, args = [], { optional = false } = {}) {
 
 function copyEnvFiles() {
   console.log('\n==> env files');
+  const sharedExample = path.join(BACKEND_ROOT, '.env.example');
+  const sharedEnv = path.join(BACKEND_ROOT, '.env');
+  if (existsSync(sharedExample) && !existsSync(sharedEnv)) {
+    copyFileSync(sharedExample, sharedEnv);
+    console.log('create backend/.env (shared — SMTP, JWT, service URLs)');
+  } else if (existsSync(sharedEnv)) {
+    console.log('keep  backend/.env');
+  }
   for (const rel of ENV_TARGETS) {
     const dir = path.join(BACKEND_ROOT, rel);
     const src = path.join(dir, '.env.example');

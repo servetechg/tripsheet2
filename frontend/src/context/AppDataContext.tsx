@@ -141,7 +141,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     companyId?: string | null,
     scope: RefreshScope = 'full',
   ) => {
-    setLoading(true);
+    const hasToken = Boolean(getToken());
+    if (hasToken || companyId) setLoading(true);
+
     const live = await pingApi();
     setApiEnabled(live);
     if (!live) {
@@ -156,21 +158,45 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     const health = await checkBackendServices();
     setServicesDown(health.down);
 
-    try {
-      const cos = await companiesApi.list();
-      setCompanies(cos.map(asCompany));
+    if (!hasToken && !companyId) {
+      setLoading(false);
+      return;
+    }
 
+    try {
+      let cosList: Company[] = [];
+      if (hasToken) {
+        // Resolve the signed-in tenant first (list can lag or fail for non–super-admin).
+        if (companyId && companyId !== 'all') {
+          try {
+            const one = await companiesApi.get(companyId);
+            cosList = [asCompany(one)];
+          } catch {
+            cosList = [];
+          }
+        }
+        try {
+          const cos = await companiesApi.list();
+          for (const row of cos.map(asCompany)) {
+            if (!cosList.some((c) => c.id === row.id)) cosList.push(row);
+          }
+        } catch {
+          // keep companyId fetch result when list fails
+        }
+      }
+      setCompanies(cosList);
+
+      let authUsers: AppUser[] = [];
       if (getToken()) {
         try {
           const allUsers = await authApi.listUsers(
             companyId && companyId !== 'all' ? companyId : undefined,
           );
-          setUsers(
-            allUsers.map((u) => ({
-              ...u,
-              companyId: u.companyId ?? null,
-            })),
-          );
+          authUsers = allUsers.map((u) => ({
+            ...u,
+            companyId: u.companyId ?? null,
+          }));
+          setUsers(authUsers);
         } catch {
           // list users may fail if token invalid — ignore here
         }
@@ -205,11 +231,21 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ]);
         }
 
-        const driverUsers: AppUser[] = (drv as any[]).map((d) => ({
-          id: d.userId || d.id,
+        const authByUserId = new Map(
+          authUsers
+            .filter((u) => u.companyId === companyId)
+            .map((u) => [u.id, u] as const),
+        );
+
+        const driverUsers: AppUser[] = (drv as any[]).map((d) => {
+          const authId = d.userId || d.id;
+          const authUser = authByUserId.get(authId);
+          return {
+          id: authId,
           driverRecordId: d.id,
           name: d.name,
           email: d.email,
+          pendingEmail: authUser?.pendingEmail ?? null,
           role: 'driver',
           companyId: d.companyId,
           phone: d.phone,
@@ -238,7 +274,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           ownerOperatorProfile: d.ownerOperatorProfile,
           qualifications: d.qualifications,
           availabilityStatus: d.availabilityStatus || 'available',
-        }));
+        };
+        });
 
         setUsers((prev) => {
           const supers = prev.filter((u) => u.role === 'superadmin');
@@ -248,14 +285,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           const prevDrivers = prev.filter(
             (u) => u.role === 'driver' && u.companyId === companyId,
           );
-          const byEmail = new Map<string, AppUser>();
+          const byKey = new Map<string, AppUser>();
           for (const d of prevDrivers) {
-            if (d.email) byEmail.set(d.email.toLowerCase(), d);
+            const key = d.driverRecordId || d.id;
+            if (key) byKey.set(key, d);
           }
           for (const d of driverUsers) {
-            if (d.email) byEmail.set(d.email.toLowerCase(), d);
+            const key = d.driverRecordId || d.id;
+            if (key) byKey.set(key, d);
           }
-          return [...supers, ...admins, ...Array.from(byEmail.values())];
+          return [...supers, ...admins, ...Array.from(byKey.values())];
         });
 
         setDriverDocs(docs);
@@ -277,6 +316,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Always ping gateway on mount (login page has no token yet).
   useEffect(() => {
     void refreshAll();
   }, [refreshAll]);

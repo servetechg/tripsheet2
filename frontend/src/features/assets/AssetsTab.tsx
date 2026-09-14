@@ -41,6 +41,7 @@ export function AssetsTab({
     'trucks',
   );
   const [show, setShow] = useState(false);
+  const [editAsset, setEditAsset] = useState<any>(null);
   const [f, setF] = useState(emptyAsset);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -77,18 +78,37 @@ export function AssetsTab({
         ? 'TRAILER'
         : 'EQUIPMENT';
 
-  const add = async () => {
+  const openEdit = (a: any) => {
+    setEditAsset(a);
+    setF({
+      type: a.type || 'truck',
+      unitNo: a.unitNo || '',
+      year: a.year != null ? String(a.year) : '',
+      make: a.make || '',
+      model: a.model || '',
+      vin: a.vin || '',
+      plate: a.plate || '',
+      notes: a.notes || '',
+      insuranceExpiry: a.insuranceExpiry || '',
+      insuranceProviderId: a.insuranceProviderId || '',
+      insuranceProviderName: a.insuranceProviderName || '',
+      plateExpiry: a.plateExpiry || '',
+      permitExpiry: a.permitExpiry || '',
+    });
+    setShow(true);
+    setErr('');
+  };
+
+  const resetAssetForm = () => {
+    setF(emptyAsset);
+    setEditAsset(null);
+    setShow(false);
+    setErr('');
+  };
+
+  const saveAsset = async () => {
     if (blank(f.unitNo)) {
       setErr('Unit No. is required.');
-      return;
-    }
-    if (
-      assets.find(
-        (a: any) =>
-          a.companyId === company.id && a.unitNo === f.unitNo.trim(),
-      )
-    ) {
-      setErr('Unit No. already exists.');
       return;
     }
     const type =
@@ -100,21 +120,38 @@ export function AssetsTab({
     const body = {
       ...f,
       type,
-      status: 'available' as const,
       unitNo: f.unitNo.trim(),
       companyId: company.id,
     };
+    if (!editAsset) {
+      if (
+        assets.find(
+          (a: any) =>
+            a.companyId === company.id && a.unitNo === f.unitNo.trim(),
+        )
+      ) {
+        setErr('Unit No. already exists.');
+        return;
+      }
+      (body as any).status = 'available';
+    }
     try {
       setBusy(true);
       if (apiEnabled) {
-        await assetsApi.create(body);
+        if (editAsset) {
+          await assetsApi.update(editAsset.id, body);
+        } else {
+          await assetsApi.create(body);
+        }
         await refreshAll?.();
+      } else if (editAsset) {
+        setAssets((p: any[]) =>
+          p.map((a) => (a.id === editAsset.id ? { ...a, ...body } : a)),
+        );
       } else {
-        setAssets((p: any[]) => [...p, { ...body, id: uid() }]);
+        setAssets((p: any[]) => [...p, { ...body, id: uid(), status: 'available' }]);
       }
-      setF(emptyAsset);
-      setShow(false);
-      setErr('');
+      resetAssetForm();
     } catch (e: any) {
       setErr(e?.message || 'Failed to save asset');
     } finally {
@@ -222,7 +259,7 @@ export function AssetsTab({
             key={id}
             onClick={() => {
               setAssetTab(id);
-              setShow(false);
+              resetAssetForm();
             }}
             style={{
               background: assetTab === id ? G.gold : 'transparent',
@@ -249,6 +286,8 @@ export function AssetsTab({
         <Btn
           style={{ marginLeft: 'auto' }}
           onClick={() => {
+            setEditAsset(null);
+            setF(emptyAsset);
             setShow(true);
             setErr('');
           }}
@@ -259,7 +298,7 @@ export function AssetsTab({
 
       {show && (
         <Card>
-          <SectionTitle>ADD {typeLabel}</SectionTitle>
+          <SectionTitle>{editAsset ? `EDIT ${typeLabel}` : `ADD ${typeLabel}`}</SectionTitle>
           <Err msg={err} />
           <G2 cols={2}>
             <Inp
@@ -368,17 +407,10 @@ export function AssetsTab({
             placeholder="Optional notes"
           />
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={add} loading={busy} loadingLabel="Saving…">
-              SAVE ASSET
+            <Btn onClick={() => void saveAsset()} loading={busy} loadingLabel="Saving…">
+              {editAsset ? 'SAVE CHANGES' : 'SAVE ASSET'}
             </Btn>
-            <Btn
-              variant="outline"
-              disabled={busy}
-              onClick={() => {
-                setShow(false);
-                setErr('');
-              }}
-            >
+            <Btn variant="outline" disabled={busy} onClick={resetAssetForm}>
               CANCEL
             </Btn>
           </div>
@@ -488,6 +520,9 @@ export function AssetsTab({
                 )}
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Btn size="sm" variant="outline" onClick={() => openEdit(a)}>
+                  Edit
+                </Btn>
                 <Sel
                   compact
                   value={normalizeAssetStatus(a.status)}

@@ -38,7 +38,11 @@ export class DriversService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async findAll(companyId?: string, userId?: string) {
+  async findAll(
+    companyId?: string,
+    userId?: string,
+    opts?: { includeArchived?: boolean },
+  ) {
     const store = getTenantStore();
     const asDriver = store?.role === 'driver';
     const uid = asDriver ? store?.userId : userId;
@@ -46,7 +50,9 @@ export class DriversService {
       where: {
         ...(companyId ? { companyId } : {}),
         ...(uid ? { userId: uid } : {}),
-        lifecycleStatus: { not: 'archived' },
+        ...(opts?.includeArchived
+          ? {}
+          : { lifecycleStatus: { not: 'archived' } }),
       },
       orderBy: { name: 'asc' },
       include: {
@@ -109,6 +115,14 @@ export class DriversService {
 
   async update(id: string, dto: UpdateDriverDto) {
     const existing = await this.ensureExists(id);
+    if (dto.email !== undefined) {
+      const next = dto.email.toLowerCase().trim();
+      if (next !== existing.email.toLowerCase()) {
+        throw new BadRequestException(
+          'Email cannot be changed here. Use Request email change — confirmation is sent to the new and current addresses.',
+        );
+      }
+    }
     let lifecycleStatus = dto.lifecycleStatus;
     if (lifecycleStatus === undefined && dto.active !== undefined) {
       lifecycleStatus = dto.active ? 'active' : 'suspended';
@@ -189,6 +203,29 @@ export class DriversService {
   async archive(id: string) {
     assertPermission('drivers.archive');
     return this.setLifecycle(id, 'archived', 'drivers.archive');
+  }
+
+  async restore(id: string) {
+    assertPermission('drivers.archive');
+    const existing = await this.ensureExists(id);
+    if (existing.lifecycleStatus !== 'archived') {
+      throw new BadRequestException('Driver is not archived');
+    }
+    return this.setLifecycle(id, 'active', 'drivers.restore');
+  }
+
+  async syncEmailByUserId(userId: string, email: string) {
+    const normalized = email.toLowerCase().trim();
+    if (!normalized) {
+      throw new BadRequestException('Email is required');
+    }
+    const drivers = await this.prisma.driver.findMany({ where: { userId } });
+    if (!drivers.length) return { ok: true, updated: 0 };
+    await this.prisma.driver.updateMany({
+      where: { userId },
+      data: { email: normalized },
+    });
+    return { ok: true, updated: drivers.length };
   }
 
   async remove(id: string) {

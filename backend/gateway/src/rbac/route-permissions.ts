@@ -21,6 +21,7 @@ const PUBLIC: RegExp[] = [
   /^\/api\/auth\/mfa\/enroll-login\/confirm$/,
   /^\/api\/auth\/forgot-password$/,
   /^\/api\/auth\/reset-password$/,
+  /^\/api\/auth\/confirm-email-change$/,
   /^\/api\/invites\/by-token\//,
   /^\/api\/invites\/[^/]+\/complete$/,
 ];
