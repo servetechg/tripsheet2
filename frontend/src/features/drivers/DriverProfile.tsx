@@ -264,6 +264,7 @@ export function DriverProfile({
       } else {
         setDriverDocs((p: any[]) => p.filter((d: any) => d.id !== docId));
       }
+      notify('Document deleted successfully');
     } catch (e: any) {
       notify(e?.message || 'Delete failed', 'error');
     }

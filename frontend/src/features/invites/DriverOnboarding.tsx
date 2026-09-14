@@ -5,6 +5,7 @@ import { BrandLogo } from '@/components/brand/BrandLogo';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
 import { uid } from '@/lib/uid';
+import { notify } from '@/components/feedback/Toast';
 
 type Profile = {
   name: string;
@@ -111,6 +112,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
     setSubmitting(true);
     try {
       await onComplete(profile, docs, contract);
+      notify('Application submitted successfully');
       setStep(5);
     } catch (e: any) {
       const raw = e?.message ?? e?.body?.message;
@@ -120,6 +122,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
           ? raw
           : 'Failed to submit application.';
       setErr(msg);
+      notify(msg, 'error');
     } finally {
       setSubmitting(false);
     }

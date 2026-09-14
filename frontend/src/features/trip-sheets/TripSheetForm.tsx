@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { G, RADIUS, page } from '@/lib/theme';
 import { Btn, BackButton, Card, Inp, Sel, SectionTitle, G2, Icons } from '@/components/ui';
 import { uid } from '@/lib/uid';
@@ -21,18 +21,19 @@ const emptyExp = () => ({
   id: uid(),
   category: 'Fuel',
   description: '',
-  receiptNo: '',
   amount: '',
-  currency: 'CAD',
+  receiptNo: '',
+  paidBy: 'Company Card',
 });
 
 const FALLBACK_EXPENSE = [
   'Fuel',
-  'Lumper',
-  'Toll',
+  'DEF',
+  'Scale',
+  'Tolls',
+  'Wash',
   'Parking',
   'Repair',
-  'Food',
   'Other',
 ];
 
@@ -60,8 +61,15 @@ interface FormErrors {
     endDate?: string;
     driver1?: string;
   };
-  trips?: Record<string, TripErrors>;
-  expenses?: Record<string, ExpenseErrors>;
+  trips?: {
+    [id: string]: TripErrors;
+  };
+  expenses?: {
+    [id: string]: {
+      description?: string;
+      amount?: string;
+    };
+  };
   general?: string;
 }
 
@@ -72,27 +80,44 @@ export function TripSheetForm({
   onSave,
   onBack,
 }: any) {
-  const [hdr, setHdr] = useState(
-    editSheet?.header || {
+  const [init] = useState(() => ({
+    hdr: editSheet?.header || {
       truckNo: user?.truckNo || '',
       startDate: '',
       endDate: '',
       driver1: user?.name || '',
       driver2: '',
     },
-  );
-  const [trips, setTrips] = useState<any[]>(
-    editSheet?.trips?.length ? editSheet.trips : [emptyTrip()],
-  );
-  const [exps, setExps] = useState<any[]>(
-    editSheet?.expenses?.length ? editSheet.expenses : [emptyExp()],
-  );
-  const [notes, setNotes] = useState(editSheet?.notes || '');
+    trips: editSheet?.trips?.length ? editSheet.trips : [emptyTrip()],
+    expenses: editSheet?.expenses?.length ? editSheet.expenses : [emptyExp()],
+    notes: editSheet?.notes || '',
+  }));
+
+  const [hdr, setHdr] = useState(init.hdr);
+  const [trips, setTrips] = useState<any[]>(init.trips);
+  const [exps, setExps] = useState<any[]>(init.expenses);
+  const [notes, setNotes] = useState(init.notes);
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const [expCats, setExpCats] = useState<string[]>(FALLBACK_EXPENSE);
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitted, setSubmitted] = useState(false);
+
+  const initialSnapshot = useMemo(() => {
+    if (!editSheet) return null;
+    return JSON.stringify(init);
+  }, [editSheet, init]);
+
+  const isFormDirty = useMemo(() => {
+    if (!editSheet || !initialSnapshot) return true;
+    const current = JSON.stringify({
+      hdr,
+      trips,
+      expenses: exps,
+      notes,
+    });
+    return current !== initialSnapshot;
+  }, [editSheet, initialSnapshot, hdr, trips, exps, notes]);
 
   useEffect(() => {
     if (!company?.id) return;
@@ -452,6 +477,7 @@ export function TripSheetForm({
           onClick={save}
           loading={saving}
           loadingLabel="Saving…"
+          disabled={saving || (Boolean(editSheet) && !isFormDirty)}
           style={{ padding: '9px 18px' }}
         >
           SAVE
@@ -887,7 +913,8 @@ export function TripSheetForm({
           {Icons.eye({ size: 16, color: G.muted })} VIEW / PDF
         </Btn>
         <Btn
-          style={{ flex: 1, padding: 13, opacity: saving ? 0.6 : 1 }}
+          disabled={saving || (Boolean(editSheet) && !isFormDirty)}
+          style={{ flex: 1, padding: 13 }}
           onClick={save}
         >
           {saving ? 'SAVING…' : 'SAVE SHEET'}

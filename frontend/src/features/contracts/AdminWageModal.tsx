@@ -6,7 +6,7 @@ import { PAY_TYPES } from '@/lib/docTypes';
 
 export function AdminWageModal({ driver, company, existingContract, onSave, onClose }: any) {
   const today = new Date().toLocaleDateString("en-CA");
-  const [f, setF] = useState({
+  const [initialF] = useState(() => ({
     payType:       existingContract?.payType       || "per_mile",
     payRate:       existingContract?.payRate       || "",
     payUnit:       existingContract?.payUnit       || "CAD",
@@ -23,7 +23,11 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
     startDate:     existingContract?.startDate     || today,
     signedByAdmin: true,
     signedByDriver: existingContract?.signedByDriver || false,
-  });
+  }));
+  const [f, setF] = useState(initialF);
+  const isDirty = existingContract
+    ? Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])
+    : !blank(f.payRate);
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   const pt = PAY_TYPES.find(p=>p.id===f.payType)||PAY_TYPES[0];
   const [err, setErr] = useState("");
@@ -177,6 +181,7 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
             onClick={() => void save()}
             loading={saving}
             loadingLabel="Saving…"
+            disabled={saving || !isDirty}
             style={{ flex:1,padding:13, display:'inline-flex', alignItems:'center', justifyContent:'center', gap:6 }}
           >
             {Icons.save({ size: 16, color: G.onGold })}

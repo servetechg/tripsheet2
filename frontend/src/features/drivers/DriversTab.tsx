@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, StatCard, StatsGrid, Icons, Modal } from '@/components/ui';
 import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
@@ -41,6 +41,7 @@ export function DriversTab({
   const [selectedDriver, setSD] = useState<any>(null);
   const [show, setShow] = useState(false);
   const [editDriver, setEditDriver] = useState<any>(null);
+  const [initialF, setInitialF] = useState<any>(null);
   const [generatedLink, setGeneratedLink] = useState<any>(null);
   const [generatedInviteId, setGeneratedInviteId] = useState<string | null>(
     null,
@@ -315,15 +316,16 @@ export function DriversTab({
       availabilityStatus: 'available',
     });
     setEditDriver(null);
+    setInitialF(null);
     setShow(false);
     setErr('');
   };
 
   const openEditDriver = (d: any) => {
-    setF({
+    const init = {
       name: d.name || '',
       email: d.email || '',
-      password: d.password || '',
+      password: '',
       licenseNo: d.licenseNo || '',
       phone: d.phone || '',
       dob: d.dob || '',
@@ -339,9 +341,39 @@ export function DriversTab({
       hireDate: d.hireDate || '',
       branchId: d.branchId || '',
       availabilityStatus: d.availabilityStatus || 'available',
-    });
+    };
+    setF(init);
+    setInitialF(init);
     setEditDriver(d);
     setShow(true);
+  };
+
+  const ensureDriverRecordId = async (d: any): Promise<string | null> => {
+    if (d.driverRecordId) return d.driverRecordId;
+    if (!apiEnabled) return null;
+    try {
+      const list = await driversApi.list(company.id).catch(() => []);
+      const match = (list as any[]).find(
+        (x) =>
+          x.userId === d.id ||
+          (x.email && d.email && x.email.toLowerCase() === d.email.toLowerCase()),
+      );
+      if (match?.id) return match.id;
+      const created = await driversApi.create({
+        companyId: company.id,
+        userId: d.id,
+        name: d.name || 'Driver',
+        email: d.email,
+        phone: d.phone,
+        licenseNo: d.licenseNo,
+        active: d.active !== false,
+        lifecycleStatus: d.lifecycleStatus || 'active',
+        availabilityStatus: d.availabilityStatus || 'available',
+      });
+      return created?.id || null;
+    } catch {
+      return null;
+    }
   };
 
   const save = async () => {
@@ -357,7 +389,7 @@ export function DriversTab({
       setBusy(true);
       if (apiEnabled) {
         if (editDriver) {
-          const recordId = editDriver.driverRecordId;
+          const recordId = await ensureDriverRecordId(editDriver);
           if (recordId) {
             await driversApi.update(recordId, {
               name: f.name.trim(),
@@ -447,8 +479,11 @@ export function DriversTab({
         ]);
       }
       resetForm();
+      notify(editDriver ? 'Driver profile updated' : 'Driver created successfully');
     } catch (e: any) {
-      setErr(e?.message || 'Failed to save driver');
+      const msg = e?.message || 'Failed to save driver';
+      setErr(msg);
+      notify(msg, 'error');
     } finally {
       setBusy(false);
     }
@@ -464,15 +499,12 @@ export function DriversTab({
     if (!ok) return;
     try {
       if (apiEnabled) {
-        const recordId = d.driverRecordId;
+        const recordId = await ensureDriverRecordId(d);
         if (recordId) {
           await driversApi.archive(recordId);
-        } else {
-          const list = await driversApi.list(company.id);
-          const match = (list as any[]).find(
-            (x) => x.userId === d.id || x.email === d.email,
-          );
-          if (match) await driversApi.archive(match.id);
+        }
+        if (d.id) {
+          await authApi.setUserStatus(d.id, 'archived').catch(() => {});
         }
         await refreshAll?.();
       } else {
@@ -486,10 +518,21 @@ export function DriversTab({
 
   const approveDriver = async (d: any, e?: { stopPropagation?: () => void }) => {
     e?.stopPropagation?.();
-    const recordId = d.driverRecordId;
-    if (!recordId || !apiEnabled) return;
     try {
-      await driversApi.approve(recordId);
+      const recordId = await ensureDriverRecordId(d);
+      if (recordId && apiEnabled) {
+        await driversApi.approve(recordId);
+      }
+      if (d.id && apiEnabled) {
+        await authApi.setUserStatus(d.id, 'active').catch(() => {});
+      }
+      if (!apiEnabled) {
+        setUsers?.((p: any[]) =>
+          p.map((u) =>
+            u.id === d.id ? { ...u, lifecycleStatus: 'active', active: true } : u,
+          ),
+        );
+      }
       await refreshAll?.();
       notify(`${d.name} approved — now active for dispatch`);
     } catch (err: any) {
@@ -527,6 +570,15 @@ export function DriversTab({
     }
     return (d.lifecycleStatus || 'active') === statusFilter;
   });
+
+  const isFormDirty = Boolean(
+    editDriver
+      ? initialF &&
+        Object.keys(initialF).some(
+          (k) => (f as any)[k] !== (initialF as any)[k],
+        )
+      : !blank(f.name) && !blank(f.email) && !blank(f.password),
+  );
 
   if (view === 'profile' && selectedDriver) {
     return (
@@ -1028,258 +1080,261 @@ export function DriversTab({
         </div>
       )}
 
-      {show && (
-        <Card>
-          <SectionTitle>
-            {editDriver ? 'EDIT DRIVER' : 'NEW DRIVER ACCOUNT'}
-          </SectionTitle>
-          <ErrBox msg={err} />
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 2,
-              color: G.info,
-              marginBottom: 10,
-              paddingBottom: 6,
-              borderBottom: `1px solid ${G.border}`,
-            }}
-          >
-            LOGIN & IDENTITY
-          </div>
-          <G2 cols={2}>
-            <Inp
-              label="Full Name *"
-              value={f.name}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, name: e.target.value }))
-              }
-              placeholder="Driver full name"
-            />
-            {editDriver ? (
-              <div>
-                <Inp
-                  label="Email"
-                  value={f.email}
-                  disabled
-                  placeholder="driver@company.com"
-                />
-                {editDriver.id ? (
-                  <Btn
-                    size="sm"
-                    variant="outline"
-                    style={{ marginTop: 6 }}
-                    onClick={() => setEmailModalOpen(true)}
-                  >
-                    Change email…
-                  </Btn>
-                ) : null}
-                {editDriver.pendingEmail ? (
-                  <div style={{ fontSize: 11, color: G.gold, marginTop: 4 }}>
-                    Pending: {editDriver.pendingEmail}
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <Inp
-                label="Email *"
-                value={f.email}
-                onChange={(e: any) =>
-                  setF((x) => ({ ...x, email: e.target.value }))
-                }
-                placeholder="driver@company.com"
-              />
-            )}
-          </G2>
-          <G2 cols={2}>
-            <Inp
-              label={editDriver ? 'Password' : 'Password *'}
-              value={f.password}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, password: e.target.value }))
-              }
-              placeholder={
-                editDriver ? 'Leave blank to keep' : 'Login password'
-              }
-              type="password"
-            />
-            <Inp
-              label="Phone"
-              phone
-              value={f.phone}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, phone: e.target.value }))
-              }
-              placeholder="(403) 555-0100"
-            />
-          </G2>
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 2,
-              color: G.gold,
-              marginBottom: 10,
-              paddingBottom: 6,
-              borderBottom: `1px solid ${G.border}`,
-            }}
-          >
-            PERSONAL DETAILS
-          </div>
-          <G2 cols={2}>
-            <Inp
-              label="Date of Birth"
-              value={f.dob}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, dob: e.target.value }))
-              }
-              placeholder="YYYY-MM-DD"
-              type="date"
-            />
-            <Sel
-              label="Citizenship"
-              value={f.citizenship}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, citizenship: e.target.value }))
-              }
-            >
-              {['CA', 'US', 'IN', 'MX', 'Other'].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </Sel>
-          </G2>
-          <G2 cols={2}>
-            <Inp
-              label="License No."
-              value={f.licenseNo}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, licenseNo: e.target.value }))
-              }
-              placeholder="e.g. AB-123456"
-            />
-            <Inp
-              label="FAST Card #"
-              value={f.fastCard}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, fastCard: e.target.value }))
-              }
-              placeholder="Optional"
-            />
-          </G2>
-          <Inp
-            label="Home Address"
-            value={f.address}
-            onChange={(e: any) =>
-              setF((x) => ({ ...x, address: e.target.value }))
-            }
-            placeholder="Full address"
-          />
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 2,
-              color: G.muted,
-              marginBottom: 10,
-              paddingBottom: 6,
-              borderBottom: `1px solid ${G.border}`,
-            }}
-          >
-            EMERGENCY CONTACT
-          </div>
-          <G2 cols={2}>
-            <Inp
-              label="Emergency Contact Name"
-              value={f.emergencyName}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, emergencyName: e.target.value }))
-              }
-              placeholder="Full name"
-            />
-            <Inp
-              label="Emergency Contact Phone"
-              phone
-              value={f.emergencyPhone}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, emergencyPhone: e.target.value }))
-              }
-              placeholder="(403) 555-0100"
-            />
-          </G2>
-          <Inp
-            label="Notes"
-            value={f.notes}
-            onChange={(e: any) =>
-              setF((x) => ({ ...x, notes: e.target.value }))
-            }
-            placeholder="Any additional notes..."
-          />
-          <div
-            style={{
-              fontSize: 10,
-              letterSpacing: 2,
-              color: G.muted,
-              marginBottom: 10,
-              paddingBottom: 6,
-              borderBottom: `1px solid ${G.border}`,
-            }}
-          >
-            EMPLOYMENT
-          </div>
-          <G2 cols={2}>
-            <Sel
-              label="Driver type"
-              value={f.driverType}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, driverType: e.target.value }))
-              }
-            >
-              {Object.entries(DRIVER_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Sel>
-            <Inp
-              label="Employee #"
-              value={f.employeeNumber}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, employeeNumber: e.target.value }))
-              }
-            />
-            <Inp
-              label="Hire date"
-              type="date"
-              value={f.hireDate}
-              onChange={(e: any) =>
-                setF((x) => ({ ...x, hireDate: e.target.value }))
-              }
-            />
-          </G2>
-          <Sel
-            label="Availability"
-            value={f.availabilityStatus}
-            onChange={(e: any) =>
-              setF((x) => ({ ...x, availabilityStatus: e.target.value }))
-            }
-          >
-            {DRIVER_AVAILABILITY_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {AVAILABILITY_LABELS[s]}
-              </option>
-            ))}
-          </Sel>
-          <div style={{ display: 'flex', gap: 10 }}>
+      <Modal
+        open={show}
+        onClose={resetForm}
+        title={editDriver ? `Edit Driver — ${editDriver.name || editDriver.email}` : 'New Driver Account'}
+        maxWidth={640}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Btn variant="outline" onClick={resetForm} disabled={busy}>
+              CANCEL
+            </Btn>
             <Btn
               onClick={save}
               loading={busy}
+              disabled={!isFormDirty || busy}
               loadingLabel={editDriver ? 'Saving…' : 'Creating…'}
             >
               {editDriver ? 'SAVE CHANGES' : 'CREATE DRIVER'}
             </Btn>
-            <Btn variant="outline" onClick={resetForm} disabled={busy}>
-              CANCEL
-            </Btn>
           </div>
-        </Card>
-      )}
+        }
+      >
+        <ErrBox msg={err} />
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 2,
+            color: G.info,
+            marginBottom: 10,
+            paddingBottom: 6,
+            borderBottom: `1px solid ${G.border}`,
+          }}
+        >
+          LOGIN & IDENTITY
+        </div>
+        <G2 cols={2}>
+          <Inp
+            label="Full Name *"
+            value={f.name}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, name: e.target.value }))
+            }
+            placeholder="Driver full name"
+          />
+          {editDriver ? (
+            <div>
+              <Inp
+                label="Email"
+                value={f.email}
+                disabled
+                placeholder="driver@company.com"
+              />
+              {editDriver.id ? (
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  style={{ marginTop: 6 }}
+                  onClick={() => setEmailModalOpen(true)}
+                >
+                  Change email…
+                </Btn>
+              ) : null}
+              {editDriver.pendingEmail ? (
+                <div style={{ fontSize: 11, color: G.gold, marginTop: 4 }}>
+                  Pending: {editDriver.pendingEmail}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Inp
+              label="Email *"
+              value={f.email}
+              onChange={(e: any) =>
+                setF((x) => ({ ...x, email: e.target.value }))
+              }
+              placeholder="driver@company.com"
+            />
+          )}
+        </G2>
+        <G2 cols={2}>
+          <Inp
+            label={editDriver ? 'Password' : 'Password *'}
+            value={f.password}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, password: e.target.value }))
+            }
+            placeholder={
+              editDriver ? 'Leave blank to keep' : 'Login password'
+            }
+            type="password"
+          />
+          <Inp
+            label="Phone"
+            phone
+            value={f.phone}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, phone: e.target.value }))
+            }
+            placeholder="(403) 555-0100"
+          />
+        </G2>
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 2,
+            color: G.gold,
+            marginBottom: 10,
+            paddingBottom: 6,
+            borderBottom: `1px solid ${G.border}`,
+          }}
+        >
+          PERSONAL DETAILS
+        </div>
+        <G2 cols={2}>
+          <Inp
+            label="Date of Birth"
+            value={f.dob}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, dob: e.target.value }))
+            }
+            placeholder="YYYY-MM-DD"
+            type="date"
+          />
+          <Sel
+            label="Citizenship"
+            value={f.citizenship}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, citizenship: e.target.value }))
+            }
+          >
+            {['CA', 'US', 'IN', 'MX', 'Other'].map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </Sel>
+        </G2>
+        <G2 cols={2}>
+          <Inp
+            label="License No."
+            value={f.licenseNo}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, licenseNo: e.target.value }))
+            }
+            placeholder="e.g. AB-123456"
+          />
+          <Inp
+            label="FAST Card #"
+            value={f.fastCard}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, fastCard: e.target.value }))
+            }
+            placeholder="Optional"
+          />
+        </G2>
+        <Inp
+          label="Home Address"
+          value={f.address}
+          onChange={(e: any) =>
+            setF((x) => ({ ...x, address: e.target.value }))
+          }
+          placeholder="Full address"
+        />
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 2,
+            color: G.muted,
+            marginBottom: 10,
+            paddingBottom: 6,
+            borderBottom: `1px solid ${G.border}`,
+          }}
+        >
+          EMERGENCY CONTACT
+        </div>
+        <G2 cols={2}>
+          <Inp
+            label="Emergency Contact Name"
+            value={f.emergencyName}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, emergencyName: e.target.value }))
+            }
+            placeholder="Full name"
+          />
+          <Inp
+            label="Emergency Contact Phone"
+            phone
+            value={f.emergencyPhone}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, emergencyPhone: e.target.value }))
+            }
+            placeholder="(403) 555-0100"
+          />
+        </G2>
+        <Inp
+          label="Notes"
+          value={f.notes}
+          onChange={(e: any) =>
+            setF((x) => ({ ...x, notes: e.target.value }))
+          }
+          placeholder="Any additional notes..."
+        />
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: 2,
+            color: G.muted,
+            marginBottom: 10,
+            paddingBottom: 6,
+            borderBottom: `1px solid ${G.border}`,
+          }}
+        >
+          EMPLOYMENT
+        </div>
+        <G2 cols={2}>
+          <Sel
+            label="Driver type"
+            value={f.driverType}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, driverType: e.target.value }))
+            }
+          >
+            {Object.entries(DRIVER_TYPE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </Sel>
+          <Inp
+            label="Employee #"
+            value={f.employeeNumber}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, employeeNumber: e.target.value }))
+            }
+          />
+          <Inp
+            label="Hire date"
+            type="date"
+            value={f.hireDate}
+            onChange={(e: any) =>
+              setF((x) => ({ ...x, hireDate: e.target.value }))
+            }
+          />
+        </G2>
+        <Sel
+          label="Availability"
+          value={f.availabilityStatus}
+          onChange={(e: any) =>
+            setF((x) => ({ ...x, availabilityStatus: e.target.value }))
+          }
+        >
+          {DRIVER_AVAILABILITY_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {AVAILABILITY_LABELS[s]}
+            </option>
+          ))}
+        </Sel>
+      </Modal>
 
       {filteredDrivers.length === 0 ? (
         <Card style={{ textAlign: 'center', padding: 50 }}>
@@ -1555,8 +1610,6 @@ export function DriversTab({
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            const recordId = d.driverRecordId;
-                            if (!recordId) return;
                             const ok = await confirm({
                               title: 'Suspend driver',
                               message: `Suspend ${d.name}? They will not be able to log in or receive dispatches.`,
@@ -1565,7 +1618,22 @@ export function DriversTab({
                             });
                             if (!ok) return;
                             try {
-                              await driversApi.suspend(recordId);
+                              const recordId = await ensureDriverRecordId(d);
+                              if (recordId && apiEnabled) {
+                                await driversApi.suspend(recordId);
+                              }
+                              if (d.id && apiEnabled) {
+                                await authApi.setUserStatus(d.id, 'suspended').catch(() => {});
+                              }
+                              if (!apiEnabled) {
+                                setUsers?.((p: any[]) =>
+                                  p.map((u) =>
+                                    u.id === d.id
+                                      ? { ...u, lifecycleStatus: 'suspended', active: false }
+                                      : u,
+                                  ),
+                                );
+                              }
                               await refreshAll?.();
                               notify(`${d.name} suspended`);
                             } catch (err: any) {
@@ -1591,8 +1659,6 @@ export function DriversTab({
                         <button
                           onClick={async (e) => {
                             e.stopPropagation();
-                            const recordId = d.driverRecordId;
-                            if (!recordId) return;
                             const ok = await confirm({
                               title: 'Unsuspend driver',
                               message: `Reactivate ${d.name}? They will be able to log in and be assigned to dispatches.`,
@@ -1600,7 +1666,22 @@ export function DriversTab({
                             });
                             if (!ok) return;
                             try {
-                              await driversApi.unsuspend(recordId);
+                              const recordId = await ensureDriverRecordId(d);
+                              if (recordId && apiEnabled) {
+                                await driversApi.unsuspend(recordId);
+                              }
+                              if (d.id && apiEnabled) {
+                                await authApi.setUserStatus(d.id, 'active').catch(() => {});
+                              }
+                              if (!apiEnabled) {
+                                setUsers?.((p: any[]) =>
+                                  p.map((u) =>
+                                    u.id === d.id
+                                      ? { ...u, lifecycleStatus: 'active', active: true }
+                                      : u,
+                                  ),
+                                );
+                              }
                               await refreshAll?.();
                               notify(`${d.name} unsuspended — now active`);
                             } catch (err: any) {

@@ -83,7 +83,7 @@ export function MfaSettingsPanel({ onClose }: { onClose: () => void }) {
                   .finally(() => setBusy(false));
               }}
             >
-              Set up authenticator
+              Set Up Authenticator
             </Btn>
           )}
           {enabled && (

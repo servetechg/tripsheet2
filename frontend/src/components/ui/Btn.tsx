@@ -136,6 +136,9 @@ export function Btn({
         gap: 8,
         ...(full ? { width: '100%' } : {}),
         ...sx,
+        ...(disabled || loading
+          ? { opacity: 0.45, cursor: 'not-allowed' }
+          : {}),
       }}
       disabled={disabled || loading}
       aria-busy={loading || undefined}

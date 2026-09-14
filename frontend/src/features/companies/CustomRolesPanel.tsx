@@ -72,6 +72,20 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
     setChecked(new Set(selected.permissions || []));
   }, [selectedId, selected?.id]);
 
+  const isDirty = useMemo(() => {
+    if (selectedId === 'new') return Boolean(name.trim());
+    if (!selected) return false;
+    if (name.trim() !== (selected.name || '').trim()) return true;
+    if ((description || '').trim() !== (selected.description || '').trim()) return true;
+    if (baseRole !== selected.baseRole) return true;
+    const orig = new Set(selected.permissions || []);
+    if (checked.size !== orig.size) return true;
+    for (const p of checked) {
+      if (!orig.has(p)) return true;
+    }
+    return false;
+  }, [selectedId, selected, name, description, baseRole, checked]);
+
   const modules = useMemo(() => {
     const map = new Map<string, Perm[]>();
     for (const p of catalog) {
@@ -465,6 +479,7 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
             <Btn
               loading={busy}
               loadingLabel={selectedId === 'new' ? 'Creating…' : 'Saving…'}
+              disabled={busy || !isDirty}
               onClick={() => void save()}
             >
               {selectedId === 'new' ? 'Create Role' : 'Save Grants'}
