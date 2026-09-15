@@ -1789,11 +1789,27 @@ export function DriversTab({
           open={emailModalOpen}
           onClose={() => setEmailModalOpen(false)}
           userId={editDriver.id}
-          currentEmail={f.email}
+          currentEmail={editDriver.email || f.email}
           pendingEmail={editDriver.pendingEmail}
           onSuccess={() => {
-            void refreshAll?.();
-            setEmailModalOpen(false);
+            void refreshAll?.().then(() => {
+              setEmailModalOpen(false);
+              if (!editDriver?.id || !apiEnabled) return;
+              void authApi.listUsers(company.id).then((rows) => {
+                const fresh = rows.find((r) => r.id === editDriver.id);
+                if (!fresh) return;
+                setEditDriver((prev: any) =>
+                  prev
+                    ? {
+                        ...prev,
+                        email: fresh.email,
+                        pendingEmail: fresh.pendingEmail ?? null,
+                      }
+                    : prev,
+                );
+                setF((prev) => ({ ...prev, email: fresh.email }));
+              });
+            });
           }}
         />
       ) : null}
