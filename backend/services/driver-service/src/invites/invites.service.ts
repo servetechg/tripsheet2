@@ -52,7 +52,7 @@ export class InvitesService {
     });
   }
 
-  async create(dto: CreateInviteDto) {
+  async create(dto: CreateInviteDto, actorEmail?: string) {
     const kind = dto.kind === 'staff' ? 'staff' : 'driver';
     if (kind === 'staff') {
       assertPermission('users.create');
@@ -88,7 +88,7 @@ export class InvitesService {
     });
 
     if (invite.email) {
-      void this.queueInviteEmail(invite);
+      void this.queueInviteEmail(invite, actorEmail);
     }
     return invite;
   }
@@ -118,7 +118,7 @@ export class InvitesService {
   }
 
   /** Re-send an existing pending invite link over email or SMS. */
-  async sendLink(id: string, dto: SendInviteDto) {
+  async sendLink(id: string, dto: SendInviteDto, actorEmail?: string) {
     const invite = await this.prisma.invite.findUnique({ where: { id } });
     if (!invite) {
       throw new NotFoundException(`Invite ${id} not found`);
@@ -188,6 +188,7 @@ export class InvitesService {
               subject: `You are invited to join ${brand}`,
               role: invite.role,
               token: invite.token,
+              replyTo: actorEmail?.trim().toLowerCase() || undefined,
             },
           };
 
@@ -807,13 +808,16 @@ export class InvitesService {
     return `${origin.replace(/\/$/, '')}/invite?invite=${encodeURIComponent(token)}`;
   }
 
-  private async queueInviteEmail(invite: {
-    token: string;
-    companyId: string;
-    email: string | null;
-    name: string | null;
-    role: string;
-  }) {
+  private async queueInviteEmail(
+    invite: {
+      token: string;
+      companyId: string;
+      email: string | null;
+      name: string | null;
+      role: string;
+    },
+    actorEmail?: string,
+  ) {
     const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
     if (!notifyUrl || !invite.email) return;
     const link = this.inviteLink(invite.token);
@@ -832,6 +836,7 @@ export class InvitesService {
             subject: 'You are invited to FleetQuix',
             role: invite.role,
             token: invite.token,
+            replyTo: actorEmail?.trim().toLowerCase() || undefined,
           },
         }),
       });

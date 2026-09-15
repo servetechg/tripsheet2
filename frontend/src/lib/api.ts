@@ -464,6 +464,28 @@ export type CustomRoleDto = {
   permissions: string[];
 };
 
+export type EmailDeliveryDto = {
+  companyId: string;
+  mode: 'platform' | 'smtp';
+  fromDisplayName: string;
+  fromEmail: string;
+  replyToEmail: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpSecure: boolean;
+  smtpUser: string;
+  hasSmtpPassword: boolean;
+  domainVerifiedAt?: string | null;
+  active: boolean;
+  lastTestedAt?: string | null;
+  lastTestStatus: string;
+  platformFromAddress: string;
+  platformEmailProvider?: 'smtp' | 'none';
+  platformEmailReady?: boolean;
+  deliveryModel?: 'platform_branding';
+  tenantReplyToEmail?: string;
+};
+
 export const companiesApi = {
   list: () => api<any[]>('/companies'),
   get: (id: string) => api<any>(`/companies/${id}`),
@@ -494,6 +516,20 @@ export const companiesApi = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  emailDelivery: (id: string) =>
+    api<EmailDeliveryDto>(
+      `/companies/${encodeURIComponent(id)}/email-delivery`,
+    ),
+  patchEmailDelivery: (id: string, body: unknown) =>
+    api<EmailDeliveryDto>(
+      `/companies/${encodeURIComponent(id)}/email-delivery`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
+  testEmailDelivery: (id: string, to: string) =>
+    api<{ ok: boolean; to: string; status: string }>(
+      `/companies/${encodeURIComponent(id)}/email-delivery/test`,
+      { method: 'POST', body: JSON.stringify({ to }) },
+    ),
   branches: (id: string) =>
     api<any[]>(`/companies/${encodeURIComponent(id)}/branches`),
   saveBranch: (id: string, body: unknown) =>

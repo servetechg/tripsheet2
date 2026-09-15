@@ -30,11 +30,18 @@ export class NotificationsService {
     }
     const channel = String(body.channel || 'email');
     if (channel === 'email') {
+      const meta = { ...((body.meta as Record<string, unknown>) ?? {}) };
+      if (body.replyTo && !meta.replyTo) {
+        meta.replyTo = String(body.replyTo);
+      }
+      if (body.senderEmail && !meta.replyTo) {
+        meta.replyTo = String(body.senderEmail);
+      }
       return this.emailService.send({
         to,
         body: text,
         companyId: body.companyId ? String(body.companyId) : undefined,
-        meta: (body.meta as Record<string, unknown>) ?? undefined,
+        meta,
       });
     }
     return this.prisma.notificationLog.create({
@@ -59,10 +66,14 @@ export class NotificationsService {
 
   async getHealthDetail() {
     const redisOk = await this.redis.ping();
+    const email = this.emailService.getPlatformStatus();
     return {
       redis: redisOk ? 'ok' : 'down',
       twilioConfigured: this.smsService.isTwilioConfigured(),
-      smtpConfigured: this.emailService.isSmtpConfigured(),
+      smtpConfigured: email.smtpConfigured,
+      platformEmailReady: email.platformReady,
+      emailProvider: email.provider,
+      platformFromAddress: email.platformFromAddress,
     };
   }
 }

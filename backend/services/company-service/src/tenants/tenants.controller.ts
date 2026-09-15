@@ -12,6 +12,7 @@ import { TenantsService } from './tenants.service';
 import { ProvisioningService } from './provisioning.service';
 import { TenantOpsService } from './tenant-ops.service';
 import { TenantLocalService } from '../org/tenant-local.service';
+import { EmailDeliveryService } from '../email-delivery/email-delivery.service';
 
 @Controller()
 export class TenantsController {
@@ -20,6 +21,7 @@ export class TenantsController {
     private readonly provisioning: ProvisioningService,
     private readonly ops: TenantOpsService,
     private readonly tenantLocal: TenantLocalService,
+    private readonly emailDelivery: EmailDeliveryService,
   ) {}
 
   @Get('tenants')
@@ -92,6 +94,17 @@ export class TenantsController {
   ) {
     this.tenants.assertInternalKey(key);
     return this.tenants.getPublicCompanySummary(companyId);
+  }
+
+  /** Internal: resolved outbound email profile for notification-service. */
+  @Get('internal/companies/:companyId/email-delivery')
+  internalEmailDelivery(
+    @Param('companyId') companyId: string,
+    @Query('replyTo') replyTo?: string,
+    @Headers('x-internal-api-key') key?: string,
+  ) {
+    this.tenants.assertInternalKey(key);
+    return this.emailDelivery.resolveForSend(companyId, replyTo);
   }
 
   @Post('internal/tenants/:companyId/ensure-driver-schema')

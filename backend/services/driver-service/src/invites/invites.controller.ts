@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { InvitesService } from './invites.service';
 import { CreateInviteDto } from './dto/create-invite.dto';
 import { CompleteInviteDto } from './dto/complete-invite.dto';
@@ -14,8 +22,11 @@ export class InvitesController {
   }
 
   @Post()
-  create(@Body() dto: CreateInviteDto) {
-    return this.invitesService.create(dto);
+  create(
+    @Body() dto: CreateInviteDto,
+    @Headers('x-user-email') actorEmail?: string,
+  ) {
+    return this.invitesService.create(dto, actorEmail);
   }
 
   @Get('by-token/:token')
@@ -29,8 +40,12 @@ export class InvitesController {
   }
 
   @Post(':id/send')
-  send(@Param('id') id: string, @Body() dto: SendInviteDto) {
-    return this.invitesService.sendLink(id, dto);
+  send(
+    @Param('id') id: string,
+    @Body() dto: SendInviteDto,
+    @Headers('x-user-email') actorEmail?: string,
+  ) {
+    return this.invitesService.sendLink(id, dto, actorEmail);
   }
 
   @Post(':id/revoke')

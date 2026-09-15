@@ -44,9 +44,39 @@ model Company {
   subscription     Subscription?
   tenantDatabase   TenantDatabase?
   lifecycleEvents  TenantLifecycleEvent[]
+  emailDelivery    CompanyEmailDelivery?
 
   @@index([status])
   @@index([planId])
+}
+
+/// Per-tenant outbound email identity (platform SMTP + branding or BYO SMTP).
+model CompanyEmailDelivery {
+  id               String    @id @default(cuid())
+  companyId        String    @unique
+  /// platform = shared transactional provider; smtp = tenant BYO credentials
+  mode             String    @default("platform")
+  fromDisplayName  String    @default("")
+  /// Optional tenant from address (smtp mode or verified domain later)
+  fromEmail        String    @default("")
+  replyToEmail     String    @default("")
+  smtpHost         String    @default("")
+  smtpPort         Int       @default(587)
+  smtpSecure       Boolean   @default(false)
+  smtpUser         String    @default("")
+  /// AES-256-GCM ciphertext (base64)
+  smtpPassCipher   String    @default("")
+  domainVerifiedAt DateTime?
+  active           Boolean   @default(true)
+  lastTestedAt     DateTime?
+  lastTestStatus   String    @default("")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([mode])
+  @@index([active])
 }
 
 model Subscription {
