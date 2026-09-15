@@ -11,6 +11,7 @@ import { toTenantSlug } from '../platform/crypto.util';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { stripInternalTenantFields } from '../tenants/tenant-error.util';
+import { EmailDeliveryService } from '../email-delivery/email-delivery.service';
 
 @Injectable()
 export class CompaniesService {
@@ -19,6 +20,7 @@ export class CompaniesService {
     private readonly plans: PlansService,
     private readonly tenants: TenantsService,
     private readonly provisioning: ProvisioningService,
+    private readonly emailDelivery: EmailDeliveryService,
   ) {}
 
   findAll() {
@@ -143,6 +145,8 @@ export class CompaniesService {
         subscription: true,
       },
     });
+
+    await this.emailDelivery.seedDefault(company.id, company.name);
 
     await this.tenants.registerPending(company.id, shortName, {
       actorName: 'superadmin',

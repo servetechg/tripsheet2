@@ -37,6 +37,15 @@ const OPTIONAL = new Set([
   'TWILIO_FROM_NUMBER',
   'TENANT_RUNTIME_MODE',
   'AUTH_EXPOSE_RESET_URL',
+  'PLATFORM_FROM_EMAIL',
+  'PLATFORM_EMAIL_FROM_NAME',
+  'PLATFORM_REPLY_TO',
+  'SMTP_HOST',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'SMTP_FROM',
+  'SMTP_PORT',
+  'SMTP_SECURE',
 ]);
 
 /** Keys required for email delivery and cross-service calls in local dev. */
@@ -53,7 +62,7 @@ const REQUIRED = [
   'SMTP_HOST',
   'SMTP_USER',
   'SMTP_PASS',
-  'SMTP_FROM',
+  'PLATFORM_FROM_EMAIL',
   'APP_PUBLIC_ORIGIN',
 ];
 
@@ -114,11 +123,32 @@ if (emptyRequired.length) {
   console.log('Required keys for local dev are set.');
 }
 
-if (smtpOk) {
-  console.log('SMTP looks configured — emails should send after service restart.');
+const platformFromSet = Boolean((env.get('PLATFORM_FROM_EMAIL') || '').trim());
+
+if (smtpOk && platformFromSet) {
+  console.log('SMTP configured (Model A) — platform From + tenant reply-to after restart.');
+} else if (smtpOk) {
+  console.log('SMTP relay configured.');
+  console.warn(
+    '  Set PLATFORM_FROM_EMAIL=noreply@yourdomain.com (different from SMTP_USER) for Model A.',
+  );
 } else {
   console.warn(
-    '\nSMTP incomplete or still using placeholders — emails stay queued until SMTP_* is set.',
+    '\nSMTP incomplete — emails stay queued until SMTP_* and PLATFORM_FROM_EMAIL are set.',
+  );
+}
+
+const smtpUser = (env.get('SMTP_USER') || '').trim().toLowerCase();
+const smtpFrom = (env.get('SMTP_FROM') || '').trim().toLowerCase();
+const platformFrom = (env.get('PLATFORM_FROM_EMAIL') || '').trim().toLowerCase();
+if (
+  smtpUser &&
+  !platformFrom &&
+  smtpFrom &&
+  smtpFrom === smtpUser
+) {
+  console.warn(
+    '\n⚠ SMTP_FROM matches SMTP_USER (personal mailbox). Set PLATFORM_FROM_EMAIL for Model A.',
   );
 }
 

@@ -10,6 +10,7 @@ import { MasterDataPanel } from './MasterDataPanel';
 import { LoginHistoryPanel } from './LoginHistoryPanel';
 import { DepartmentsPanel } from './DepartmentsPanel';
 import { NotificationRulesPanel } from './NotificationRulesPanel';
+import { EmailDeliveryPanel } from './EmailDeliveryPanel';
 import { UsersPanel } from './UsersPanel';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
@@ -122,6 +123,7 @@ type Sub =
   | 'apiKeys'
   | 'security'
   | 'notifications'
+  | 'email'
   | 'plan'
   | 'users'
   | 'roles'
@@ -237,6 +239,7 @@ export function CompanySettingsTab({
       { id: 'apiKeys', label: 'API Keys' },
       { id: 'security', label: 'Security' },
       { id: 'notifications', label: 'Alerts' },
+      { id: 'email', label: 'Email' },
       { id: 'plan', label: 'Plan' },
     ] as { id: Sub; label: string }[]
   ).filter((t) => {
@@ -988,6 +991,13 @@ export function CompanySettingsTab({
           cid={cid}
           rules={rules}
           onReload={reload}
+        />
+      )}
+
+      {sub === 'email' && (
+        <EmailDeliveryPanel
+          companyId={cid}
+          adminEmail={adminUser?.email}
         />
       )}
 

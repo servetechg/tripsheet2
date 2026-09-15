@@ -77,6 +77,16 @@ export class InternalAuthController {
     });
   }
 
+  /** Primary outbound sender for a tenant (company owner / first admin). */
+  @Get('companies/:companyId/sender-email')
+  companySenderEmail(
+    @Headers('x-internal-api-key') key: string | undefined,
+    @Param('companyId') companyId: string,
+  ) {
+    this.assertKey(key);
+    return this.authService.getCompanySenderEmail(companyId);
+  }
+
   private assertKey(key: string | undefined) {
     const expected =
       this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';

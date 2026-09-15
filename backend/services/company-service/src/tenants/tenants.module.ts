@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { OrgModule } from '../org/org.module';
+import { EmailDeliveryModule } from '../email-delivery/email-delivery.module';
 import { TenantsController } from './tenants.controller';
 import { TenantsService } from './tenants.service';
 import { ProvisioningService } from './provisioning.service';
 import { TenantOpsService } from './tenant-ops.service';
 
 @Module({
-  imports: [OrgModule],
+  imports: [OrgModule, EmailDeliveryModule],
   controllers: [TenantsController],
   providers: [TenantsService, ProvisioningService, TenantOpsService],
   exports: [TenantsService, ProvisioningService, TenantOpsService],

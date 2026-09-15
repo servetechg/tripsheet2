@@ -1,9 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
-import nodemailer from 'nodemailer';
-import type { Transporter } from 'nodemailer';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailDeliveryResolverService } from './email-delivery-resolver.service';
+import { PlatformEmailSenderService } from './platform-email.sender.service';
 
 export type SendEmailInput = {
   to: string;
@@ -15,60 +14,71 @@ export type SendEmailInput = {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: Transporter | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-  ) {
-    if (this.isSmtpConfigured()) {
-      this.transporter = nodemailer.createTransport({
-        host: this.config.get<string>('SMTP_HOST')!,
-        port: Number(this.config.get<string>('SMTP_PORT') || 587),
-        secure:
-          this.config.get<string>('SMTP_SECURE') === 'true' ||
-          Number(this.config.get<string>('SMTP_PORT') || 0) === 465,
-        auth: {
-          user: this.config.get<string>('SMTP_USER')!,
-          pass: this.config.get<string>('SMTP_PASS')!,
-        },
-      });
-    }
+    private readonly deliveryResolver: EmailDeliveryResolverService,
+    private readonly platformSender: PlatformEmailSenderService,
+  ) {}
+
+  isPlatformReady(): boolean {
+    return this.platformSender.isPlatformReady();
   }
 
+  /** @deprecated use isPlatformReady */
   isSmtpConfigured(): boolean {
-    return Boolean(
-      this.config.get<string>('SMTP_HOST') &&
-        this.config.get<string>('SMTP_USER') &&
-        this.config.get<string>('SMTP_PASS') &&
-        this.config.get<string>('SMTP_FROM'),
-    );
+    return this.platformSender.isPlatformReady();
+  }
+
+  isPlatformSmtpConfigured(): boolean {
+    return this.platformSender.isSmtpRelayConfigured();
+  }
+
+  getPlatformStatus() {
+    return {
+      provider: this.platformSender.emailProvider(),
+      smtpConfigured: this.platformSender.isSmtpRelayConfigured(),
+      platformReady: this.platformSender.isPlatformReady(),
+      platformFromAddress: this.platformSender.platformFromAddress(),
+    };
   }
 
   async send(dto: SendEmailInput) {
     const subject = this.subjectFor(dto.meta, dto.body);
+    const actingReplyTo = String(
+      dto.meta?.replyTo || dto.meta?.senderEmail || '',
+    ).trim();
+    const profile = await this.deliveryResolver.resolve(
+      dto.companyId,
+      actingReplyTo || undefined,
+    );
     let status: string;
     let providerId: string | null = null;
+    let provider = this.platformSender.emailProvider();
 
-    if (this.isSmtpConfigured() && this.transporter) {
-      try {
-        const info = await this.transporter.sendMail({
-          from: this.config.get<string>('SMTP_FROM')!,
-          to: dto.to,
-          subject,
-          text: dto.body,
-          html: this.toHtml(dto.body),
-        });
+    if (this.platformSender.canSend(profile)) {
+      const result = await this.platformSender.send({
+        profile,
+        to: dto.to,
+        subject,
+        text: dto.body,
+        html: this.toHtml(dto.body, profile.fromDisplayName),
+      });
+
+      provider = result.provider;
+      if (result.ok) {
         status = 'sent';
-        providerId = info.messageId || null;
-      } catch (err) {
+        providerId = result.messageId || null;
+      } else {
         status = 'failed';
-        this.logger.warn(`SMTP send failed to=${dto.to}: ${String(err)}`);
+        this.logger.warn(
+          `Email send failed companyId=${dto.companyId || 'platform'} to=${dto.to}: ${result.error || 'unknown'}`,
+        );
       }
     } else {
       status = 'queued';
       this.logger.log(
-        `[Email queued — SMTP not configured] to=${dto.to} subject=${subject}`,
+        `[Email queued — platform email not configured] companyId=${dto.companyId || 'platform'} to=${dto.to} subject=${subject}`,
       );
     }
 
@@ -82,7 +92,12 @@ export class EmailService {
         providerId,
         meta:
           dto.meta !== undefined
-            ? (dto.meta as Prisma.InputJsonValue)
+            ? ({
+                ...dto.meta,
+                emailMode: profile.mode,
+                emailProvider: provider,
+                fromAddress: profile.fromAddress,
+              } as Prisma.InputJsonValue)
             : undefined,
       },
     });
@@ -111,20 +126,31 @@ export class EmailService {
         return 'Confirm your new FleetQuix email';
       case 'email_change_completed':
         return 'Your FleetQuix email was updated';
+      case 'email_delivery_test':
+        return 'FleetQuix email delivery test';
       default:
         return body.length > 60 ? `${body.slice(0, 57)}…` : body || 'FleetQuix notification';
     }
   }
 
-  private toHtml(body: string): string {
+  private toHtml(body: string, brandName?: string): string {
     const escaped = body
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     const linked = escaped.replace(
       /(https?:\/\/[^\s<]+)/g,
-      '<a href="$1">$1</a>',
+      '<a href="$1" style="color:#2563eb">$1</a>',
     );
-    return `<p style="font-family:sans-serif;line-height:1.5">${linked.replace(/\n/g, '<br/>')}</p>`;
+    const content = linked.replace(/\n/g, '<br/>');
+    const brand = brandName?.trim() || 'FleetQuix';
+    return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f5">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:24px 12px">
+<tr><td align="center">
+<table width="100%" style="max-width:560px;background:#fff;border-radius:8px;border:1px solid #e4e4e7">
+<tr><td style="padding:20px 24px;border-bottom:1px solid #e4e4e7;font-family:sans-serif;font-size:16px;font-weight:700;color:#18181b">${brand}</td></tr>
+<tr><td style="padding:24px;font-family:sans-serif;font-size:14px;line-height:1.6;color:#3f3f46">${content}</td></tr>
+<tr><td style="padding:16px 24px;border-top:1px solid #e4e4e7;font-family:sans-serif;font-size:11px;color:#71717a">Sent via ${brand} on FleetQuix</td></tr>
+</table></td></tr></table></body></html>`;
   }
 }

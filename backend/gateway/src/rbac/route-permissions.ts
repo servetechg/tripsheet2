@@ -82,7 +82,7 @@ function rule(
 
   if (
     /^\/api\/companies\/[^/]+\/entitlements$/.test(p) ||
-    /^\/api\/companies\/[^/]+\/(settings|branding|security)$/.test(p)
+    /^\/api\/companies\/[^/]+\/(settings|branding|security|email-delivery)$/.test(p)
   ) {
     return { codes: 'any' };
   }

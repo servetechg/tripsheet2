@@ -8,6 +8,7 @@ import { TenantsModule } from './tenants/tenants.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 import { OrgModule } from './org/org.module';
+import { EmailDeliveryModule } from './email-delivery/email-delivery.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { OrgModule } from './org/org.module';
     CompaniesModule,
     OrgModule,
     AuditModule,
+    EmailDeliveryModule,
   ],
   controllers: [HealthController],
 })

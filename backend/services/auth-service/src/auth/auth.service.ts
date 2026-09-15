@@ -1550,6 +1550,48 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
+  /** Tenant primary sender — company owner email used in outbound From: headers. */
+  async getCompanySenderEmail(companyId: string) {
+    const baseWhere = {
+      companyId,
+      status: 'active' as const,
+      deletedAt: null,
+    };
+
+    const owner = await this.prisma.user.findFirst({
+      where: { ...baseWhere, role: 'company_owner' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, email: true, name: true, role: true },
+    });
+    if (owner) {
+      return {
+        companyId,
+        userId: owner.id,
+        email: owner.email,
+        name: owner.name,
+        role: owner.role,
+      };
+    }
+
+    const admin = await this.prisma.user.findFirst({
+      where: {
+        ...baseWhere,
+        role: { notIn: ['driver', 'superadmin'] },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, email: true, name: true, role: true },
+    });
+    if (!admin) return null;
+
+    return {
+      companyId,
+      userId: admin.id,
+      email: admin.email,
+      name: admin.name,
+      role: admin.role,
+    };
+  }
+
   /**
    * Invite / service retries: create user, or return existing if same email.
    * Only for internal service calls — not for public registration.

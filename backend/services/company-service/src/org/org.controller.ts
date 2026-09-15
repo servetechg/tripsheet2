@@ -14,6 +14,8 @@ import { TenantLocalService } from './tenant-local.service';
 import { PlansService } from '../plans/plans.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { MdmService } from '../mdm/mdm.service';
+import { EmailDeliveryService } from '../email-delivery/email-delivery.service';
+import { PatchEmailDeliveryDto } from '../email-delivery/dto/patch-email-delivery.dto';
 
 @Controller('companies/:companyId')
 export class OrgController {
@@ -22,6 +24,7 @@ export class OrgController {
     private readonly plans: PlansService,
     private readonly prisma: PrismaService,
     private readonly mdm: MdmService,
+    private readonly emailDelivery: EmailDeliveryService,
   ) {}
 
   private assertCompanyAccess(
@@ -234,6 +237,36 @@ export class OrgController {
   ) {
     this.assertCompanyAccess(companyId, headers);
     return this.local.patchSecurityPolicy(companyId, body);
+  }
+
+  @Get('email-delivery')
+  getEmailDelivery(
+    @Param('companyId') companyId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+  ) {
+    this.assertCompanyAccess(companyId, headers);
+    return this.emailDelivery.getPublic(companyId);
+  }
+
+  @Patch('email-delivery')
+  patchEmailDelivery(
+    @Param('companyId') companyId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() body: PatchEmailDeliveryDto,
+  ) {
+    this.assertCompanyAccess(companyId, headers);
+    return this.emailDelivery.patch(companyId, body);
+  }
+
+  @Post('email-delivery/test')
+  testEmailDelivery(
+    @Param('companyId') companyId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() body: { to?: string },
+  ) {
+    this.assertCompanyAccess(companyId, headers);
+    const to = body?.to?.trim() || String(headers['x-user-email'] || '');
+    return this.emailDelivery.sendTest(companyId, to);
   }
 
   @Get('notification-rules')
