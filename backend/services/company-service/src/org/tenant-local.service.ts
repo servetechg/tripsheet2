@@ -31,6 +31,24 @@ import {
   REF_KIND_EXPENSE,
 } from '../mdm/ops-ref.util';
 
+const MAX_INLINE_FILE_CHARS = 2_800_000;
+
+function resolveInlineFileUrl(
+  body: Record<string, unknown>,
+  opts: { field?: string; urlField?: string } = {},
+): string {
+  const dataField = opts.field || 'fileData';
+  const urlField = opts.urlField || 'fileUrl';
+  const raw = String(body[dataField] || '');
+  if (raw.startsWith('data:')) {
+    if (raw.length > MAX_INLINE_FILE_CHARS) {
+      throw new BadRequestException('File too large (max 2MB)');
+    }
+    return raw;
+  }
+  return String(body[urlField] || '');
+}
+
 type AuditActor = { id?: string; name?: string };
 
 @Injectable()
@@ -485,6 +503,13 @@ export class TenantLocalService {
       const sets: string[] = [];
       const vals: unknown[] = [companyId];
       let i = 2;
+      const logoFromUpload = resolveInlineFileUrl(body, {
+        field: 'logoData',
+        urlField: 'logoUrl',
+      });
+      if (logoFromUpload) {
+        body.logoUrl = logoFromUpload;
+      }
       for (const f of fields) {
         if (body[f] !== undefined) {
           sets.push(`"${f}"=$${i++}`);
@@ -623,6 +648,10 @@ export class TenantLocalService {
 
   async createDocument(companyId: string, body: Record<string, unknown>) {
     await this.ensurePhase5Schema(companyId);
+    const fileUrl = resolveInlineFileUrl(body);
+    if (!fileUrl.trim()) {
+      throw new BadRequestException('Document file is required');
+    }
     const c = await this.tenantClient(companyId);
     try {
       const id = `cdoc_${randomBytes(8).toString('hex')}`;
@@ -636,7 +665,7 @@ export class TenantLocalService {
           String(body.name || 'Document'),
           String(body.type || 'general'),
           String(body.fileName || ''),
-          String(body.fileUrl || ''),
+          fileUrl,
           body.fileSize != null ? Number(body.fileSize) : null,
           String(body.uploadedBy || ''),
           String(body.expiresAt || ''),

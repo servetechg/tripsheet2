@@ -2016,9 +2016,13 @@ export class MdmService {
   ): Promise<DupHit[]> {
     const c = await this.local.openTenantClient(companyId);
     try {
+      const hasMcDot = table === 'Broker' || table === 'Carrier';
       const res = await c.query(
-        `SELECT "id","name","status","mc","dot","phone","normalizedKey"
-         FROM company_local."${table}" WHERE "companyId"=$1 LIMIT 200`,
+        hasMcDot
+          ? `SELECT "id","name","status","mc","dot","phone","normalizedKey"
+             FROM company_local."${table}" WHERE "companyId"=$1 LIMIT 200`
+          : `SELECT "id","name","status","phone","normalizedKey"
+             FROM company_local."${table}" WHERE "companyId"=$1 LIMIT 200`,
         [companyId],
       );
       const hits: DupHit[] = [];

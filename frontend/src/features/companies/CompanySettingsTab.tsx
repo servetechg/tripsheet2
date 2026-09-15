@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2, AddressAutocomplete } from '@/components/ui';
+import {
+  Btn,
+  Card,
+  Inp,
+  Pill,
+  Divider,
+  SectionTitle,
+  G2,
+  AddressAutocomplete,
+  FileUploadField,
+  type UploadedFile,
+} from '@/components/ui';
+import { VaultFileRow } from '@/components/files/VaultFileRow';
+import { isImageUrl } from '@/lib/filePreview';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -161,7 +174,12 @@ export function CompanySettingsTab({
     address: company.address || '',
   });
   const [newBranch, setNewBranch] = useState({ name: '', address: '' });
-  const [newDoc, setNewDoc] = useState({ name: '', type: 'policy', fileUrl: '' });
+  const [newDoc, setNewDoc] = useState<{
+    name: string;
+    type: string;
+    file: UploadedFile | null;
+  }>({ name: '', type: 'policy', file: null });
+  const [logoFile, setLogoFile] = useState<UploadedFile | null>(null);
   const [newKeyName, setNewKeyName] = useState('Integration key');
   const [revealedKey, setRevealedKey] = useState('');
   const [copiedKey, setCopiedKey] = useState(false);
@@ -543,13 +561,47 @@ export function CompanySettingsTab({
       {sub === 'branding' && branding && (
         <Card>
           <SectionTitle>Branding</SectionTitle>
+          {isImageUrl(branding.logoUrl) && !logoFile ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 16,
+                padding: '14px 16px',
+                marginBottom: 16,
+                border: `1px solid ${G.border}`,
+                borderRadius: RADIUS.lg,
+                background: G.inset,
+              }}
+            >
+              <img
+                src={branding.logoUrl}
+                alt="Current company logo"
+                style={{
+                  height: 56,
+                  maxWidth: 160,
+                  objectFit: 'contain',
+                  borderRadius: RADIUS.md,
+                  background: G.card,
+                  padding: 6,
+                }}
+              />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Current logo</div>
+                <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>
+                  Upload a new file below to replace it
+                </div>
+              </div>
+            </div>
+          ) : null}
           <G2 cols={2}>
-            <Inp
-              label="Logo URL"
-              value={branding.logoUrl || ''}
-              onChange={(e) =>
-                setBranding((b: any) => ({ ...b, logoUrl: e.target.value }))
-              }
+            <FileUploadField
+              label="Company logo"
+              accept=".png,.jpg,.jpeg,.webp,.svg"
+              hint="PNG, JPG, WEBP, SVG · Max 2MB"
+              value={logoFile}
+              previewUrl={logoFile ? null : branding.logoUrl || null}
+              onChange={(file) => setLogoFile(file)}
             />
             <Inp
               label="Accent color"
@@ -598,9 +650,21 @@ export function CompanySettingsTab({
           </G2>
           <Btn
             onClick={() => {
+              const payload: Record<string, unknown> = {
+                accentColor: branding.accentColor,
+                primaryColor: branding.primaryColor,
+                secondaryColor: branding.secondaryColor,
+                invoiceHeader: branding.invoiceHeader,
+                invoiceFooter: branding.invoiceFooter,
+              };
+              if (logoFile) payload.logoData = logoFile.data;
               void companiesApi
-                .patchBranding(cid, branding)
-                .then(() => notify('Branding saved'))
+                .patchBranding(cid, payload)
+                .then(() => {
+                  setLogoFile(null);
+                  notify('Branding saved');
+                  return reload();
+                })
                 .catch((err: any) =>
                   notify(err?.message || 'Save failed', 'error'),
                 );
@@ -614,7 +678,7 @@ export function CompanySettingsTab({
       {sub === 'documents' && (
         <Card>
           <SectionTitle>Company document vault</SectionTitle>
-          <G2 cols={3}>
+          <G2 cols={2}>
             <Inp
               label="Name"
               value={newDoc.name}
@@ -625,70 +689,69 @@ export function CompanySettingsTab({
               value={newDoc.type}
               onChange={(e) => setNewDoc((d) => ({ ...d, type: e.target.value }))}
             />
-            <Inp
-              label="File URL"
-              value={newDoc.fileUrl}
-              onChange={(e) =>
-                setNewDoc((d) => ({ ...d, fileUrl: e.target.value }))
-              }
-            />
           </G2>
+          <FileUploadField
+            label="Document file"
+            value={newDoc.file}
+            onChange={(file) => setNewDoc((d) => ({ ...d, file }))}
+          />
           <Btn
+            disabled={!newDoc.name.trim() || !newDoc.file}
             onClick={() => {
+              if (!newDoc.file) {
+                notify('Select a file to upload', 'error');
+                return;
+              }
               void companiesApi
                 .createDocument(cid, {
-                  ...newDoc,
+                  name: newDoc.name.trim(),
+                  type: newDoc.type,
+                  fileName: newDoc.file.name,
+                  fileSize: newDoc.file.size,
+                  fileData: newDoc.file.data,
                   uploadedBy: adminUser?.email || adminUser?.name || '',
                 })
                 .then(() => {
-                  setNewDoc({ name: '', type: 'policy', fileUrl: '' });
+                  setNewDoc({ name: '', type: 'policy', file: null });
+                  notify('Document uploaded');
                   return reload();
                 })
                 .catch((err: any) => notify(err?.message || 'Failed', 'error'));
             }}
           >
-            Add Document
+            Upload Document
           </Btn>
-          <div style={{ marginTop: 12 }}>
-            {docs.map((d) => (
-              <div
-                key={d.id}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  padding: '8px 0',
-                  borderBottom: `1px solid ${G.border}`,
-                  fontSize: 13,
-                }}
-              >
-                <div>
-                  <strong>{d.name}</strong> · {d.type}
-                  {d.fileUrl ? (
-                    <>
-                      {' · '}
-                      <a href={d.fileUrl} target="_blank" rel="noreferrer">
-                        open
-                      </a>
-                    </>
-                  ) : null}
-                </div>
-                <Btn
-                  size="sm"
-                  variant="danger"
-                  onClick={() => {
+          {docs.length > 0 ? (
+            <>
+              <Divider label="Saved documents" />
+              {docs.map((d) => (
+                <VaultFileRow
+                  key={d.id}
+                  name={d.name}
+                  type={d.type}
+                  fileName={d.fileName}
+                  fileUrl={d.fileUrl}
+                  fileSize={d.fileSize}
+                  meta={d.uploadedBy ? `Uploaded by ${d.uploadedBy}` : undefined}
+                  onDelete={() => {
                     void companiesApi
                       .deleteDocument(cid, d.id)
-                      .then(reload)
+                      .then(() => {
+                        notify('Document removed');
+                        return reload();
+                      })
                       .catch((err: any) =>
-                        notify(err?.message || 'Failed', 'error'),
+                        notify(err?.message || 'Delete failed', 'error'),
                       );
                   }}
-                >
-                  Delete
-                </Btn>
-              </div>
-            ))}
-          </div>
+                />
+              ))}
+            </>
+          ) : (
+            <div style={{ marginTop: 16, fontSize: 13, color: G.muted }}>
+              No documents uploaded yet.
+            </div>
+          )}
         </Card>
       )}
 
