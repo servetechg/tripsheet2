@@ -682,6 +682,49 @@ export class TenantLocalService {
     }
   }
 
+  async patchDocument(
+    companyId: string,
+    docId: string,
+    body: Record<string, unknown>,
+  ) {
+    await this.ensurePhase5Schema(companyId);
+    const c = await this.tenantClient(companyId);
+    try {
+      const existing = await c.query(
+        `SELECT * FROM company_local."CompanyDocument" WHERE "id"=$1 AND "companyId"=$2`,
+        [docId, companyId],
+      );
+      if (!existing.rows[0]) {
+        throw new NotFoundException('Document not found');
+      }
+      const fields = ['name', 'type', 'notes', 'expiresAt'] as const;
+      const sets: string[] = [];
+      const vals: unknown[] = [];
+      let i = 1;
+      for (const f of fields) {
+        if (body[f] !== undefined) {
+          sets.push(`"${f}"=$${i++}`);
+          vals.push(String(body[f]));
+        }
+      }
+      if (!sets.length) return existing.rows[0];
+      sets.push(`"updatedAt"=NOW()`);
+      vals.push(docId, companyId);
+      await c.query(
+        `UPDATE company_local."CompanyDocument" SET ${sets.join(', ')}
+         WHERE "id"=$${i++} AND "companyId"=$${i}`,
+        vals,
+      );
+      const res = await c.query(
+        `SELECT * FROM company_local."CompanyDocument" WHERE "id"=$1`,
+        [docId],
+      );
+      return res.rows[0];
+    } finally {
+      await c.end().catch(() => undefined);
+    }
+  }
+
   async deleteDocument(companyId: string, docId: string) {
     const c = await this.tenantClient(companyId);
     try {

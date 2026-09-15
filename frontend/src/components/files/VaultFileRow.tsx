@@ -14,6 +14,7 @@ type VaultFileRowProps = {
   fileUrl?: string | null;
   fileSize?: number | null;
   meta?: string | null;
+  onEdit?: () => void;
   onDelete?: () => void;
 };
 
@@ -24,6 +25,7 @@ export function VaultFileRow({
   fileUrl,
   fileSize,
   meta,
+  onEdit,
   onDelete,
 }: VaultFileRowProps) {
   const label = fileLabel(fileName, fileUrl);
@@ -92,6 +94,11 @@ export function VaultFileRow({
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        {onEdit ? (
+          <Btn size="sm" variant="outline" onClick={onEdit}>
+            Edit
+          </Btn>
+        ) : null}
         {fileUrl ? (
           <Btn
             size="sm"
