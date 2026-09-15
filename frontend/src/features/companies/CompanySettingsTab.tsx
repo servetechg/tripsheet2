@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2 } from '@/components/ui';
+import { Btn, Card, Inp, Pill, Divider, SectionTitle, G2, AddressAutocomplete } from '@/components/ui';
 import { companiesApi, authApi, invitesApi, type CustomRoleDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -321,11 +321,11 @@ export function CompanySettingsTab({
                 setProfile((p) => ({ ...p, tagline: e.target.value }))
               }
             />
-            <Inp
+            <AddressAutocomplete
               label="Address"
               value={profile.address}
-              onChange={(e) =>
-                setProfile((p) => ({ ...p, address: e.target.value }))
+              onChange={(val) =>
+                setProfile((p) => ({ ...p, address: val }))
               }
             />
           </G2>
@@ -451,11 +451,11 @@ export function CompanySettingsTab({
               }
               style={{ marginBottom: 0 }}
             />
-            <Inp
+            <AddressAutocomplete
               label="Address"
               value={newBranch.address}
-              onChange={(e) =>
-                setNewBranch((b) => ({ ...b, address: e.target.value }))
+              onChange={(val) =>
+                setNewBranch((b) => ({ ...b, address: val }))
               }
               style={{ marginBottom: 0 }}
             />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { G, page } from '@/lib/theme';
-import { Btn, BackButton, Inp, Sel, G2, Icons } from '@/components/ui';
+import { Btn, BackButton, Inp, Sel, G2, Icons, AddressAutocomplete } from '@/components/ui';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
@@ -399,18 +399,18 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
                 value={profile.citizenship}
                 onChange={(e) => upd('citizenship', e.target.value)}
               >
-                {['CA', 'US', 'IN', 'MX', 'Other'].map((c) => (
+                {['CA', 'US'].map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
               </Sel>
             </G2>
-            <Inp
+            <AddressAutocomplete
               label="Home Address"
               value={profile.address}
-              onChange={(e) => upd('address', e.target.value)}
-              placeholder="Full address"
+              onChange={(val) => upd('address', val)}
+              placeholder="Start typing home address (US & Canada)..."
             />
             <Inp
               label="FAST Card # (if you have one)"

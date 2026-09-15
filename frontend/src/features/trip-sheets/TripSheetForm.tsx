@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { G, RADIUS, page } from '@/lib/theme';
-import { Btn, BackButton, Card, Inp, Sel, SectionTitle, G2, Icons } from '@/components/ui';
+import { Btn, BackButton, Card, Inp, Sel, SectionTitle, G2, Icons, AddressAutocomplete } from '@/components/ui';
 import { uid } from '@/lib/uid';
 import { PrintPreview } from './PrintPreview';
 import { companiesApi } from '@/lib/api';
@@ -668,20 +668,34 @@ export function TripSheetForm({
                 />
               </G2>
               <G2 cols={2}>
-                <Inp
+                <AddressAutocomplete
                   label="From"
                   required
                   error={errors.trips?.[t.id]?.from}
                   value={t.from}
-                  onChange={(e) => updT(t.id, 'from', e.target.value)}
+                  onChange={(val) => updT(t.id, 'from', val)}
+                  onSelectAddress={(addr) => {
+                    const label =
+                      addr.formatted ||
+                      [addr.city, addr.state_code].filter(Boolean).join(', ') ||
+                      t.from;
+                    updT(t.id, 'from', label);
+                  }}
                   placeholder="e.g. Calgary, AB"
                 />
-                <Inp
+                <AddressAutocomplete
                   label="To"
                   required
                   error={errors.trips?.[t.id]?.to}
                   value={t.to}
-                  onChange={(e) => updT(t.id, 'to', e.target.value)}
+                  onChange={(val) => updT(t.id, 'to', val)}
+                  onSelectAddress={(addr) => {
+                    const label =
+                      addr.formatted ||
+                      [addr.city, addr.state_code].filter(Boolean).join(', ') ||
+                      t.to;
+                    updT(t.id, 'to', label);
+                  }}
                   placeholder="e.g. Toronto, ON"
                 />
               </G2>

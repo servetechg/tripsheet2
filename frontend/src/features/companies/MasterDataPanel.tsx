@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { G, labelBase, inputBase, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons, AddressAutocomplete } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -1015,16 +1015,54 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             )}
             {kind === 'locations' && (
               <>
+                <AddressAutocomplete
+                  label="Address"
+                  value={form.line1}
+                  onChange={(val) => setForm((prev) => ({ ...prev, line1: val }))}
+                  onSelectAddress={(addr) => {
+                    const streetLine =
+                      addr.address_line1 ||
+                      (addr.street
+                        ? `${addr.housenumber ? addr.housenumber + ' ' : ''}${addr.street}`
+                        : addr.formatted);
+                    const countryCode = (addr.country_code || form.country || 'CA').toUpperCase();
+                    setForm((prev) => ({
+                      ...prev,
+                      line1: streetLine,
+                      city: addr.city || prev.city,
+                      region: addr.state_code || prev.region,
+                      postal: addr.postcode || prev.postal,
+                      country: countryCode === 'US' || countryCode === 'CA' ? countryCode : 'CA',
+                      name: prev.name || addr.name || addr.city || streetLine,
+                    }));
+                  }}
+                  placeholder="Street or facility address"
+                />
                 <Inp
                   label="City"
                   value={form.city}
                   onChange={(e) => setForm({ ...form, city: e.target.value })}
                 />
                 <Inp
-                  label="Address"
-                  value={form.line1}
-                  onChange={(e) => setForm({ ...form, line1: e.target.value })}
+                  label="State / Province"
+                  value={form.region}
+                  onChange={(e) => setForm({ ...form, region: e.target.value })}
+                  placeholder="e.g. AB, ON, IL, TX"
                 />
+                <Inp
+                  label="Postal / ZIP"
+                  value={form.postal}
+                  onChange={(e) => setForm({ ...form, postal: e.target.value })}
+                  placeholder="e.g. T2P 0H3 or 90012"
+                />
+                <Sel
+                  label="Country"
+                  value={form.country || 'CA'}
+                  onChange={(e: any) => setForm({ ...form, country: e.target.value })}
+                >
+                  <option value="CA">Canada</option>
+                  <option value="US">United States</option>
+                </Sel>
               </>
             )}
             {kind !== 'locations' &&

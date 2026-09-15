@@ -12,7 +12,7 @@ import {
   StatCard,
   StatsGrid,
   Icons,
-  SearchSelect,
+  AddressAutocomplete,
 } from '@/components/ui';
 import { blank } from '@/lib/format';
 import {
@@ -24,7 +24,6 @@ import {
   sanitizeInteger,
   toDatetimeLocal,
 } from '@/lib/formFields';
-import { FREIGHT_LOCATIONS } from '@/lib/locations';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
@@ -60,8 +59,6 @@ type FormErrors = Partial<
     string
   >
 >;
-
-const LOCATION_OPTIONS = [...FREIGHT_LOCATIONS];
 
 export function DispatchTab({
   company,
@@ -1096,24 +1093,34 @@ export function DispatchTab({
             </Sel>
           </G2>
           <G2 cols={2}>
-            <SearchSelect
+            <AddressAutocomplete
               label="Origin"
               required
               value={f.origin}
               onChange={(v) => upd('origin', v)}
-              options={LOCATION_OPTIONS}
-              placeholder="Search city… e.g. Calgary"
-              allowCustom
+              onSelectAddress={(addr) => {
+                const label =
+                  addr.formatted ||
+                  addr.address_line1 ||
+                  [addr.city, addr.state_code].filter(Boolean).join(', ');
+                upd('origin', label);
+              }}
+              placeholder="Search city, facility, or address…"
               error={fieldErr.origin}
             />
-            <SearchSelect
+            <AddressAutocomplete
               label="Destination"
               required
               value={f.destination}
               onChange={(v) => upd('destination', v)}
-              options={LOCATION_OPTIONS}
-              placeholder="Search city… e.g. Toronto"
-              allowCustom
+              onSelectAddress={(addr) => {
+                const label =
+                  addr.formatted ||
+                  addr.address_line1 ||
+                  [addr.city, addr.state_code].filter(Boolean).join(', ');
+                upd('destination', label);
+              }}
+              placeholder="Search city, facility, or address…"
               error={fieldErr.destination}
             />
           </G2>
@@ -1213,23 +1220,33 @@ export function DispatchTab({
               placeholder="e.g. 1200"
               error={fieldErr.miles}
             />
-            <SearchSelect
+            <AddressAutocomplete
               label="Stop 1 (optional)"
               value={f.stop1}
               onChange={(v) => upd('stop1', v)}
-              options={LOCATION_OPTIONS}
+              onSelectAddress={(addr) => {
+                const label =
+                  addr.formatted ||
+                  addr.address_line1 ||
+                  [addr.city, addr.state_code].filter(Boolean).join(', ');
+                upd('stop1', label);
+              }}
               placeholder="Search intermediate stop…"
-              allowCustom
               error={fieldErr.stop1}
             />
           </G2>
-          <SearchSelect
+          <AddressAutocomplete
             label="Stop 2 (optional)"
             value={f.stop2}
             onChange={(v) => upd('stop2', v)}
-            options={LOCATION_OPTIONS}
+            onSelectAddress={(addr) => {
+              const label =
+                addr.formatted ||
+                addr.address_line1 ||
+                [addr.city, addr.state_code].filter(Boolean).join(', ');
+              upd('stop2', label);
+            }}
             placeholder="Search intermediate stop…"
-            allowCustom
             error={fieldErr.stop2}
           />
           <FieldInp
