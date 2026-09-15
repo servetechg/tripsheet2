@@ -967,6 +967,9 @@ export class AuthService {
       : null;
     const resolved = await this.resolvePermissions(user);
     const driverId = await this.resolveDriverId(user);
+    if (driverId) {
+      void this.syncDriverEmail(user.id, user.email);
+    }
     const accessMinutes = accessTokenMinutesFromEnv(
       this.config.get<string>('ACCESS_TOKEN_MINUTES'),
     );

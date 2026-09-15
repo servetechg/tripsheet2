@@ -264,8 +264,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           return {
           id: authId,
           driverRecordId: d.id,
-          name: d.name,
-          email: d.email,
+          name: authUser?.name || d.name,
+          email: authUser?.email || d.email,
           pendingEmail: authUser?.pendingEmail ?? null,
           role: 'driver',
           companyId: d.companyId,

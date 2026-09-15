@@ -619,8 +619,15 @@ function DriverWorkspace() {
   if (bootstrapping) return <BootSplash label="Restoring session…" />;
   if (!user) return null;
 
-  const freshSession =
-    data.users.find((u) => u.id === user.id) || (user as AppUser);
+  const fromData = data.users.find((u) => u.id === user.id);
+  const freshSession: AppUser = fromData
+    ? {
+        ...fromData,
+        email: user.email || fromData.email,
+        name: user.name || fromData.name,
+        pendingEmail: user.pendingEmail ?? fromData.pendingEmail,
+      }
+    : (user as AppUser);
   const company = data.companies.find((c) => c.id === freshSession.companyId);
   const waitingForCompany =
     Boolean(freshSession.companyId) && !companyHydrated;
