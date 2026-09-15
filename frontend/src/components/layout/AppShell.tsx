@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { G, SPACE, page } from '@/lib/theme';
 import type { ThemeMode } from '@/lib/theme';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -7,7 +7,12 @@ import { SideNav } from './SideNav';
 import { UserMenu } from './UserMenu';
 import { NotificationBell } from './NotificationBell';
 import { BrandLogo } from '@/components/brand/BrandLogo';
-import { HEADER_HEIGHT, SIDEBAR_WIDTH } from './shellLayout';
+import {
+  HEADER_HEIGHT,
+  SIDEBAR_WIDTH,
+  SIDEBAR_WIDTH_COLLAPSED,
+  SIDEBAR_COLLAPSED_KEY,
+} from './shellLayout';
 import type { NavTab } from '@/types/app';
 
 interface AppShellProps {
@@ -24,6 +29,14 @@ interface AppShellProps {
   onLogout?: () => void;
   showNotifications?: boolean;
   children?: ReactNode;
+}
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 
 export function AppShell({
@@ -44,6 +57,25 @@ export function AppShell({
   const w = useMediaQuery();
   const mob = w < 768;
   const showUserMenu = !!(onLogout || onToggleTheme);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  const sidebarWidth = mob
+    ? 0
+    : sidebarCollapsed
+      ? SIDEBAR_WIDTH_COLLAPSED
+      : SIDEBAR_WIDTH;
 
   return (
     <div style={{ ...page() }}>
@@ -52,8 +84,8 @@ export function AppShell({
           tabs={tabs}
           active={activeTab}
           onChange={onTabChange}
-          logo={logo}
-          subtitle={subtitle}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
         />
       )}
       <div
@@ -70,8 +102,9 @@ export function AppShell({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginLeft: mob ? 0 : SIDEBAR_WIDTH,
-          width: mob ? '100%' : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          marginLeft: sidebarWidth,
+          width: mob ? '100%' : `calc(100% - ${sidebarWidth}px)`,
+          transition: 'margin-left .2s ease, width .2s ease',
         }}
       >
         {mob ? (
@@ -105,14 +138,15 @@ export function AppShell({
       </div>
       <div
         style={{
-          marginLeft: mob ? 0 : SIDEBAR_WIDTH,
+          marginLeft: sidebarWidth,
           padding: mob
             ? '14px 13px 90px'
             : '24px 28px 48px',
-          width: mob ? '100%' : `calc(100% - ${SIDEBAR_WIDTH}px)`,
+          width: mob ? '100%' : `calc(100% - ${sidebarWidth}px)`,
           maxWidth: '100%',
           boxSizing: 'border-box',
           minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
+          transition: 'margin-left .2s ease, width .2s ease',
         }}
       >
         {children}

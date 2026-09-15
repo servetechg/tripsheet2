@@ -17,6 +17,8 @@ export { G2 } from './G2';
 export { StatCard, StatsGrid } from './StatCard';
 export type { StatCardProps, StatsGridProps } from './StatCard';
 export { Icons } from './Icons';
+export { FileUploadField } from './FileUploadField';
+export type { UploadedFile } from './FileUploadField';
 export { AddressAutocomplete } from './AddressAutocomplete';
 export type { AddressAutocompleteProps } from './AddressAutocomplete';
 export type { GeoapifyAddress } from '@/lib/geoapify';
