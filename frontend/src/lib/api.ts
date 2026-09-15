@@ -798,6 +798,11 @@ export const companiesApi = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  patchDocument: (id: string, docId: string, body: unknown) =>
+    api(
+      `/companies/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,
+      { method: 'PATCH', body: JSON.stringify(body) },
+    ),
   deleteDocument: (id: string, docId: string) =>
     api(
       `/companies/${encodeURIComponent(id)}/documents/${encodeURIComponent(docId)}`,

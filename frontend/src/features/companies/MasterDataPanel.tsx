@@ -1161,7 +1161,6 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               loadingLabel={editingId ? 'Saving…' : 'Adding…'}
               disabled={
                 busy ||
-                fetching ||
                 (Boolean(editingId) &&
                   !(
                     initialForm &&
@@ -1181,7 +1180,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             {!editingId && IO_KINDS.includes(kind as IoKind) && (
               <Btn
                 variant="outline"
-                disabled={busy || fetching}
+                disabled={busy}
                 onClick={() => void exportKind(kind as IoKind)}
               >
                 Export CSV
@@ -1222,8 +1221,10 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               <option value="blocked">Blocked / suspended</option>
             </Sel>
           </div>
-          {fetching && !rows.length && (
-            <div style={{ color: G.muted, fontSize: 13 }}>Loading records…</div>
+          {fetching && (
+            <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
+              {rows.length ? 'Refreshing records…' : 'Loading records…'}
+            </div>
           )}
           {!fetching && !rows.length && (
             <div style={{ color: G.muted, fontSize: 13 }}>
@@ -1297,7 +1298,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                     <Btn
                       size="sm"
                       variant="outline"
-                      disabled={busy || fetching}
+                      disabled={busy}
                       onClick={() => startEdit(r)}
                     >
                       Edit
@@ -1306,7 +1307,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                       <Btn
                         size="sm"
                         variant="danger"
-                        disabled={busy || fetching}
+                        disabled={busy}
                         onClick={() => void archiveRecord(r.id, title)}
                       >
                         Archive

@@ -181,6 +181,17 @@ export class OrgController {
     return this.local.createDocument(companyId, body);
   }
 
+  @Patch('documents/:docId')
+  patchDocument(
+    @Param('companyId') companyId: string,
+    @Param('docId') docId: string,
+    @Headers() headers: Record<string, string | string[] | undefined>,
+    @Body() body: Record<string, unknown>,
+  ) {
+    this.assertCompanyAccess(companyId, headers);
+    return this.local.patchDocument(companyId, docId, body);
+  }
+
   @Delete('documents/:docId')
   deleteDocument(
     @Param('companyId') companyId: string,

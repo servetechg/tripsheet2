@@ -10,6 +10,7 @@ import {
   G2,
   AddressAutocomplete,
   FileUploadField,
+  Modal,
   type UploadedFile,
 } from '@/components/ui';
 import { VaultFileRow } from '@/components/files/VaultFileRow';
@@ -174,6 +175,12 @@ export function CompanySettingsTab({
     address: company.address || '',
   });
   const [newBranch, setNewBranch] = useState({ name: '', address: '' });
+  const [editingBranch, setEditingBranch] = useState<any>(null);
+  const [branchForm, setBranchForm] = useState({ name: '', address: '' });
+  const [branchBusy, setBranchBusy] = useState(false);
+  const [editingDoc, setEditingDoc] = useState<any>(null);
+  const [docForm, setDocForm] = useState({ name: '', type: '' });
+  const [docBusy, setDocBusy] = useState(false);
   const [newDoc, setNewDoc] = useState<{
     name: string;
     type: string;
@@ -507,43 +514,128 @@ export function CompanySettingsTab({
                 style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  padding: '8px 0',
-                  borderBottom: `1px solid ${G.border}`,
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '12px 14px',
+                  marginBottom: 8,
+                  border: `1px solid ${G.border}`,
+                  borderRadius: RADIUS.lg,
+                  background: G.card,
                 }}
               >
-                <div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{b.name}</div>
-                  <div style={{ fontSize: 11, color: G.muted }}>
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
                     {b.address || '—'} · {b.timeZone} · {b.currency}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                   <Pill color={b.active ? G.success : G.muted} small>
                     {b.active ? 'active' : 'inactive'}
                   </Pill>
                   {b.active && (
-                    <Btn
-                      size="sm"
-                      variant="danger"
-                      onClick={() => {
-                        void companiesApi
-                          .deleteBranch(cid, b.id)
-                          .then(() => {
-                            notify('Branch deactivated');
-                            return reload();
-                          })
-                          .catch((err: any) =>
-                            notify(err?.message || 'Failed to deactivate branch', 'error'),
-                          );
-                      }}
-                    >
-                      Deactivate
-                    </Btn>
+                    <>
+                      <Btn
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingBranch(b);
+                          setBranchForm({
+                            name: b.name || '',
+                            address: b.address || '',
+                          });
+                        }}
+                      >
+                        Edit
+                      </Btn>
+                      <Btn
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          void companiesApi
+                            .deleteBranch(cid, b.id)
+                            .then(() => {
+                              notify('Branch deactivated');
+                              return reload();
+                            })
+                            .catch((err: any) =>
+                              notify(err?.message || 'Failed to deactivate branch', 'error'),
+                            );
+                        }}
+                      >
+                        Deactivate
+                      </Btn>
+                    </>
                   )}
                 </div>
               </div>
             ))}
           </div>
+          {editingBranch ? (
+            <Modal
+              open
+              title="Edit branch"
+              onClose={() => setEditingBranch(null)}
+              maxWidth={480}
+            >
+              <G2 cols={1}>
+                <Inp
+                  label="Name"
+                  value={branchForm.name}
+                  onChange={(e) =>
+                    setBranchForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                />
+                <AddressAutocomplete
+                  label="Address"
+                  value={branchForm.address}
+                  onChange={(val) =>
+                    setBranchForm((f) => ({ ...f, address: val }))
+                  }
+                />
+              </G2>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <Btn
+                  loading={branchBusy}
+                  loadingLabel="Saving…"
+                  disabled={
+                    branchBusy ||
+                    !branchForm.name.trim() ||
+                    (branchForm.name.trim() === (editingBranch.name || '') &&
+                      branchForm.address.trim() === (editingBranch.address || ''))
+                  }
+                  onClick={() => {
+                    setBranchBusy(true);
+                    void companiesApi
+                      .saveBranch(cid, {
+                        id: editingBranch.id,
+                        name: branchForm.name.trim(),
+                        address: branchForm.address.trim(),
+                        phone: editingBranch.phone,
+                        email: editingBranch.email,
+                        timeZone: editingBranch.timeZone,
+                        currency: editingBranch.currency,
+                        active: true,
+                      })
+                      .then(() => {
+                        notify('Branch updated');
+                        setEditingBranch(null);
+                        return reload();
+                      })
+                      .catch((err: any) =>
+                        notify(err?.message || 'Update failed', 'error'),
+                      )
+                      .finally(() => setBranchBusy(false));
+                  }}
+                >
+                  Save changes
+                </Btn>
+                <Btn variant="outline" disabled={branchBusy} onClick={() => setEditingBranch(null)}>
+                  Cancel
+                </Btn>
+              </div>
+            </Modal>
+          ) : null}
         </Card>
       )}
 
@@ -733,6 +825,10 @@ export function CompanySettingsTab({
                   fileUrl={d.fileUrl}
                   fileSize={d.fileSize}
                   meta={d.uploadedBy ? `Uploaded by ${d.uploadedBy}` : undefined}
+                  onEdit={() => {
+                    setEditingDoc(d);
+                    setDocForm({ name: d.name || '', type: d.type || 'policy' });
+                  }}
                   onDelete={() => {
                     void companiesApi
                       .deleteDocument(cid, d.id)
@@ -752,6 +848,68 @@ export function CompanySettingsTab({
               No documents uploaded yet.
             </div>
           )}
+          {editingDoc ? (
+            <Modal
+              open
+              title="Edit document"
+              onClose={() => setEditingDoc(null)}
+              maxWidth={460}
+            >
+              <div style={{ fontSize: 13, color: G.muted, marginBottom: 12 }}>
+                Update the display name or category. Replace the file by uploading a new document.
+              </div>
+              <G2 cols={1}>
+                <Inp
+                  label="Name"
+                  value={docForm.name}
+                  onChange={(e) =>
+                    setDocForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                />
+                <Inp
+                  label="Type"
+                  value={docForm.type}
+                  onChange={(e) =>
+                    setDocForm((f) => ({ ...f, type: e.target.value }))
+                  }
+                />
+              </G2>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <Btn
+                  loading={docBusy}
+                  loadingLabel="Saving…"
+                  disabled={
+                    docBusy ||
+                    !docForm.name.trim() ||
+                    (docForm.name.trim() === (editingDoc.name || '') &&
+                      docForm.type.trim() === (editingDoc.type || ''))
+                  }
+                  onClick={() => {
+                    setDocBusy(true);
+                    void companiesApi
+                      .patchDocument(cid, editingDoc.id, {
+                        name: docForm.name.trim(),
+                        type: docForm.type.trim(),
+                      })
+                      .then(() => {
+                        notify('Document updated');
+                        setEditingDoc(null);
+                        return reload();
+                      })
+                      .catch((err: any) =>
+                        notify(err?.message || 'Update failed', 'error'),
+                      )
+                      .finally(() => setDocBusy(false));
+                  }}
+                >
+                  Save changes
+                </Btn>
+                <Btn variant="outline" disabled={docBusy} onClick={() => setEditingDoc(null)}>
+                  Cancel
+                </Btn>
+              </div>
+            </Modal>
+          ) : null}
         </Card>
       )}
 
