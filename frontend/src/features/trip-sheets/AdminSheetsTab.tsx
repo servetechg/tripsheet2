@@ -1,5 +1,6 @@
-import { G } from '@/lib/theme';
+import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import { Btn, Card, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { isCompactIdentifier } from '@/lib/format';
 
 export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
   const sorted = [...sheets].sort((a: any, b: any) =>
@@ -76,6 +77,24 @@ export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
           const usd = (s.expenses || [])
             .filter((e: any) => e.currency === 'USD')
             .reduce((a: number, e: any) => a + (parseFloat(e.amount) || 0), 0);
+          const tripNumbers = (s.trips || [])
+            .map((trip: any) => trip.tripNo)
+            .filter(Boolean);
+          const compactTripNumbers = tripNumbers.filter((tripNo: string) =>
+            isCompactIdentifier(tripNo),
+          );
+          const unusualTripNumbers = tripNumbers.filter(
+            (tripNo: string) => !isCompactIdentifier(tripNo),
+          );
+          const submittedAt = s.createdAt
+            ? new Date(s.createdAt).toLocaleString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+              })
+            : 'Submission date unavailable';
           return (
             <Card key={s.id}>
               <div
@@ -87,39 +106,144 @@ export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
                   alignItems: 'flex-start',
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: 14 }}>
-                    Truck #{s.header?.truckNo || '—'}
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {Icons.driver({ size: 17, color: G.gold })}
+                    <span
+                      style={{
+                        color: G.text,
+                        fontSize: 16,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {d?.name || 'Unknown driver'}
+                    </span>
+                    {s.header?.truckNo && (
+                      <span
+                        style={{
+                          padding: '3px 8px',
+                          borderRadius: RADIUS.sm,
+                          background: G.goldBg,
+                          color: G.gold,
+                          fontFamily: FONT_MONO,
+                          fontSize: 11,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Truck #{s.header.truckNo}
+                      </span>
+                    )}
                   </div>
                   <div
                     style={{
-                      fontSize: 12,
-                      color: G.gold,
-                      marginTop: 3,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
+                      marginTop: 7,
+                      color: G.text,
+                      fontSize: 13,
+                      fontWeight: 650,
                     }}
                   >
-                    {Icons.driver({ size: 14, color: G.gold })}
-                    {d?.name || 'Unknown Driver'}
+                    {s.header?.startDate || 'Start date unavailable'} →{' '}
+                    {s.header?.endDate || 'End date unavailable'}
                   </div>
-                  <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                    {s.header?.startDate} → {s.header?.endDate}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flexWrap: 'wrap',
+                      marginTop: 8,
+                    }}
+                  >
+                    {compactTripNumbers.map((tripNo: string) => (
+                      <span
+                        key={tripNo}
+                        style={{
+                          padding: '2px 7px',
+                          border: `1px solid ${G.border}`,
+                          borderRadius: RADIUS.sm,
+                          color: G.muted2,
+                          fontFamily: FONT_MONO,
+                          fontSize: 10,
+                          fontWeight: 700,
+                        }}
+                      >
+                        Trip #{tripNo}
+                      </span>
+                    ))}
+                    {tripNumbers.length === 0 && (
+                      <span style={{ color: G.muted, fontSize: 10 }}>
+                        Trips not numbered
+                      </span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: G.muted }}>
-                    {s.trips?.length || 0} leg(s) · {s.expenses?.length || 0}{' '}
-                    expense(s)
-                  </div>
-                  {(cad > 0 || usd > 0) && (
+                  {unusualTripNumbers.length > 0 && (
                     <div
-                      style={{ fontSize: 11, color: G.success, marginTop: 3 }}
+                      title={unusualTripNumbers.join(', ')}
+                      style={{
+                        maxWidth: 480,
+                        marginTop: 5,
+                        color: G.muted,
+                        fontFamily: FONT_MONO,
+                        fontSize: 9,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
                     >
-                      {cad > 0 ? `CAD ${cad.toFixed(2)}` : ''}
-                      {cad > 0 && usd > 0 ? ' · ' : ''}
-                      {usd > 0 ? `USD ${usd.toFixed(2)}` : ''}
+                      Other trip reference: {unusualTripNumbers.join(', ')}
                     </div>
                   )}
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(90px, 1fr))',
+                      gap: 6,
+                      maxWidth: 520,
+                      marginTop: 12,
+                      padding: 7,
+                      border: `1px solid ${G.border}`,
+                      borderRadius: RADIUS.md,
+                      background: G.card2,
+                    }}
+                  >
+                    {[
+                      ['Legs', s.trips?.length || 0, G.text],
+                      ['Expenses', s.expenses?.length || 0, G.text],
+                      ['CAD total', `$${cad.toFixed(2)}`, G.text],
+                      ['USD total', `$${usd.toFixed(2)}`, G.text],
+                    ].map(([label, value, color]) => (
+                      <div key={String(label)} style={{ padding: '4px 7px' }}>
+                        <div
+                          style={{
+                            color: G.muted,
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: 0.6,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          {label}
+                        </div>
+                        <div
+                          style={{
+                            marginTop: 3,
+                            color: String(color),
+                            fontSize: 13,
+                            fontWeight: 800,
+                          }}
+                        >
+                          {value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div
                   style={{
@@ -129,7 +253,9 @@ export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
                     gap: 8,
                   }}
                 >
-                  <div style={{ fontSize: 10, color: G.gold }}>{s.createdAt}</div>
+                  <div style={{ fontSize: 10, color: G.muted }}>
+                    Submitted {submittedAt}
+                  </div>
                   <Btn size="sm" variant="outline" onClick={() => onViewPdf?.(s)}>
                     View PDF
                   </Btn>

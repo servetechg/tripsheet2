@@ -6,6 +6,7 @@ import { notify } from '@/components/feedback/Toast';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { useConfirm, type ConfirmOptions } from '@/context/ConfirmContext';
 import { EmailChangeModal } from '@/components/account/EmailChangeModal';
+import { humanizeEnum } from '@/lib/format';
 
 interface UsersPanelProps {
   cid: string;
@@ -177,7 +178,7 @@ export function UsersPanel({
       });
       const link = `${window.location.origin}/invite?invite=${encodeURIComponent(inv.token)}`;
       setInviteLink(link);
-      notify(`Invite created for ${inviteForm.role}`, 'success');
+      notify(`Invite created for ${humanizeEnum(inviteForm.role)}`, 'success');
       setInviteForm({ name: '', email: '', role: 'dispatcher' });
       void refreshAll?.(cid);
       void reloadInvites();
@@ -442,7 +443,6 @@ export function UsersPanel({
               </div>
               <Btn
                 size="sm"
-                variant="outline"
                 onClick={copyInviteLink}
                 style={{
                   height: 34,
@@ -522,17 +522,18 @@ export function UsersPanel({
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: G.text }}>
-                          {inv.name ? `${inv.name} (${inv.email})` : inv.email || '—'}
+                          {inv.name || inv.email || 'Unnamed invitee'}
                         </span>
                         <Pill color={G.gold} small>
-                          {inv.role.toUpperCase()}
+                          {ROLE_LABELS[inv.role as keyof typeof ROLE_LABELS] || humanizeEnum(inv.role)}
                         </Pill>
                         <Pill color={G.muted} small>
-                          {inv.kind.toUpperCase()}
+                          {humanizeEnum(inv.kind)}
                         </Pill>
                       </div>
                       <div style={{ fontSize: 11, color: G.muted, marginTop: 3 }}>
-                        Status: <strong style={{ color: G.warning }}>{inv.status}</strong>
+                        {inv.name && inv.email ? `${inv.email} · ` : ''}
+                        Status: <strong style={{ color: G.warning }}>{humanizeEnum(inv.status)}</strong>
                         {expiresDate ? ` · Expires ${expiresDate}` : ''}
                       </div>
                     </div>
@@ -934,7 +935,7 @@ export function UsersPanel({
                           {u.name || 'Unnamed Member'}
                         </span>
                         <Pill color={statusColor} small>
-                          {st.toUpperCase()}
+                          {humanizeEnum(st)}
                         </Pill>
                         {u.customRoleName && (
                           <Pill color={G.purple} small>
@@ -1006,7 +1007,7 @@ export function UsersPanel({
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                         <Pill color={locked ? G.gold : G.muted}>
                           {locked ? '🛡️ ' : ''}
-                          {u.customRoleName || ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] || u.role}
+                          {u.customRoleName || ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] || humanizeEnum(u.role)}
                         </Pill>
                       </div>
                     )}

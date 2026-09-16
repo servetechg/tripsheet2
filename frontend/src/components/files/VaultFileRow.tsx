@@ -74,6 +74,7 @@ export function VaultFileRow({
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
+          title={name}
           style={{
             fontWeight: 700,
             fontSize: 14,
@@ -85,7 +86,17 @@ export function VaultFileRow({
         >
           {name}
         </div>
-        <div style={{ fontSize: 12, color: G.muted, marginTop: 2 }}>
+        <div
+          title={[type, label, formatFileSize(fileSize)].filter(Boolean).join(' · ')}
+          style={{
+            fontSize: 12,
+            color: G.muted,
+            marginTop: 2,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
           {[type, label, formatFileSize(fileSize)].filter(Boolean).join(' · ')}
         </div>
         {meta ? (

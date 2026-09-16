@@ -296,6 +296,7 @@ export function AddressAutocomplete({
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
+                    title={line1}
                     style={{
                       fontSize: 13,
                       fontWeight: 500,
@@ -309,6 +310,7 @@ export function AddressAutocomplete({
                   </div>
                   {line2 && line2 !== line1 && (
                     <div
+                      title={line2}
                       style={{
                         fontSize: 11,
                         color: G.muted,

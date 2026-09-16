@@ -1,5 +1,5 @@
 import { G, RADIUS } from '@/lib/theme';
-import { NavIcon, Icons } from '@/components/ui/Icons';
+import { NavIcon } from '@/components/ui/Icons';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import {
   HEADER_HEIGHT,
@@ -48,23 +48,61 @@ export function SideNav({
     >
       <div
         style={{
-          padding: collapsed ? '18px 12px 16px' : '18px 20px 16px',
+          padding: collapsed ? '18px 8px 16px' : '18px 14px 16px 20px',
           borderBottom: isDark
             ? '1px solid rgba(255, 255, 255, 0.06)'
             : `1px solid ${G.border}`,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          gap: collapsed ? 4 : 12,
           flexShrink: 0,
           minHeight: HEADER_HEIGHT,
           boxSizing: 'border-box',
         }}
       >
-        <BrandLogo
-          variant={collapsed ? 'mark' : 'full'}
-          height={collapsed ? 28 : 24}
-          style={{ maxWidth: collapsed ? 36 : 140 }}
-        />
+        {!collapsed && (
+          <BrandLogo
+            variant="full"
+            height={24}
+            style={{ maxWidth: 140, flexShrink: 0 }}
+          />
+        )}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          style={{
+            width: collapsed ? 28 : 32,
+            height: collapsed ? 28 : 32,
+            padding: collapsed ? 6 : 8,
+            border: `1px solid ${G.border}`,
+            borderRadius: RADIUS.md,
+            background: 'transparent',
+            color: G.muted,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16" />
+            <path d="M4 12h11" />
+            <path d="M4 17h16" />
+          </svg>
+        </button>
       </div>
 
       <div
@@ -138,42 +176,6 @@ export function SideNav({
         })}
       </div>
 
-      <div
-        style={{
-          padding: collapsed ? '12px 8px 16px' : '12px 10px 16px',
-          borderTop: isDark
-            ? '1px solid rgba(255, 255, 255, 0.06)'
-            : `1px solid ${G.border}`,
-          flexShrink: 0,
-        }}
-      >
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            gap: 10,
-            padding: collapsed ? '10px 0' : '10px 14px',
-            background: 'transparent',
-            border: `1px solid ${G.border}`,
-            borderRadius: RADIUS.md,
-            color: G.muted,
-            cursor: 'pointer',
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {collapsed
-            ? Icons.chevronRight({ size: 18, color: G.muted })
-            : Icons.chevronLeft({ size: 18, color: G.muted })}
-          {!collapsed ? <span>Collapse</span> : null}
-        </button>
-      </div>
     </div>
   );
 }

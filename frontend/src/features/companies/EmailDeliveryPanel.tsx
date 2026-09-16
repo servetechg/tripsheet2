@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { G, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Pill, SectionTitle, G2, Divider } from '@/components/ui';
+import { Btn, Card, Inp, Pill, SectionTitle, G2, Divider, Skeleton } from '@/components/ui';
 import { companiesApi, type EmailDeliveryDto } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { ErrBox } from '@/components/feedback/ErrBox';
 
 export function EmailDeliveryPanel({
   companyId,
@@ -12,17 +13,28 @@ export function EmailDeliveryPanel({
   adminEmail?: string;
 }) {
   const [profile, setProfile] = useState<EmailDeliveryDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState('');
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testTo, setTestTo] = useState(adminEmail || '');
 
-  const load = () =>
-    companiesApi
+  const load = () => {
+    setLoading(true);
+    setLoadErr('');
+    return companiesApi
       .emailDelivery(companyId)
-      .then(setProfile)
-      .catch((err: Error) =>
-        notify(err?.message || 'Failed to load email settings', 'error'),
-      );
+      .then((res) => {
+        setProfile(res);
+        setLoadErr('');
+      })
+      .catch((err: Error) => {
+        const msg = err?.message || 'Failed to load email settings';
+        setLoadErr(msg);
+        notify(msg, 'error');
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     void load();
@@ -32,11 +44,28 @@ export function EmailDeliveryPanel({
     if (adminEmail && !testTo) setTestTo(adminEmail);
   }, [adminEmail, testTo]);
 
+  if (loading) {
+    return (
+      <Card>
+        <SectionTitle>Email delivery</SectionTitle>
+        <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
+          Loading email settings…
+        </div>
+        <Skeleton rows={3} height={52} />
+      </Card>
+    );
+  }
+
   if (!profile) {
     return (
       <Card>
         <SectionTitle>Email delivery</SectionTitle>
-        <div style={{ color: G.muted, fontSize: 13 }}>Loading…</div>
+        <ErrBox msg={loadErr || 'Email settings are unavailable right now.'} />
+        <div style={{ color: G.muted, fontSize: 12, marginBottom: 12 }}>
+          The company service did not return email delivery settings. It may be
+          restarting or temporarily unreachable.
+        </div>
+        <Btn onClick={() => void load()}>Retry</Btn>
       </Card>
     );
   }
@@ -177,7 +206,7 @@ export function EmailDeliveryPanel({
         Enable email delivery for this company
       </label>
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 8, marginTop: 16, marginBottom: 16, flexWrap: 'wrap' }}>
         <Btn
           disabled={saving}
           onClick={() => {
@@ -209,6 +238,7 @@ export function EmailDeliveryPanel({
           label="Send test to"
           value={testTo}
           onChange={(e) => setTestTo(e.target.value)}
+          style={{ marginBottom: 0 }}
         />
         <div style={{ display: 'flex', alignItems: 'flex-end' }}>
           <Btn

@@ -10,7 +10,6 @@ const btnIconStyle = {
 };
 
 export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, error, onDismissError, onSubmit, onAccept, onReject, onCancel, onDelete, onEdit, onLeadSheet }: any) {
-  const [expanded, setExpanded] = useState(false);
   const [countdown, setCountdown] = useState<any>(null);
   const driver  = drivers.find(d=>d.id===m.driverId);
   const truck   = trucks.find(t=>t.id===m.truckId);
@@ -38,12 +37,11 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
   return (
     <div style={{ background:G.card, border:`1px solid ${m.status==="accepted"?G.success+"66":m.status==="rejected"?G.danger+"66":G.border}`, borderRadius:14, marginBottom:12, overflow:"hidden" }}>
       {/* Header row */}
-      <div style={{ padding:"14px 16px", cursor:"pointer" }} onClick={()=>setExpanded(e=>!e)}>
+      <div style={{ padding:"14px 16px" }}>
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", flexWrap:"wrap", gap:8 }}>
-          <div>
+          <div style={{ flex:"1 1 420px", minWidth:0 }}>
             <div style={{ display:"flex", alignItems:"center", gap:10, flexWrap:"wrap", marginBottom:6 }}>
               <span style={{ fontSize:13, fontWeight:800, color: isACI?G.info:G.purple }}>{m.type}</span>
-              <span style={{ fontSize:11, color:G.gold, fontWeight:700, fontFamily:FONT_MONO }}>{m.crn}</span>
               <span style={{ background:statusInfo.color+"22", color:statusInfo.color, border:`1px solid ${statusInfo.color}44`, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, letterSpacing:1 }}>{statusInfo.label}</span>
               {countdown && (
                 <span style={{ background:"#D4A01722", color:G.gold, border:`1px solid ${G.gold}44`, borderRadius:20, padding:"2px 10px", fontSize:10, fontWeight:700, letterSpacing:1 }}>
@@ -58,10 +56,24 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
             </div>
             <div style={{ fontSize:12, color:G.text }}>Driver: {driver?.name||m.driverName||"—"} · Truck: {truck?.unitNo||m.truckNo||"—"} · Trailer: {trailer?.unitNo||m.trailerNo||"—"}</div>
             <div style={{ fontSize:11, color:G.muted, marginTop:2 }}>Port: {m.portName||m.portCode} · ETA: {m.eta||"—"} {m.etaTime||""}</div>
-            <div style={{ fontSize:11, color:G.muted }}>Shipments: {m.shipments?.length||0} · Created: {m.createdAt}</div>
+            <div style={{ fontSize:12, color:G.text, marginTop:4 }}>
+              {(m.shipments || []).map((s: any) => s.commodityDesc).filter(Boolean).join(' · ') || 'Commodity not specified'}
+            </div>
+            <div style={{ fontSize:11, color:G.muted }}>
+              Shipments: {m.shipments?.length||0} · CRN: <span style={{ fontFamily:FONT_MONO }}>{m.crn||"—"}</span> · Created: {m.createdAt}
+            </div>
             {m.status==="rejected"&&m.rejectionReason&&<div style={{ fontSize:11, color:G.danger, marginTop:4 }}>✗ Rejected: {m.rejectionReason}</div>}
           </div>
-          <div style={{ fontSize:13, color:G.muted }}>{expanded?"▲":"▼"}</div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8, flexWrap:"wrap", flex:"0 1 auto" }}>
+            {m.status==="draft"     && <Btn disabled={!!pending} onClick={()=>onSubmit()} style={{ padding:"7px 14px", fontSize:11, background:G.info, borderColor:G.info, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Submission"?<>{Icons.pending({ size: 16, color: '#fff' })} SUBMITTING…</>:<>SUBMIT</>}</Btn>}
+            {m.status==="submitted" && <Btn disabled={!!pending} onClick={()=>onAccept()} style={{ padding:"7px 14px", fontSize:11, background:G.success, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Accept"?<>{Icons.pending({ size: 16, color: '#fff' })} PROCESSING…</>:<>MARK ACCEPTED</>}</Btn>}
+            {m.status==="submitted" && <Btn variant="danger" disabled={!!pending} onClick={()=>onReject()} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Reject"?<>{Icons.pending({ size: 16, color: G.danger })} PROCESSING…</>:<>MARK REJECTED</>}</Btn>}
+            {m.status==="rejected"  && <Btn disabled={!!pending} onClick={()=>onEdit()} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.onGold })} EDIT & RESUBMIT</Btn>}
+            {m.status==="draft" && <Btn variant="outline" disabled={!!pending} onClick={()=>onEdit()} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.muted })} EDIT</Btn>}
+            {!["delivered","cancelled"].includes(m.status) && m.status!=="draft" && <Btn variant="danger" disabled={!!pending} onClick={()=>onCancel()} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Cancellation"?<>{Icons.pending({ size: 16, color: G.danger })} CANCELLING…</>:<>CANCEL</>}</Btn>}
+            <Btn variant="ghost" onClick={()=>onLeadSheet()} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.print({ size: 16, color: G.muted })} LEAD SHEET</Btn>
+            {m.status==="draft" && <Btn variant="danger" disabled={!!pending} onClick={()=>onDelete()} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.trash({ size: 16, color: G.danger })} DELETE</Btn>}
+          </div>
         </div>
       </div>
 
@@ -76,30 +88,16 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
         </div>
       )}
 
-      {/* Action bar */}
-      <div style={{ padding:"10px 16px", borderTop:`1px solid ${G.border}`, display:"flex", gap:8, flexWrap:"wrap", background:G.card2 }}>
-        {m.status==="draft"     && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onSubmit();}} style={{ padding:"7px 14px", fontSize:11, background:G.info, borderColor:G.info, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Submission"?<>{Icons.pending({ size: 16, color: '#fff' })} SUBMITTING…</>:<>SUBMIT</>}</Btn>}
-        {m.status==="submitted" && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onAccept();}} style={{ padding:"7px 14px", fontSize:11, background:G.success, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Accept"?<>{Icons.pending({ size: 16, color: '#fff' })} PROCESSING…</>:<>MARK ACCEPTED</>}</Btn>}
-        {m.status==="submitted" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onReject();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Reject"?<>{Icons.pending({ size: 16, color: G.danger })} PROCESSING…</>:<>MARK REJECTED</>}</Btn>}
-        {m.status==="rejected"  && <Btn disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.onGold })} EDIT & RESUBMIT</Btn>}
-        {m.status==="draft" && <Btn variant="outline" disabled={!!pending} onClick={e=>{e.stopPropagation();onEdit();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.edit({ size: 16, color: G.muted })} EDIT</Btn>}
-        {!["delivered","cancelled"].includes(m.status) && m.status!=="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onCancel();}} style={{ padding:"7px 14px", fontSize:11, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Cancellation"?<>{Icons.pending({ size: 16, color: G.danger })} CANCELLING…</>:<>CANCEL</>}</Btn>}
-        <Btn variant="ghost" onClick={e=>{e.stopPropagation();onLeadSheet();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.print({ size: 16, color: G.muted })} LEAD SHEET</Btn>
-        {m.status==="draft" && <Btn variant="danger" disabled={!!pending} onClick={e=>{e.stopPropagation();onDelete();}} style={{ padding:"7px 14px", fontSize:11, ...btnIconStyle }}>{Icons.trash({ size: 16, color: G.danger })} DELETE</Btn>}
-      </div>
-
-      {/* Expanded detail */}
-      {expanded && (
-        <div style={{ padding:"14px 16px", borderTop:`1px solid ${G.border}` }}>
+      <div style={{ padding:"14px 16px", borderTop:`1px solid ${G.border}` }}>
           <div style={{ fontSize:10, letterSpacing:2, color:G.muted, marginBottom:10 }}>SHIPMENTS</div>
           {(m.shipments||[]).map((s,i)=>(
             <div key={s.id} style={{ background:G.card2, border:`1px solid ${G.border2}`, borderRadius:8, padding:"10px 14px", marginBottom:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:6 }}>
                 <div>
-                  <span style={{ fontSize:11, fontWeight:700, color: isACI?G.info:G.purple }}>#{i+1} {s.type}</span>
-                  <span style={{ fontSize:11, color:G.gold, marginLeft:10 }}>{s.ccn}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:G.text }}>{s.commodityDesc||"Commodity not specified"}</span>
+                  <span style={{ fontSize:11, color:isACI?G.info:G.purple, marginLeft:10 }}>#{i+1} {s.type}</span>
                 </div>
-                <span style={{ fontSize:11, color:G.muted }}>{s.commodityDesc||"—"}</span>
+                <span style={{ fontSize:10, color:G.muted, fontFamily:FONT_MONO }}>CCN/PAPS: {s.ccn||"—"}</span>
               </div>
               <div style={{ fontSize:11, color:G.muted, marginTop:4 }}>
                 {s.shipperName||"?"} ({s.shipperCountry}) → {s.consigneeName||"?"} ({s.consigneeCountry})
@@ -109,8 +107,7 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
               </div>
             </div>
           ))}
-        </div>
-      )}
+      </div>
     </div>
   );
 }

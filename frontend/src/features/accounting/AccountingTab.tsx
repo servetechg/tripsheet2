@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, SectionTitle, Pill, Divider } from '@/components/ui';
+import { Btn, Card, Inp, Sel, SectionTitle, Pill, Divider, Skeleton } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { settlementsApi, contractsApi } from '@/lib/api';
-import { blank } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
 import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
 import { PAY_TYPES } from '@/lib/docTypes';
 import type { SettlementLine } from '@tripsheet/shared';
@@ -32,6 +32,7 @@ export function AccountingTab({
   apiEnabled?: boolean;
 }) {
   const [list, setList] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(Boolean(apiEnabled));
   const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -50,12 +51,18 @@ export function AccountingTab({
     : f.driverId;
 
   const load = async () => {
-    if (!apiEnabled) return;
+    if (!apiEnabled) {
+      setLoadingList(false);
+      return;
+    }
+    setLoadingList(true);
     try {
       const rows = await settlementsApi.list({ companyId: company.id });
       setList(rows);
     } catch (e: any) {
       notify(e?.message || 'Failed to load settlements', 'error');
+    } finally {
+      setLoadingList(false);
     }
   };
 
@@ -92,7 +99,7 @@ export function AccountingTab({
     if (wageContract?.payType) {
       const pt = PAY_TYPES.find((p) => p.id === wageContract.payType);
       lines.push({
-        label: `Wage terms: ${pt?.label || wageContract.payType} @ ${wageContract.payRate || '—'} ${wageContract.payUnit || pt?.unit || ''} (informational — auto-pay deferred)`,
+        label: `Wage terms: ${pt?.label || humanizeEnum(wageContract.payType)} @ ${wageContract.payRate || '—'} ${wageContract.payUnit || pt?.unit || ''} (informational — auto-pay deferred)`,
         amount: 0,
         kind: 'wage_info',
         source: `contract:${wageContract.id || 'active'}`,
@@ -107,7 +114,7 @@ export function AccountingTab({
         const amount = Number(ex.amount);
         if (!Number.isFinite(amount) || amount === 0) continue;
         lines.push({
-          label: `${ex.category || 'Expense'}: ${ex.description || ex.receiptNo || 'item'}`,
+          label: `${humanizeEnum(ex.category || 'Expense')}: ${ex.description || ex.receiptNo || 'item'}`,
           amount,
           kind: 'expense',
           tripSheetId: sheet.id,
@@ -123,7 +130,7 @@ export function AccountingTab({
       if (load.status !== 'delivered') continue;
       const miles = Number(load.miles) || 0;
       lines.push({
-        label: `Load ${load.tripNo || load.id.slice(0, 8)} · ${load.origin || '?'} → ${load.destination || '?'} (${miles} mi)`,
+        label: `${formatLoadLabel(load)} (${miles} mi)`,
         amount: 0,
         kind: 'load_summary',
         loadId: load.id,
@@ -137,6 +144,27 @@ export function AccountingTab({
   const expenseTotal = settlementPreview
     .filter((l) => l.kind === 'expense')
     .reduce((s, l) => s + l.amount, 0);
+
+  const settlementDriverName = (settlement: any) => {
+    if (settlement.driverName) return settlement.driverName;
+    const driver = drivers.find((d) =>
+      matchesDriverRef(settlement.driverId, {
+        id: d.id,
+        driverRecordId: driverRecordIdOf(d),
+      }),
+    );
+    return driver?.name || 'Driver not available';
+  };
+
+  const tripSheetLabel = (tripSheetId: string) => {
+    const sheet = sheets.find((item) => item.id === tripSheetId);
+    const tripNumbers = (sheet?.trips || [])
+      .map((trip: any) => trip.tripNo)
+      .filter(Boolean);
+    return tripNumbers.length
+      ? `Trip ${tripNumbers.map((tripNo: string) => `#${tripNo}`).join(', ')}`
+      : 'Trip sheet';
+  };
 
   const create = async () => {
     setErr('');
@@ -310,7 +338,7 @@ export function AccountingTab({
               <strong>Contract wage (read-only preview)</strong>
               <div style={{ marginTop: 6, color: G.muted }}>
                 {PAY_TYPES.find((p) => p.id === wageContract.payType)?.label ||
-                  wageContract.payType}{' '}
+                  humanizeEnum(wageContract.payType)}{' '}
                 · {wageContract.payRate} {wageContract.payUnit || ''}
                 {wageContract.detentionRate
                   ? ` · Detention ${wageContract.detentionRate}`
@@ -345,13 +373,7 @@ export function AccountingTab({
                 {l.tripSheetId && (
                   <span style={{ color: G.muted, fontSize: 10 }}>
                     {' '}
-                    · sheet {l.tripSheetId.slice(0, 8)}
-                  </span>
-                )}
-                {l.loadId && (
-                  <span style={{ color: G.muted, fontSize: 10 }}>
-                    {' '}
-                    · load {l.loadId.slice(0, 8)}
+                    · {tripSheetLabel(l.tripSheetId)}
                   </span>
                 )}
               </span>
@@ -376,7 +398,14 @@ export function AccountingTab({
         </Card>
       )}
 
-      {list.length === 0 ? (
+      {loadingList ? (
+        <div>
+          <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
+            Loading settlements…
+          </div>
+          <Skeleton rows={3} height={74} />
+        </div>
+      ) : list.length === 0 ? (
         <div style={{ color: G.muted, fontSize: 13 }}>
           No settlements yet. Create one from driver trip-sheet expenses and
           contract wage preview.
@@ -404,7 +433,7 @@ export function AccountingTab({
               >
                 <div>
                   <div style={{ fontWeight: 800, color: G.text }}>
-                    {s.driverName || s.driverId}
+                    {settlementDriverName(s)}
                   </div>
                   <div style={{ fontSize: 12, color: G.muted, marginTop: 4 }}>
                     {String(s.periodStart).slice(0, 10)} →{' '}
@@ -412,7 +441,7 @@ export function AccountingTab({
                     {Number(s.totalAmount).toFixed(2)}
                   </div>
                 </div>
-                <Pill color={statusColor(s.status)}>{s.status}</Pill>
+                <Pill color={statusColor(s.status)}>{humanizeEnum(s.status)}</Pill>
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
                 {s.status === 'draft' && (

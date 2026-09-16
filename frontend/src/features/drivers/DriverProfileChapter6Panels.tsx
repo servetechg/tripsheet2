@@ -81,7 +81,7 @@ export function DriverEquipmentPanel({
               <option value="">—</option>
               {trucks.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.unitNo || t.id}
+                  {t.unitNo || 'Unnumbered truck'}
                 </option>
               ))}
             </Sel>
@@ -99,7 +99,7 @@ export function DriverEquipmentPanel({
               <option value="">—</option>
               {trailers.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.unitNo || t.id}
+                  {t.unitNo || 'Unnumbered trailer'}
                 </option>
               ))}
             </Sel>
@@ -124,7 +124,11 @@ export function DriverEquipmentPanel({
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700, color: G.text }}>
-                  {r.assetType.toUpperCase()} · {r.unitNo || r.assetId.slice(0, 8)}
+                  {r.assetType.toUpperCase()} ·{' '}
+                  {r.unitNo ||
+                    (r.assetType === 'trailer'
+                      ? 'Unnumbered trailer'
+                      : 'Unnumbered truck')}
                 </div>
                 <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
                   {r.role} · from {new Date(r.assignedAt).toLocaleDateString('en-CA')}

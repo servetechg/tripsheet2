@@ -3,7 +3,7 @@ import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons, AddressAutocomplete, Modal } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
-import { blank } from '@/lib/format';
+import { blank, humanizeEnum } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ServiceHealthBanner } from '@/components/feedback/ServiceHealthBanner';
 import { AppShell } from '@/components/layout/AppShell';
@@ -59,7 +59,7 @@ function tenantStatusColor(status?: string) {
 }
 
 function formatTenantStatus(status?: string) {
-  return (status || 'pending_provision').replace(/_/g, ' ');
+  return humanizeEnum(status || 'pending_provision');
 }
 
 function MetaCell({
@@ -233,9 +233,7 @@ export function SuperAdminPanel({
           companyId: company.id,
         });
         await refreshAll?.('all');
-        notify(
-          `Company created: ${company.tenantDatabase?.dbName || company.slug} (${company.tenantDatabase?.status || 'pending'})`,
-        );
+        notify(`Company created: ${company.name}`, 'success');
       } else {
         const cid = uid();
         const slug = derivedSlug;
@@ -539,14 +537,16 @@ export function SuperAdminPanel({
               </option>
             ))}
           </Sel>
-          <div style={{ fontSize: 11, color: G.muted, marginBottom: 12 }}>
-            Tenant DB name will be{' '}
-            <code>
-              fq_tenant_
-              {toKebabSlug(f.slug || f.shortName || f.name).replace(/-/g, '_') || '…'}
-            </code>{' '}
-            (created automatically on save).
-          </div>
+          <details style={{ fontSize: 11, color: G.muted, marginBottom: 12 }}>
+            <summary style={{ cursor: 'pointer' }}>Technical provisioning details</summary>
+            <div style={{ marginTop: 5 }}>
+              Tenant database: <code>
+                fq_tenant_
+                {toKebabSlug(f.slug || f.shortName || f.name).replace(/-/g, '_') || '…'}
+              </code>{' '}
+              (created automatically on save).
+            </div>
+          </details>
           <Divider label="Company Admin Login" />
           <G2 cols={3}>
             <Inp
@@ -741,11 +741,6 @@ export function SuperAdminPanel({
                       <Pill color={c.active ? G.success : G.danger}>
                         {c.active ? 'Active' : 'Disabled'}
                       </Pill>
-                      {apiEnabled && (
-                        <Pill color={tenantStatusColor(tenantStatus)} small>
-                          DB {formatTenantStatus(tenantStatus)}
-                        </Pill>
-                      )}
                     </div>
                   </div>
 
@@ -763,9 +758,34 @@ export function SuperAdminPanel({
                       value={`${drivers} registered`}
                     />
                     <MetaCell label="Plan" value={planName} />
-                    <MetaCell label="Slug" value={c.slug || '—'} mono />
-                    <MetaCell label="Database" value={dbName} mono />
                   </div>
+
+                  <details style={{ marginTop: 10, fontSize: 11, color: G.muted2 }}>
+                    <summary style={{ cursor: 'pointer', color: G.muted }}>
+                      Technical tenant details
+                    </summary>
+                    <div
+                      style={{
+                        marginTop: 7,
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                        gap: 8,
+                      }}
+                    >
+                      <MetaCell label="Slug" value={c.slug || '—'} mono />
+                      <MetaCell label="Database" value={dbName} mono />
+                      {apiEnabled && (
+                        <MetaCell
+                          label="Database status"
+                          value={
+                            <span style={{ color: tenantStatusColor(tenantStatus) }}>
+                              {formatTenantStatus(tenantStatus)}
+                            </span>
+                          }
+                        />
+                      )}
+                    </div>
+                  </details>
 
                   {c.tenantDatabase?.issue ? (
                     <TenantIssueAlert issue={c.tenantDatabase.issue} />

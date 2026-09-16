@@ -541,7 +541,14 @@ export function DriverDashboard({
                     ● ACTIVE LOAD
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>
-                    {myLoad.id} · {myLoad.origin} → {myLoad.destination}
+                    Trip #{myLoad.tripNo || 'Unavailable'}
+                  </div>
+                  <div style={{ fontSize: 12, color: G.text, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                    <span>{myLoad.origin}</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--color-text)' }}>
+                      {Icons.arrowRight({ size: 12, color: 'var(--color-text)' })}
+                    </span>
+                    <span>{myLoad.destination}</span>
                   </div>
                   <div
                     style={{
@@ -555,10 +562,10 @@ export function DriverDashboard({
                     }}
                   >
                     {Icons.truck({ size: 14, color: G.muted })}
-                    Truck {myLoad.truckNo || '—'}
+                    {myLoad.truckNo ? `Truck ${myLoad.truckNo}` : 'Unnumbered truck'}
                     <span>·</span>
                     {Icons.trailer({ size: 14, color: G.muted })}
-                    Trailer {myLoad.trailerNo || '—'}
+                    {myLoad.trailerNo ? `Trailer ${myLoad.trailerNo}` : 'Unnumbered trailer'}
                   </div>
                   {myLoad.eta && (
                     <div style={{ fontSize: 11, color: G.gold, marginTop: 2 }}>
@@ -1142,12 +1149,11 @@ export function DriverDashboard({
                     }}
                   >
                     {[
-                      ['Load ID', myLoad.id],
-                      ['Trip No.', myLoad.tripNo || '—'],
-                      ['Truck', myLoad.truckNo || '—'],
-                      ['Trailer', myLoad.trailerNo || '—'],
+                      ['Trip #', myLoad.tripNo || 'Unavailable'],
                       ['From', myLoad.origin],
                       ['To', myLoad.destination],
+                      ['Truck', myLoad.truckNo || 'Unnumbered truck'],
+                      ['Trailer', myLoad.trailerNo || 'Unnumbered trailer'],
                       ['Pickup', myLoad.pickupTime || '—'],
                       [
                         'Speed',

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { G } from '@/lib/theme';
-import { Card, Pill, StatCard, StatsGrid, Icons } from '@/components/ui';
+import { G, RADIUS } from '@/lib/theme';
+import { Card, Pill, StatCard, StatsGrid, Icons, RouteFromTo } from '@/components/ui';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { formatDisplayDateTime } from '@/lib/formFields';
 import { loadsApi } from '@/lib/api';
 import { MapView } from './MapView';
 
@@ -172,66 +173,153 @@ export function TrackTab({
                     justifyContent: 'space-between',
                     alignItems: 'flex-start',
                     flexWrap: 'wrap',
-                    gap: 6,
+                    gap: 10,
                   }}
                 >
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 8,
-                        marginBottom: 6,
+                        justifyContent: 'space-between',
+                        gap: 10,
                         flexWrap: 'wrap',
                       }}
                     >
-                      <span style={{ fontWeight: 800, color: G.gold }}>
-                        {l.id}
-                      </span>
-                      <Pill color={statusColor[l.status] || G.muted}>
-                        {l.status.replace('_', ' ').toUpperCase()}
-                      </Pill>
-                      {l.status === 'in_transit' && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          flexWrap: 'wrap',
+                        }}
+                      >
                         <span
                           style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            background: G.success,
-                            display: 'inline-block',
-                            boxShadow: `0 0 6px ${G.success}`,
+                            fontSize: 16,
+                            fontWeight: 800,
+                            color: G.gold,
                           }}
-                        />
+                        >
+                          {l.tripNo ? `Trip #${l.tripNo}` : 'Unnumbered load'}
+                        </span>
+                        <Pill color={statusColor[l.status] || G.muted}>
+                          {l.status.replace('_', ' ').toUpperCase()}
+                        </Pill>
+                        {l.status === 'in_transit' && (
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 5,
+                              padding: '2px 8px',
+                              borderRadius: RADIUS.pill,
+                              background: G.successBg,
+                              color: G.success,
+                              fontSize: 10,
+                              fontWeight: 700,
+                            }}
+                          >
+                            <span
+                              style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: G.success,
+                                boxShadow: `0 0 6px ${G.success}`,
+                              }}
+                            />
+                            LIVE
+                          </span>
+                        )}
+                      </div>
+                      {l.pickupTime && (
+                        <div
+                          style={{
+                            padding: '6px 10px',
+                            borderRadius: RADIUS.md,
+                            border: `1px solid ${G.border}`,
+                            background: G.inset,
+                            fontSize: 10,
+                            color: G.muted,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              letterSpacing: 0.5,
+                              textTransform: 'uppercase',
+                              marginBottom: 2,
+                            }}
+                          >
+                            Scheduled pickup
+                          </div>
+                          <div style={{ color: G.text, fontWeight: 600, fontSize: 11 }}>
+                            {formatDisplayDateTime(l.pickupTime)}
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      {driver?.name || '—'}
-                    </div>
+
+                    <RouteFromTo origin={l.origin} destination={l.destination} />
+
                     <div
                       style={{
-                        fontSize: 11,
-                        color: G.muted,
-                        display: 'inline-flex',
+                        display: 'flex',
                         alignItems: 'center',
-                        gap: 6,
+                        justifyContent: 'space-between',
+                        gap: 10,
                         flexWrap: 'wrap',
+                        marginTop: 10,
+                        paddingTop: 10,
+                        borderTop: `1px solid ${G.border}`,
                       }}
                     >
-                      {Icons.truck({ size: 14, color: G.muted })}
-                      {l.truckNo || '—'} · {l.origin} → {l.destination}
-                    </div>
-                    {l.status === 'in_transit' && (
                       <div
-                        style={{ fontSize: 11, color: G.gold, marginTop: 4 }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 12,
+                          flexWrap: 'wrap',
+                          fontSize: 12,
+                          color: G.text,
+                        }}
                       >
-                        {l.speed} km/h · Updated {l.lastUpdate}
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {Icons.driver({ size: 14, color: G.gold })}
+                          {driver?.name || 'Unknown driver'}
+                        </span>
+                        <span
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            color: G.muted2,
+                          }}
+                        >
+                          {Icons.truck({ size: 14, color: G.muted })}
+                          {l.truckNo ? `Unit #${l.truckNo}` : 'No truck assigned'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                  <div
-                    style={{ fontSize: 11, color: G.muted, textAlign: 'right' }}
-                  >
-                    {l.pickupTime || ''}
+                      {l.status === 'in_transit' && (
+                        <span style={{ fontSize: 11, color: G.gold, fontWeight: 600 }}>
+                          {l.speed} km/h · {l.lastUpdate || 'Updating…'}
+                        </span>
+                      )}
+                      {isSel && (
+                        <span style={{ fontSize: 11, color: G.muted }}>
+                          Map open
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

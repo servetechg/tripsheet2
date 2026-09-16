@@ -3,6 +3,7 @@ import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Pill, Icons, Chk } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { humanizeEnum } from '@/lib/format';
 
 export interface NotificationRuleItem {
   id: string;
@@ -95,10 +96,7 @@ function getRuleMeta(eventType: string): RuleMeta {
       };
     default:
       return {
-        title: eventType
-          .replace(/^security\./, '')
-          .replace(/_/g, ' ')
-          .replace(/\b\w/g, (c) => c.toUpperCase()),
+        title: humanizeEnum(eventType.replace(/^security\./, '')),
         description: `Automated alert triggered on the ${eventType} system event.`,
         category: 'System Event',
         icon: 'bell',
@@ -806,26 +804,6 @@ export function NotificationRulesPanel({
                       >
                         {meta.title}
                       </span>
-                      <span
-                        onClick={(e) => copyEventCode(r.eventType, e)}
-                        title="Click to copy event code"
-                        style={{
-                          fontFamily: 'monospace',
-                          fontSize: 11,
-                          color: G.muted,
-                          background: G.bg,
-                          padding: '2px 8px',
-                          borderRadius: RADIUS.sm,
-                          border: `1px solid ${G.border}`,
-                          cursor: 'copy',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                        }}
-                      >
-                        {r.eventType}
-                        <Icons.copy size={10} color={G.muted} />
-                      </span>
                     </div>
 
                     <div
@@ -839,6 +817,30 @@ export function NotificationRulesPanel({
                       {meta.description}
                     </div>
 
+                    <details
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ marginTop: 7, fontSize: 11, color: G.muted2 }}
+                    >
+                      <summary style={{ cursor: 'pointer', color: G.muted }}>
+                        Technical rule details
+                      </summary>
+                      <span
+                        onClick={(e) => copyEventCode(r.eventType, e)}
+                        title="Click to copy event code"
+                        style={{
+                          marginTop: 5,
+                          fontFamily: 'monospace',
+                          cursor: 'copy',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        Event: {r.eventType}
+                        <Icons.copy size={10} color={G.muted} />
+                      </span>
+                    </details>
+
                     {/* Channel & Target Badges */}
                     <div
                       style={{
@@ -850,10 +852,10 @@ export function NotificationRulesPanel({
                       }}
                     >
                       <Pill color={G.gold} small>
-                        CHANNEL: {r.channel.toUpperCase()}
+                        Channel: {humanizeEnum(r.channel)}
                       </Pill>
                       <Pill color={G.muted} small>
-                        TARGET: {r.target.toUpperCase()}
+                        Target: {humanizeEnum(r.target)}
                       </Pill>
                       <Pill color={meta.color} small>
                         {meta.category.toUpperCase()}

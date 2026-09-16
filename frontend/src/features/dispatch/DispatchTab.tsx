@@ -13,6 +13,7 @@ import {
   StatsGrid,
   Icons,
   AddressAutocomplete,
+  RouteFromTo,
 } from '@/components/ui';
 import { blank } from '@/lib/format';
 import {
@@ -848,7 +849,7 @@ export function DispatchTab({
                         : !availOk
                           ? `Driver is ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail} — Cannot assign`
                           : onLoad
-                            ? `Already assigned to active load ${onLoad.id}`
+                            ? `Already assigned to Trip #${onLoad.tripNo || 'Unavailable'} · ${onLoad.origin || 'Origin unavailable'} → ${onLoad.destination || 'Destination unavailable'}`
                             : `Missing required documents`}
                   </div>
                   {!isReady && missing.length > 0 && (
@@ -1060,7 +1061,7 @@ export function DispatchTab({
                   .filter((t: any) => canAssignAsset(t.status))
                   .map((t: any) => (
                     <option key={t.id} value={t.id}>
-                      #{t.unitNo} · {t.year} {t.make} {t.model}
+                      {t.unitNo ? `#${t.unitNo}` : 'Unnumbered truck'} · {t.year} {t.make} {t.model}
                     </option>
                   ))}
               </Sel>
@@ -1087,7 +1088,7 @@ export function DispatchTab({
                 .filter((t: any) => canAssignAsset(t.status))
                 .map((t: any) => (
                   <option key={t.id} value={t.id}>
-                    #{t.unitNo} · {t.make} {t.model}
+                    {t.unitNo ? `#${t.unitNo}` : 'Unnumbered trailer'} · {t.make} {t.model}
                   </option>
                 ))}
             </Sel>
@@ -1289,8 +1290,12 @@ export function DispatchTab({
         loads.map((l: any) => {
           const driver = users.find((u: any) => u.id === l.driverId);
           const sc = statusColor[l.status] || G.muted;
+          const { rev, cost, margin } = loadMargin(l);
+          const stops = Array.isArray(l.stops) ? l.stops : [];
+          const money = (value: number) =>
+            `$${Math.round(value).toLocaleString()}`;
           return (
-            <Card key={l.id}>
+            <Card key={l.id} style={{ padding: '12px 14px', marginBottom: 10 }}>
               <div
                 style={{
                   display: 'flex',
@@ -1300,166 +1305,72 @@ export function DispatchTab({
                   flexWrap: 'wrap',
                 }}
               >
-                <div style={{ flex: 1, minWidth: 200 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <div
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      flexWrap: 'wrap',
-                      marginBottom: 8,
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: G.gold,
+                      letterSpacing: -0.2,
                     }}
                   >
+                    Trip #{l.tripNo || '—'}
+                  </div>
+                  <Pill color={sc}>
+                    {l.status.replace('_', ' ').toUpperCase()}
+                  </Pill>
+                  {l.status === 'in_transit' && (
                     <span
                       style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: G.gold,
-                        letterSpacing: 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '2px 8px',
+                        borderRadius: RADIUS.pill,
+                        background: G.successBg,
+                        color: G.success,
+                        fontSize: 10,
+                        fontWeight: 700,
                       }}
                     >
-                      {l.id}
-                    </span>
-                    {l.tripNo && (
                       <span
                         style={{
-                          fontSize: 11,
-                          color: G.muted,
-                          fontFamily: FONT_MONO,
-                        }}
-                      >
-                        Trip #{l.tripNo}
-                      </span>
-                    )}
-                    <Pill color={sc}>
-                      {l.status.replace('_', ' ').toUpperCase()}
-                    </Pill>
-                    {l.status === 'in_transit' && (
-                      <span
-                        style={{
-                          width: 8,
-                          height: 8,
+                          width: 7,
+                          height: 7,
                           borderRadius: '50%',
                           background: G.success,
-                          display: 'inline-block',
-                          boxShadow: `0 0 8px ${G.success}`,
+                          boxShadow: `0 0 6px ${G.success}`,
                         }}
                       />
-                    )}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: G.text,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {driver?.name || '—'}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: G.muted,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {Icons.truck({ size: 14, color: G.muted })}
-                    {l.truckNo || '—'}
-                    <span>·</span>
-                    {Icons.trailer({ size: 14, color: G.muted })}
-                    {l.trailerNo || '—'}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: G.muted,
-                      marginTop: 2,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                    }}
-                  >
-                    {Icons.pin({ size: 14, color: G.muted })}
-                    {l.origin} → {l.destination}
-                  </div>
-                  {l.pickupTime && (
-                    <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
-                      Pickup: {formatDisplayDateTime(l.pickupTime)}
-                    </div>
+                      LIVE
+                    </span>
                   )}
-                  {l.eta && (
-                    <div style={{ fontSize: 11, color: G.gold, marginTop: 2 }}>
-                      ETA: {formatDisplayDateTime(l.eta)}
-                    </div>
-                  )}
-                  {l.notes && (
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: G.muted,
-                        marginTop: 4,
-                        fontStyle: 'italic',
-                      }}
-                    >
-                      {l.notes}
-                    </div>
-                  )}
-                  {(() => {
-                    const { rev, cost, margin } = loadMargin(l);
-                    if (rev === 0 && cost === 0) return null;
-                    const stops = Array.isArray(l.stops) ? l.stops : [];
-                    return (
-                      <div style={{ fontSize: 11, color: G.muted, marginTop: 6 }}>
-                        Rev ${rev.toFixed(0)} · Cost ${cost.toFixed(0)} · Margin{' '}
-                        <span
-                          style={{
-                            color: margin >= 0 ? G.success : G.danger,
-                            fontWeight: 700,
-                          }}
-                        >
-                          ${margin.toFixed(0)}
-                        </span>
-                        {l.miles ? ` · ${l.miles} mi` : ''}
-                        {stops.length > 0 &&
-                          ` · stops: ${stops
-                            .map((s: any) => s.location || s)
-                            .join(' → ')}`}
-                      </div>
-                    );
-                  })()}
                 </div>
                 <div
                   style={{
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                    alignItems: 'flex-end',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    gap: 6,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    {l.status === 'assigned' && can('dispatch.edit') && (
-                      <Btn
-                        size="sm"
-                        onClick={() => setStatus(l.id, 'in_transit')}
-                      >
-                        ▶ Start
-                      </Btn>
-                    )}
-                    {l.status === 'in_transit' && can('dispatch.close') && (
-                      <Btn
-                        variant="success"
-                        size="sm"
-                        onClick={() => setStatus(l.id, 'delivered')}
-                      >
-                        ✓ Deliver
-                      </Btn>
-                    )}
-                    {!['delivered', 'cancelled'].includes(l.status) &&
-                      can('dispatch.cancel') && (
+                  {l.status === 'assigned' && can('dispatch.edit') && (
+                    <Btn size="sm" onClick={() => setStatus(l.id, 'in_transit')}>
+                      ▶ Start
+                    </Btn>
+                  )}
+                  {l.status === 'in_transit' && can('dispatch.close') && (
+                    <Btn
+                      variant="success"
+                      size="sm"
+                      onClick={() => setStatus(l.id, 'delivered')}
+                    >
+                      ✓ Deliver
+                    </Btn>
+                  )}
+                  {!['delivered', 'cancelled'].includes(l.status) &&
+                    can('dispatch.cancel') && (
                       <Btn
                         variant="danger"
                         size="sm"
@@ -1468,53 +1379,207 @@ export function DispatchTab({
                         ✕ Cancel
                       </Btn>
                     )}
+                  <Btn
+                    variant="outline"
+                    size="sm"
+                    onClick={onTrack}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  >
+                    {Icons.track({ size: 16, color: G.muted })}
+                    Track
+                  </Btn>
+                  {!['delivered'].includes(l.status) && can('dispatch.edit') && (
                     <Btn
                       variant="outline"
                       size="sm"
-                      onClick={onTrack}
+                      onClick={() => openEdit(l)}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      {Icons.edit({ size: 16, color: G.muted })}
+                      Edit
+                    </Btn>
+                  )}
+                  {can('dispatch.delete') && (
+                    <Btn
+                      variant="danger"
+                      size="sm"
+                      onClick={() => deleteLoad(l.id)}
+                      aria-label={`Delete Trip ${l.tripNo || ''}`}
+                      title="Delete load"
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: 6,
+                        justifyContent: 'center',
                       }}
                     >
-                      {Icons.track({ size: 16, color: G.muted })}
-                      Track
+                      {Icons.trash({ size: 16, color: G.danger })}
                     </Btn>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    {!['delivered'].includes(l.status) && can('dispatch.edit') && (
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEdit(l)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        {Icons.edit({ size: 16, color: G.muted })}
-                        Edit
-                      </Btn>
-                    )}
-                    {can('dispatch.delete') && (
-                      <Btn
-                        variant="danger"
-                        size="sm"
-                        onClick={() => deleteLoad(l.id)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        {Icons.trash({ size: 16, color: G.danger })}
-                      </Btn>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
+
+              <details style={{ marginTop: 4, fontSize: 10, color: G.muted }}>
+                <summary style={{ cursor: 'pointer', color: G.muted2, listStylePosition: 'inside' }}>
+                  Technical details
+                </summary>
+                <div
+                  title={l.id}
+                  style={{
+                    marginTop: 4,
+                    fontFamily: FONT_MONO,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Load ID · {l.id}
+                </div>
+              </details>
+
+              <RouteFromTo
+                compact
+                origin={l.origin}
+                destination={l.destination}
+                style={{ marginTop: 8 }}
+              />
+
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  flexWrap: 'wrap',
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: G.muted2,
+                  lineHeight: 1.4,
+                }}
+              >
+                {l.pickupTime && (
+                  <span>
+                    <strong style={{ color: G.muted, fontWeight: 700 }}>Pickup</strong>{' '}
+                    <span style={{ color: G.text }}>
+                      {formatDisplayDateTime(l.pickupTime)}
+                    </span>
+                  </span>
+                )}
+                {l.eta && (
+                  <span>
+                    <strong style={{ color: G.gold, fontWeight: 700 }}>ETA</strong>{' '}
+                    <span style={{ color: G.text }}>
+                      {formatDisplayDateTime(l.eta)}
+                    </span>
+                  </span>
+                )}
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontWeight: 600,
+                    color: G.text,
+                  }}
+                >
+                  {Icons.driver({ size: 13, color: G.gold })}
+                  {driver?.name || 'Unknown driver'}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  {Icons.truck({ size: 13, color: G.muted })}
+                  {l.truckNo ? `#${l.truckNo}` : 'No truck'}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  {Icons.trailer({ size: 13, color: G.muted })}
+                  {l.trailerNo ? `#${l.trailerNo}` : 'No trailer'}
+                </span>
+              </div>
+
+              {l.notes && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: G.muted,
+                    marginTop: 8,
+                    fontStyle: 'italic',
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {l.notes}
+                </div>
+              )}
+
+              {(rev !== 0 || cost !== 0) && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns:
+                      'repeat(auto-fit, minmax(105px, 1fr))',
+                    gap: 7,
+                    marginTop: 10,
+                  }}
+                >
+                  {[
+                    { label: 'Revenue', value: money(rev), color: G.text },
+                    { label: 'Cost', value: money(cost), color: G.text },
+                    {
+                      label: 'Margin',
+                      value: money(margin),
+                      color: margin >= 0 ? G.success : G.danger,
+                    },
+                    {
+                      label: 'Miles',
+                      value: l.miles ? `${l.miles}` : '—',
+                      color: G.text,
+                    },
+                  ].map((item) => (
+                    <div
+                      key={item.label}
+                      style={{
+                        minWidth: 0,
+                        padding: '7px 10px',
+                        border: `1px solid ${G.border}`,
+                        borderRadius: RADIUS.md,
+                        background: G.card2,
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: G.muted,
+                          fontSize: 9,
+                          fontWeight: 600,
+                          letterSpacing: 0.4,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {item.label}
+                      </div>
+                      <div
+                        style={{
+                          marginTop: 2,
+                          color: item.color,
+                          fontSize: 13,
+                          fontWeight: 600,
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        {item.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {stops.length > 0 && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    color: G.muted,
+                    fontSize: 10,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Stops: {stops.map((s: any) => s.location || s).join(' → ')}
+                </div>
+              )}
             </Card>
           );
         })
