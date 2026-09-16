@@ -32,7 +32,7 @@ export function MapView({ load, users, loads, tick }: any) {
     ctx.fillText("T",x,y);
     ctx.fillStyle="#000c";ctx.fillRect(x+16,y-14,118,28);
     ctx.fillStyle=G.gold;ctx.font="bold 10px monospace";ctx.textAlign="left";ctx.textBaseline="middle";
-    ctx.fillText(load.truckNo||load.id,x+20,y-5);
+    ctx.fillText(load.truckNo ? `Unit #${load.truckNo}` : load.tripNo ? `Trip #${load.tripNo}` : "Active load",x+20,y-5);
     ctx.fillStyle="#aaa";ctx.font="9px monospace";ctx.fillText(`${load.speed||0} km/h · ${load.heading||"E"}`,x+20,y+8);
     ctx.beginPath();ctx.arc(40,H-30,7,0,Math.PI*2);ctx.fillStyle=G.info;ctx.fill();
     ctx.fillStyle="#fff";ctx.font="9px monospace";ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText("ORIGIN",52,H-30);
@@ -44,8 +44,20 @@ export function MapView({ load, users, loads, tick }: any) {
     <div style={{ background:G.card2 }}>
       <div style={{ padding:"12px 16px",borderBottom:`1px solid ${G.border}`,display:"flex",justifyContent:"space-between",alignItems:"center" }}>
         <div>
-          <span style={{ fontWeight:800,color:G.gold,fontSize:13 }}>{load.id}</span>
-          <span style={{ fontSize:11,color:G.muted,marginLeft:10 }}>{driver?.name||"Unknown"}</span>
+          <div style={{ fontWeight:800,color:G.gold,fontSize:15 }}>
+            {load.tripNo ? `Trip #${load.tripNo}` : "Unnumbered load"}
+          </div>
+          <div style={{ fontSize:12,color:G.text,marginTop:2 }}>{driver?.name||"Unknown driver"}</div>
+          <div style={{ fontSize:11,color:G.muted,marginTop:6,lineHeight:1.45 }}>
+            <div style={{ marginBottom:4 }}>
+              <span style={{ color:G.info, fontWeight:700, marginRight:6 }}>Pickup</span>
+              {load.origin || "Unknown origin"}
+            </div>
+            <div>
+              <span style={{ color:G.success, fontWeight:700, marginRight:6 }}>Delivery</span>
+              {load.destination || "Unknown destination"}
+            </div>
+          </div>
         </div>
         <div style={{ fontSize:11,color:G.muted,display:"flex",gap:10 }}>
           <span style={{ display:'inline-flex', alignItems:'center', gap:6 }}>

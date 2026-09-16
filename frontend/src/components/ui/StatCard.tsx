@@ -40,85 +40,24 @@ export function StatCard({
       <div
         style={{
           display: 'flex',
-          alignItems: 'flex-start',
+          alignItems: 'center',
           justifyContent: 'space-between',
           gap: 10,
         }}
       >
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              ...TYPE.small,
-              color: G.muted,
-              fontWeight: 500,
-              marginBottom: 8,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-            title={label}
-          >
-            {label}
-          </div>
-          <div
-            style={{
-              fontSize: 'clamp(20px, 2vw, 24px)',
-              fontWeight: 700,
-              color: G.text,
-              letterSpacing: -0.4,
-              lineHeight: 1.15,
-              fontVariantNumeric: 'tabular-nums',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}
-            title={String(value)}
-          >
-            {value}
-          </div>
-          {(subtitle || trend) && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                marginTop: 8,
-                flexWrap: 'wrap',
-              }}
-            >
-              {subtitle && (
-                <div
-                  style={{
-                    ...TYPE.small,
-                    color: G.muted,
-                    lineHeight: 1.35,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    maxWidth: '100%',
-                  }}
-                  title={subtitle}
-                >
-                  {subtitle}
-                </div>
-              )}
-              {trend && (
-                <span
-                  style={{
-                    ...TYPE.small,
-                    fontWeight: 600,
-                    color: trend.up === false ? G.danger : G.success,
-                    background: (trend.up === false ? G.danger : G.success) + '18',
-                    borderRadius: RADIUS.sm,
-                    padding: '2px 8px',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {trend.label}
-                </span>
-              )}
-            </div>
-          )}
+        <div
+          style={{
+            ...TYPE.small,
+            minWidth: 0,
+            color: G.muted,
+            fontWeight: 500,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+          title={label}
+        >
+          {label}
         </div>
 
         {icon != null && (
@@ -140,6 +79,64 @@ export function StatCard({
           </div>
         )}
       </div>
+
+      <div
+        style={{
+          width: '100%',
+          marginTop: 8,
+          fontSize: 'clamp(18px, 2vw, 24px)',
+          fontWeight: 700,
+          color: G.text,
+          letterSpacing: -0.4,
+          lineHeight: 1.15,
+          fontVariantNumeric: 'tabular-nums',
+          overflowWrap: 'anywhere',
+        }}
+        title={String(value)}
+      >
+        {value}
+      </div>
+      {(subtitle || trend) && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginTop: 8,
+            flexWrap: 'wrap',
+          }}
+        >
+          {subtitle && (
+            <div
+              style={{
+                ...TYPE.small,
+                color: G.muted,
+                lineHeight: 1.35,
+                maxWidth: '100%',
+                overflowWrap: 'anywhere',
+              }}
+              title={subtitle}
+            >
+              {subtitle}
+            </div>
+          )}
+          {trend && (
+            <span
+              style={{
+                ...TYPE.small,
+                fontWeight: 600,
+                color: trend.up === false ? G.danger : G.success,
+                background: (trend.up === false ? G.danger : G.success) + '18',
+                borderRadius: RADIUS.sm,
+                padding: '2px 8px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {trend.label}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

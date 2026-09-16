@@ -570,7 +570,7 @@ export function DriverProfile({
                 >
                   {driver.email && <span>{driver.email}</span>}
                   {driver.phone && <span>· {driver.phone}</span>}
-                  {driver.branchId && <span>· Branch: {driver.branchId}</span>}
+                  <span>· Branch: Unavailable</span>
                   <span>· {DRIVER_TYPE_LABELS[driver.driverType as keyof typeof DRIVER_TYPE_LABELS] || driver.driverType || 'Company Driver'}</span>
                   <span style={{ color: myContract?.signedByDriver && myContract?.signedByAdmin ? G.success : myContract ? G.gold : G.danger }}>
                     · {contractStatus}
@@ -696,7 +696,7 @@ export function DriverProfile({
                     ['Probation Ends', driver.probationEndDate || '—'],
                     ['Seniority Date', driver.seniorityDate || '—'],
                     ['Employment Status', driver.employmentStatus || '—'],
-                    ['Branch', driver.branchId || '—'],
+                    ['Branch', 'Unavailable'],
                     ['Language', driver.preferredLanguage || '—'],
                   ] as const
                 ).map(([k, v]) => (
@@ -1346,7 +1346,7 @@ export function DriverProfile({
                             }}
                           >
                             <span style={{ fontWeight: 700, color: G.gold }}>
-                              {l.id}
+                              Trip #{l.tripNo || 'Unavailable'}
                             </span>
                             <Pill
                               color={
@@ -1374,10 +1374,10 @@ export function DriverProfile({
                             }}
                           >
                             {Icons.truck({ size: 14, color: G.text })}
-                            {l.truckNo || '—'}
+                            {l.truckNo || 'Unnumbered truck'}
                             <span>·</span>
                             {Icons.trailer({ size: 14, color: G.text })}
-                            {l.trailerNo || '—'}
+                            {l.trailerNo || 'Unnumbered trailer'}
                           </div>
                           <div
                             style={{

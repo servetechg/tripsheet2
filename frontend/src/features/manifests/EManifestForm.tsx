@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, Fragment, useMemo } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO } from '@/lib/theme';
 import { Btn, BackButton, Inp, Sel, Icons, AddressAutocomplete } from '@/components/ui';
 import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
-import { blank } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
 import { companiesApi, driversApi } from '@/lib/api';
@@ -421,7 +421,7 @@ export function EManifestForm({ type, company, carrier, drivers, trucks, trailer
               } else { upd("tripLoadId",""); }
             }}>
               <option value="">— Select load to auto-fill —</option>
-              {loads.map(l=><option key={l.id} value={l.id}>{l.id} · {l.origin} → {l.destination} ({l.status})</option>)}
+              {loads.map(l=><option key={l.id} value={l.id}>{formatLoadLabel(l)} · {humanizeEnum(l.status)}</option>)}
             </Sel>
           </div>
         )}

@@ -7,6 +7,7 @@ import {
   type DeviceSessionDto,
   ApiError,
 } from '@/lib/api';
+import { humanizeEnum } from '@/lib/format';
 
 function parseUserAgent(ua?: string): { browser: string; os: string } {
   if (!ua) return { browser: 'Web browser', os: '' };
@@ -168,7 +169,7 @@ export function SessionsDevicesPanel({ onClose }: { onClose: () => void }) {
                 {s.trusted && <Pill color={G.warning} small>trusted</Pill>}
               </div>
               <Pill color={s.active ? G.success : G.muted} small>
-                {s.active ? 'active' : s.revokeReason || 'ended'}
+                {s.active ? 'Active' : humanizeEnum(s.revokeReason || 'ended')}
               </Pill>
             </div>
             <div
@@ -344,7 +345,7 @@ export function SessionsDevicesPanel({ onClose }: { onClose: () => void }) {
                   }}
                 >
                   <Pill color={e.success ? G.success : G.danger} small>
-                    {e.success ? '✓ Success' : e.reason ? `✕ ${e.reason}` : '✕ Failed'}
+                    {e.success ? '✓ Success' : e.reason ? `✕ ${humanizeEnum(e.reason)}` : '✕ Failed'}
                   </Pill>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>

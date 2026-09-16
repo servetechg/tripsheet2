@@ -8,6 +8,7 @@ import {
   Divider,
   SectionTitle,
   G2,
+  Skeleton,
   AddressAutocomplete,
   FileUploadField,
   type UploadedFile,
@@ -25,6 +26,7 @@ import { DepartmentsPanel } from './DepartmentsPanel';
 import { NotificationRulesPanel } from './NotificationRulesPanel';
 import { EmailDeliveryPanel } from './EmailDeliveryPanel';
 import { UsersPanel } from './UsersPanel';
+import { humanizeEnum } from '@/lib/format';
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -76,40 +78,21 @@ function SecurityEventsList({ companyId }: { companyId: string }) {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  padding: '2px 8px',
-                  borderRadius: RADIUS.sm,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                  background: isWarn ? 'rgba(248, 113, 113, 0.12)' : 'rgba(56, 189, 248, 0.12)',
-                  color: isWarn ? G.danger : G.info,
-                  border: `1px solid ${isWarn ? 'rgba(248, 113, 113, 0.25)' : 'rgba(56, 189, 248, 0.25)'}`,
-                }}
-              >
-                {r.type.replace('security.', '')}
-              </span>
               <span style={{ color: G.text, fontWeight: 500 }}>
                 {r.message}
               </span>
-              {r.ip && (
-                <span
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                    color: G.muted,
-                    background: G.bg,
-                    padding: '1px 6px',
-                    borderRadius: 4,
-                  }}
-                >
-                  {r.ip === '::1' || r.ip === '127.0.0.1' ? 'localhost' : r.ip}
-                </span>
-              )}
+              <Pill color={isWarn ? G.danger : G.info} small>
+                {humanizeEnum(r.severity)}
+              </Pill>
+              <details style={{ flexBasis: '100%', fontSize: 11, color: G.muted2 }}>
+                <summary style={{ cursor: 'pointer', color: G.muted }}>
+                  Technical details
+                </summary>
+                <div style={{ marginTop: 4, fontFamily: 'monospace' }}>
+                  Event: {r.type} · IP:{' '}
+                  {r.ip === '::1' || r.ip === '127.0.0.1' ? 'localhost' : r.ip || '—'}
+                </div>
+              </details>
             </div>
             <span style={{ color: G.muted, flexShrink: 0, fontSize: 11 }}>
               {new Date(r.createdAt).toLocaleString(undefined, {
@@ -519,7 +502,7 @@ export function CompanySettingsTab({
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <Pill color={b.active ? G.success : G.muted} small>
-                    {b.active ? 'active' : 'inactive'}
+                    {b.active ? 'Active' : 'Inactive'}
                   </Pill>
                   {b.active && (
                     <Btn
@@ -881,7 +864,7 @@ export function CompanySettingsTab({
               <div>
                 {k.name} · <code>{k.keyPrefix}…</code>{' '}
                 <Pill color={k.active ? G.success : G.muted} small>
-                  {k.active ? 'active' : 'revoked'}
+                  {k.active ? 'Active' : 'Revoked'}
                 </Pill>
               </div>
               {k.active && (
@@ -1065,26 +1048,163 @@ export function CompanySettingsTab({
       )}
 
       {sub === 'plan' && (
-        <Card>
-          <SectionTitle>Subscription & entitlements</SectionTitle>
+        <Card style={{ overflow: 'hidden' }}>
           {ent ? (
             <>
-              <div style={{ fontSize: 14, marginBottom: 8 }}>
-                Plan: <strong>{ent.planName || ent.planCode}</strong> · max
-                drivers:{' '}
-                {ent.maxDrivers < 0 ? 'unlimited' : ent.maxDrivers} · status:{' '}
-                {ent.subscriptionStatus}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  flexWrap: 'wrap',
+                  paddingBottom: 20,
+                  borderBottom: `1px solid ${G.border}`,
+                }}
+              >
+                <div>
+                  <div
+                    style={{
+                      color: G.muted,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: 0.8,
+                      textTransform: 'uppercase',
+                      marginBottom: 7,
+                    }}
+                  >
+                    Current subscription
+                  </div>
+                  <div
+                    style={{
+                      color: G.text,
+                      fontSize: 24,
+                      lineHeight: 1.2,
+                      fontWeight: 750,
+                    }}
+                  >
+                    {ent.planName || humanizeEnum(ent.planCode)}
+                  </div>
+                  <div style={{ color: G.muted, fontSize: 13, marginTop: 5 }}>
+                    Your company&apos;s plan and included capabilities
+                  </div>
+                </div>
+                <Pill
+                  color={
+                    String(ent.subscriptionStatus).toLowerCase() === 'active'
+                      ? G.success
+                      : G.warning
+                  }
+                >
+                  {humanizeEnum(ent.subscriptionStatus)}
+                </Pill>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 10,
+                  margin: '16px 0 22px',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: RADIUS.md,
+                    border: `1px solid ${G.border}`,
+                    background: G.card2,
+                  }}
+                >
+                  <div style={{ color: G.muted, fontSize: 11, marginBottom: 5 }}>
+                    DRIVER CAPACITY
+                  </div>
+                  <div style={{ color: G.text, fontSize: 18, fontWeight: 700 }}>
+                    {ent.maxDrivers < 0 ? 'Unlimited' : ent.maxDrivers}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: '14px 16px',
+                    borderRadius: RADIUS.md,
+                    border: `1px solid ${G.border}`,
+                    background: G.card2,
+                  }}
+                >
+                  <div style={{ color: G.muted, fontSize: 11, marginBottom: 5 }}>
+                    FEATURES INCLUDED
+                  </div>
+                  <div style={{ color: G.text, fontSize: 18, fontWeight: 700 }}>
+                    {Object.values(ent.features || {}).filter(Boolean).length}
+                  </div>
+                </div>
+              </div>
+
+              <SectionTitle>Feature access</SectionTitle>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+                  gap: 8,
+                }}
+              >
                 {Object.entries(ent.features || {}).map(([k, v]) => (
-                  <Pill key={k} color={v ? G.success : G.muted} small>
-                    {k}: {v ? 'on' : 'off'}
-                  </Pill>
+                  <div
+                    key={k}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 9,
+                      minHeight: 42,
+                      padding: '8px 11px',
+                      borderRadius: RADIUS.md,
+                      border: `1px solid ${v ? `${G.success}30` : G.border}`,
+                      background: v ? `${G.success}0D` : G.card2,
+                      color: v ? G.text : G.muted,
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: 'grid',
+                        placeItems: 'center',
+                        width: 20,
+                        height: 20,
+                        flexShrink: 0,
+                        borderRadius: '50%',
+                        background: v ? `${G.success}20` : G.border,
+                        color: v ? G.success : G.muted,
+                        fontSize: 12,
+                        fontWeight: 800,
+                      }}
+                    >
+                      {v ? '✓' : '—'}
+                    </span>
+                    <span style={{ flex: 1 }}>{humanizeEnum(k)}</span>
+                    <span
+                      style={{
+                        color: v ? G.success : G.muted,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {v ? 'On' : 'Off'}
+                    </span>
+                  </div>
                 ))}
               </div>
             </>
           ) : (
-            <div style={{ color: G.muted }}>Loading…</div>
+            <>
+              <SectionTitle>Subscription & entitlements</SectionTitle>
+              <div style={{ color: G.muted, fontSize: 12, marginBottom: 10 }}>
+                Loading subscription details…
+              </div>
+              <Skeleton rows={3} height={54} />
+            </>
           )}
         </Card>
       )}

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2 } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
-import { blank } from '@/lib/format';
+import { blank, humanizeEnum } from '@/lib/format';
 import { maintenanceApi, dvirApi, auditApi, companiesApi } from '@/lib/api';
 
 export function FleetOpsTab({
@@ -130,7 +130,7 @@ export function FleetOpsTab({
             variant={tab === t ? 'primary' : 'outline'}
             onClick={() => setTab(t)}
           >
-            {t}
+            {humanizeEnum(t, { dvir: 'DVIR' })}
           </Btn>
         ))}
       </div>
@@ -147,7 +147,7 @@ export function FleetOpsTab({
                 <option value="">— select —</option>
                 {assets.map((a: any) => (
                   <option key={a.id} value={a.id}>
-                    {a.type} #{a.unitNo}
+                    {humanizeEnum(a.type)} #{a.unitNo}
                   </option>
                 ))}
               </Sel>
@@ -211,18 +211,30 @@ export function FleetOpsTab({
                 borderTop: `1px solid ${G.border}`,
                 padding: '10px 0',
                 fontSize: 13,
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 12,
+                flexWrap: 'wrap',
               }}
             >
-              <strong>
-                {r.type.toUpperCase()} · #{r.unitNo}
-              </strong>{' '}
-              {r.title} · ${Number(r.cost).toFixed(2)} · {r.performedAt}
-              {r.vendor ? ` · ${r.vendor}` : ''}
-              {r.nextDueAt && (
-                <span style={{ marginLeft: 8 }}>
-                  <Pill>Next {r.nextDueAt}</Pill>
-                </span>
-              )}
+              <div>
+                <div style={{ fontWeight: 700, color: G.text }}>{r.title}</div>
+                <div style={{ color: G.muted, marginTop: 4 }}>
+                  <Pill>{humanizeEnum(r.type, { pm: 'Preventive maintenance' })}</Pill>
+                  <span style={{ marginLeft: 8 }}>
+                    #{r.unitNo} · {r.performedAt || 'Date not recorded'}
+                    {r.vendor ? ` · ${r.vendor}` : ''}
+                  </span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <strong>${Number(r.cost).toFixed(2)}</strong>
+                {r.nextDueAt && (
+                  <div style={{ marginTop: 4 }}>
+                    <Pill>Next {r.nextDueAt}</Pill>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </Card>
@@ -240,7 +252,7 @@ export function FleetOpsTab({
                 <option value="">— select —</option>
                 {assets.map((a: any) => (
                   <option key={a.id} value={a.id}>
-                    {a.type} #{a.unitNo}
+                    {humanizeEnum(a.type)} #{a.unitNo}
                   </option>
                 ))}
               </Sel>
@@ -293,7 +305,7 @@ export function FleetOpsTab({
                 fontSize: 13,
               }}
             >
-              #{r.unitNo} · {r.status} · {r.inspectedAt} · {r.driverName}
+              #{r.unitNo} · {humanizeEnum(r.status)} · {r.inspectedAt} · {r.driverName}
             </div>
           ))}
         </Card>
@@ -309,7 +321,7 @@ export function FleetOpsTab({
           )}
           {expiring.map((a: any) => (
             <div key={a.id} style={{ padding: '8px 0', fontSize: 13 }}>
-              #{a.unitNo} ({a.type}) — insurance {a.insuranceExpiry || '—'} ·
+              #{a.unitNo} ({humanizeEnum(a.type)}) — insurance {a.insuranceExpiry || '—'} ·
               plate {a.plateExpiry || '—'} · permit {a.permitExpiry || '—'}
             </div>
           ))}

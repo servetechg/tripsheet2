@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
-import { blank } from '@/lib/format';
+import { blank, humanizeEnum, isCompactIdentifier } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
@@ -434,7 +434,12 @@ export function AssetsTab({
           </div>
         </Card>
       ) : (
-        list.map((a: any) => (
+        list.map((a: any) => {
+          const compactUnitNo = isCompactIdentifier(a.unitNo);
+          const assetName =
+            [a.year, a.make, a.model].filter(Boolean).join(' ') ||
+            humanizeEnum(a.type || 'asset');
+          return (
           <Card key={a.id}>
             <div
               style={{
@@ -445,26 +450,46 @@ export function AssetsTab({
                 gap: 10,
               }}
             >
-              <div>
+              <div style={{ flex: 1, minWidth: 220 }}>
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
-                    marginBottom: 4,
+                    marginBottom: compactUnitNo ? 7 : 3,
                     flexWrap: 'wrap',
                   }}
                 >
                   <span
                     style={{
-                      fontSize: 20,
-                      fontWeight: 900,
-                      color: G.gold,
-                      fontFamily: FONT_MONO,
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: G.text,
+                      lineHeight: 1.25,
                     }}
                   >
-                    #{a.unitNo}
+                    {assetName}
                   </span>
+                  {compactUnitNo && (
+                    <span
+                      title={`Unit #${a.unitNo}`}
+                      style={{
+                        maxWidth: 180,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        background: G.goldBg,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        color: G.gold,
+                        fontFamily: FONT_MONO,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      #{a.unitNo}
+                    </span>
+                  )}
                   <Pill
                     color={
                       canAssignAsset(a.status)
@@ -487,9 +512,23 @@ export function AssetsTab({
                     <Pill color={G.danger}>EXPIRED</Pill>
                   )}
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  {a.year} {a.make} {a.model}
-                </div>
+                {!compactUnitNo && (
+                  <div
+                    title={`Unit #${a.unitNo || '—'}`}
+                    style={{
+                      maxWidth: 420,
+                      marginBottom: 5,
+                      color: G.muted,
+                      fontFamily: FONT_MONO,
+                      fontSize: 10,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    Unit #{a.unitNo || '—'}
+                  </div>
+                )}
                 {a.plate && (
                   <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
                     Plate:{' '}
@@ -573,7 +612,8 @@ export function AssetsTab({
               </div>
             </div>
           </Card>
-        ))
+          );
+        })
       )}
     </div>
   );

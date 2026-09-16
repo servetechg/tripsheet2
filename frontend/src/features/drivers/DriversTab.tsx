@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, G2, StatCard, StatsGrid, Icons, Modal, AddressAutocomplete } from '@/components/ui';
-import { blank } from '@/lib/format';
+import { blank, humanizeEnum } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { ErrBox } from '@/components/feedback/ErrBox';
 import { notify } from '@/components/feedback/Toast';
@@ -1016,17 +1016,11 @@ export function DriversTab({
                 }}
               >
                 <div>
-                  <div style={{ fontSize: 11, color: G.muted }}>
-                    Sent: {inv.createdAt}
+                  <div style={{ fontSize: 12, color: G.text, fontWeight: 600 }}>
+                    Driver onboarding link
                   </div>
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: G.muted,
-                      fontFamily: 'monospace',
-                    }}
-                  >
-                    {link.slice(0, 50)}...
+                  <div style={{ fontSize: 11, color: G.muted, marginTop: 2 }}>
+                    Created {inv.createdAt || 'recently'} · Ready to share
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1036,9 +1030,9 @@ export function DriversTab({
                       showInviteLink(inv);
                     }}
                     style={{
-                      background: 'transparent',
+                      background: G.gold,
                       border: `1px solid ${G.gold}`,
-                      color: G.gold,
+                      color: G.onGold,
                       borderRadius: 6,
                       padding: '5px 12px',
                       fontSize: 11,
@@ -1048,8 +1042,8 @@ export function DriversTab({
                       gap: 6,
                     }}
                   >
-                    {Icons.copy({ size: 16, color: G.gold })}
-                    COPY
+                    {Icons.copy({ size: 16, color: G.onGold })}
+                    COPY LINK
                   </button>
                   <button
                     onClick={() => void regenerateInvite(inv)}
@@ -1358,7 +1352,7 @@ export function DriversTab({
           const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
           const lifecycleLabel =
             DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] ||
-            lifecycle;
+            humanizeEnum(lifecycle);
           const canDispatch = lifecycleAllowsDispatch(lifecycle);
           const active = loads.find(
             (l: any) =>
@@ -1465,7 +1459,7 @@ export function DriversTab({
                     </Pill>
                     {d.driverType && d.driverType !== 'company' && (
                       <Pill color={G.info}>
-                        {DRIVER_TYPE_LABELS[d.driverType as keyof typeof DRIVER_TYPE_LABELS] || d.driverType}
+                        {DRIVER_TYPE_LABELS[d.driverType as keyof typeof DRIVER_TYPE_LABELS] || humanizeEnum(d.driverType)}
                       </Pill>
                     )}
                     {d.citizenship && (

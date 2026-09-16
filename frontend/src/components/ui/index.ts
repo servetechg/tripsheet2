@@ -20,5 +20,6 @@ export { Icons } from './Icons';
 export { FileUploadField } from './FileUploadField';
 export type { UploadedFile } from './FileUploadField';
 export { AddressAutocomplete } from './AddressAutocomplete';
+export { RouteFromTo } from './RouteFromTo';
 export type { AddressAutocompleteProps } from './AddressAutocomplete';
 export type { GeoapifyAddress } from '@/lib/geoapify';

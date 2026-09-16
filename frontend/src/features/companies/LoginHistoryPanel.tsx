@@ -3,6 +3,7 @@ import { G, RADIUS } from '@/lib/theme';
 import { Btn, Inp, Pill, Modal } from '@/components/ui';
 import { authApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
+import { humanizeEnum } from '@/lib/format';
 
 export interface LoginEventItem {
   id: string;
@@ -700,7 +701,7 @@ export function LoginHistoryPanel({ companyId }: { companyId: string }) {
                                 display: 'inline-block',
                               }}
                             />
-                            {item.reason ? item.reason.replace(/_/g, ' ') : 'Failed'}
+                            {item.reason ? humanizeEnum(item.reason) : 'Failed'}
                           </span>
                         )}
                       </td>
@@ -740,11 +741,6 @@ export function LoginHistoryPanel({ companyId }: { companyId: string }) {
                             >
                               {item.email}
                             </div>
-                            {item.userId && (
-                              <div style={{ fontSize: 10, color: G.muted, fontFamily: 'monospace' }}>
-                                ID: {item.userId.slice(0, 8)}...
-                              </div>
-                            )}
                           </div>
                         </div>
                       </td>
@@ -985,7 +981,7 @@ export function LoginHistoryPanel({ companyId }: { companyId: string }) {
                   </div>
                   {selectedEvent.reason && (
                     <div style={{ fontSize: 12, color: G.muted }}>
-                      Reason: {selectedEvent.reason}
+                      Reason: {humanizeEnum(selectedEvent.reason)}
                     </div>
                   )}
                 </div>

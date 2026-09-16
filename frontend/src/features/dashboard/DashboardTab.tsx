@@ -895,27 +895,25 @@ export function DashboardTab({
                       border: `1px solid ${G.border}`,
                     }}
                   >
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <div
+                        title={d.name}
                         style={{
                           fontSize: 13,
                           fontWeight: 600,
                           color: G.text,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          overflowWrap: 'anywhere',
                         }}
                       >
                         {d.name}
                       </div>
                       <div
+                        title={d.detail}
                         style={{
                           ...TYPE.small,
                           color: G.muted,
                           marginTop: 2,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
+                          overflowWrap: 'anywhere',
                         }}
                       >
                         {d.detail}

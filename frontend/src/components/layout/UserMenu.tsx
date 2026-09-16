@@ -130,6 +130,7 @@ export function UserMenu({
           className="ts-user-menu-meta"
         >
           <div
+            title={displayName}
             style={{
               fontSize: 13,
               fontWeight: 600,
@@ -144,6 +145,7 @@ export function UserMenu({
           </div>
           {(email || companyLabel) && (
             <div
+              title={email || companyLabel}
               style={{
                 fontSize: 11,
                 color: G.muted,

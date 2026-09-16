@@ -4,6 +4,7 @@ import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons, AddressAut
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
+import { humanizeEnum } from '@/lib/format';
 
 type Kind =
   | 'import'
@@ -72,7 +73,7 @@ const EMPTY_FORM: Record<string, string> = {
 };
 
 function rowTitle(kind: Kind, r: any): string {
-  if (kind === 'ports') return `${r.code || '—'} · ${r.name || '(unnamed)'}`;
+  if (kind === 'ports') return r.name || '(unnamed port)';
   if (kind === 'locations') {
     const parts = [r.name, r.city, r.region].filter(Boolean);
     return parts.join(', ') || '(unnamed)';
@@ -95,11 +96,12 @@ function rowMeta(kind: Kind, r: any): string {
   if (kind === 'costcenters' || kind === 'payroll' || kind === 'refs') {
     if (r.code) bits.push(r.code);
   }
-  if (kind === 'refs' && r.kind) bits.push(r.kind);
+  if (kind === 'refs' && r.kind) bits.push(humanizeEnum(r.kind));
   if (r.phone) bits.push(r.phone);
   if (r.email) bits.push(r.email);
   if (kind === 'ports' && r.borderCrossingName) bits.push(r.borderCrossingName);
   if (kind === 'ports' && r.country) bits.push(r.country);
+  if (kind === 'ports' && r.code) bits.push(`Port code ${r.code}`);
   return bits.join(' · ');
 }
 
@@ -741,7 +743,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             >
               {IO_KINDS.map((k) => (
                 <option key={k} value={k}>
-                  {k}
+                  {humanizeEnum(k)}
                 </option>
               ))}
             </Sel>
@@ -1126,7 +1128,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             >
               {statusOpts.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {humanizeEnum(s)}
                 </option>
               ))}
             </Sel>
@@ -1141,7 +1143,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               {dups.map((d) => (
                 <div key={d.id} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
                   <span>
-                    {d.name} ({d.reason})
+                    {d.name} ({humanizeEnum(d.reason)})
                   </span>
                   <Btn
                     size="sm"
@@ -1280,7 +1282,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                           : G.danger
                       }
                     >
-                      {String(r.status || '').toUpperCase()}
+                      {humanizeEnum(r.status)}
                     </Pill>
                   </div>
                 </div>
@@ -1320,7 +1322,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                   >
                     {statusOpts.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {humanizeEnum(s)}
                       </option>
                     ))}
                   </Sel>

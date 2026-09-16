@@ -3,6 +3,7 @@ import { G } from '@/lib/theme';
 import { Btn, Card, SectionTitle, Pill } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { reportsApi, notificationsApi } from '@/lib/api';
+import { formatLoadLabel, humanizeEnum } from '@/lib/format';
 
 function Stat({
   label,
@@ -304,7 +305,7 @@ export function ReportsTab({
                     }}
                   >
                     <span>
-                      {row.tripNo || row.loadId.slice(0, 8)} · rev $
+                      {formatLoadLabel(row)} · rev $
                       {Number(row.revenue).toFixed(0)} · cost $
                       {Number(row.cost).toFixed(0)}
                     </span>
@@ -361,7 +362,7 @@ export function ReportsTab({
                         : G.info
                   }
                 >
-                  {n.status}
+                  {humanizeEnum(n.status)}
                 </Pill>
                 <div style={{ fontSize: 10, color: G.muted, marginTop: 6 }}>
                   {n.createdAt ? new Date(n.createdAt).toLocaleString() : ''}

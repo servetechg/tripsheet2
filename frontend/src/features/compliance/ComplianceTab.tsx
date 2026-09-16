@@ -4,6 +4,7 @@ import { Btn, Card, SectionTitle, Pill, StatCard, StatsGrid, Icons } from '@/com
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { auditApi, notificationsApi } from '@/lib/api';
+import { humanizeEnum } from '@/lib/format';
 
 const COMPLIANCE_TYPES = new Set([
   'bol',
@@ -73,9 +74,7 @@ function getAuditMeta(action: string) {
     };
   }
   return {
-    title: action
-      ? action.replace(/\./g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-      : 'System Event',
+    title: action ? humanizeEnum(action.replace(/\./g, ' ')) : 'System Event',
     color: G.gold,
     bg: G.goldBg,
     icon: 'bell' as const,
@@ -189,7 +188,7 @@ export function ComplianceTab({
   };
 
   const labelFor = (type: string) =>
-    DRIVER_DOC_TYPES.find((t) => t.id === type)?.label || type;
+    DRIVER_DOC_TYPES.find((t) => t.id === type)?.label || humanizeEnum(type);
 
   // Filtered audit list
   const filteredAudit = useMemo(() => {
@@ -495,7 +494,7 @@ export function ComplianceTab({
                       >
                         <span>Driver:</span>
                         <strong style={{ color: G.text }}>
-                          {driver?.name || d.driverId}
+                          {driver?.name || 'Unknown driver'}
                         </strong>
                       </div>
                       {d.fileName && (
@@ -533,7 +532,7 @@ export function ComplianceTab({
                         : 'Uploaded'}
                     </span>
                     <Pill color={d.status === 'verified' ? G.success : G.gold} small>
-                      {(d.status || 'uploaded').toUpperCase()}
+                      {humanizeEnum(d.status || 'uploaded')}
                     </Pill>
                   </div>
                 </div>
@@ -871,19 +870,6 @@ export function ComplianceTab({
                         >
                           {meta.title}
                         </span>
-                        <span
-                          style={{
-                            fontFamily: 'monospace',
-                            fontSize: 11,
-                            color: G.muted,
-                            background: G.card,
-                            padding: '1px 6px',
-                            borderRadius: RADIUS.sm,
-                            border: `1px solid ${G.border}`,
-                          }}
-                        >
-                          {e.action}
-                        </span>
                       </div>
 
                       <div
@@ -900,33 +886,30 @@ export function ComplianceTab({
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                           {Icons.user({ size: 12, color: G.muted })}
                           <strong style={{ color: G.text }}>
-                            {e.actorName || 'system'}
+                            {e.actorName || 'System'}
                           </strong>
                         </span>
-
-                        <span>·</span>
-
-                        <span
+                      </div>
+                      <details style={{ marginTop: 6, fontSize: 11, color: G.muted2 }}>
+                        <summary style={{ cursor: 'pointer', color: G.muted }}>
+                          Technical details
+                        </summary>
+                        <div
                           style={{
+                            marginTop: 5,
+                            paddingLeft: 12,
                             fontFamily: 'monospace',
-                            fontSize: 11,
-                            color: G.muted2,
+                            lineHeight: 1.6,
+                            wordBreak: 'break-word',
                           }}
                         >
-                          {e.entityType}/{e.entityId || '—'}
-                        </span>
-
-                        {e.meta && Object.keys(e.meta).length > 0 && (
-                          <>
-                            <span>·</span>
-                            <span style={{ fontSize: 11, color: G.muted }}>
-                              {Object.entries(e.meta)
-                                .map(([k, v]) => `${k}: ${String(v)}`)
-                                .join(', ')}
-                            </span>
-                          </>
-                        )}
-                      </div>
+                          <div>Action: {e.action || '—'}</div>
+                          <div>Entity: {humanizeEnum(e.entityType)} · {e.entityId || '—'}</div>
+                          {e.meta && Object.keys(e.meta).length > 0 && (
+                            <div>Metadata: {JSON.stringify(e.meta)}</div>
+                          )}
+                        </div>
+                      </details>
                     </div>
                   </div>
 

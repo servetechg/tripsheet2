@@ -4,6 +4,7 @@ import { Btn, Card, Pill, SectionTitle } from '@/components/ui';
 import { tenantsApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { TenantIssueAlert } from '@/components/feedback/TenantIssueAlert';
+import { humanizeEnum } from '@/lib/format';
 
 type OpsSummary = {
   generatedAt: string;
@@ -176,14 +177,22 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
           >
             <div>
               <div style={{ fontWeight: 800 }}>
-                {row.shortName} · {row.name}
+                {row.name}
               </div>
               <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
-                <code>{row.dbName}</code>
-                {' · '}
-                schema v{row.schemaVersion}
-                {row.writeFreeze ? ' · frozen' : ''}
+                {row.shortName} · {row.sizePretty} · {row.connections}{' '}
+                {row.connections === 1 ? 'connection' : 'connections'}
               </div>
+              <details style={{ fontSize: 11, color: G.muted2, marginTop: 5 }}>
+                <summary style={{ cursor: 'pointer', color: G.muted }}>
+                  Technical tenant details
+                </summary>
+                <div style={{ marginTop: 4, fontFamily: 'monospace' }}>
+                  Database: {row.dbName} · Schema: v{row.schemaVersion} · Routing:{' '}
+                  {humanizeEnum(row.routingMode)}
+                  {row.writeFreeze ? ' · Writes frozen' : ''}
+                </div>
+              </details>
               {row.issue ? (
                 <TenantIssueAlert issue={row.issue} style={{ marginTop: 6 }} />
               ) : null}
@@ -198,11 +207,8 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
                       : G.gold
                 }
               >
-                {row.status}
+                {humanizeEnum(row.status)}
               </Pill>
-              <div style={{ fontSize: 12, marginTop: 8 }}>
-                {row.sizePretty} · {row.connections} conn
-              </div>
             </div>
           </div>
         </Card>
@@ -211,25 +217,32 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
       {data?.recentErrors?.length ? (
         <Card style={{ marginTop: 16 }}>
           <SectionTitle>Recent lifecycle errors</SectionTitle>
-          {data.recentErrors.map((e) => (
-            <div
-              key={e.id}
-              style={{
-                fontSize: 12,
-                padding: '6px 0',
-                borderBottom: `1px solid ${G.border}`,
-              }}
-            >
-              <code>{e.action}</code> · {e.actorName} ·{' '}
-              {new Date(e.createdAt).toLocaleString()}
-              {e.companyId ? (
-                <>
-                  {' · '}
-                  <code>{e.companyId.slice(0, 8)}…</code>
-                </>
-              ) : null}
-            </div>
-          ))}
+          {data.recentErrors.map((e) => {
+            const tenant = data.tenants.find((row) => row.companyId === e.companyId);
+            return (
+              <div
+                key={e.id}
+                style={{
+                  fontSize: 12,
+                  padding: '8px 0',
+                  borderBottom: `1px solid ${G.border}`,
+                }}
+              >
+                <div style={{ color: G.text, fontWeight: 600 }}>
+                  {humanizeEnum(e.action)}{tenant ? ` · ${tenant.name}` : ''}
+                </div>
+                <div style={{ color: G.muted, marginTop: 2 }}>
+                  {e.actorName || 'System'} · {new Date(e.createdAt).toLocaleString()}
+                </div>
+                <details style={{ color: G.muted2, marginTop: 4 }}>
+                  <summary style={{ cursor: 'pointer' }}>Technical details</summary>
+                  <div style={{ marginTop: 3, fontFamily: 'monospace' }}>
+                    Action: {e.action} · Company ID: {e.companyId || '—'} · Event ID: {e.id}
+                  </div>
+                </details>
+              </div>
+            );
+          })}
         </Card>
       ) : null}
     </div>

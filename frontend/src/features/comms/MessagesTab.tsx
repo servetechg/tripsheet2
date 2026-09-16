@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
-import { blank } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
 import { messagesApi, commentsApi, notificationsApi, auditApi } from '@/lib/api';
 
 export function MessagesTab({
@@ -180,7 +180,7 @@ export function MessagesTab({
                 fontSize: 13,
               }}
             >
-              <strong>{m.fromName}</strong> → {m.toName || m.threadType}: {m.body}
+              <strong>{m.fromName}</strong> → {m.toName || humanizeEnum(m.threadType)}: {m.body}
             </div>
           ))}
         </div>
@@ -196,7 +196,7 @@ export function MessagesTab({
           <option value="">— select —</option>
           {loads.map((l: any) => (
             <option key={l.id} value={l.id}>
-              {l.tripNo || l.id.slice(0, 8)} · {l.origin} → {l.destination}
+              {formatLoadLabel(l)}
             </option>
           ))}
         </Sel>
