@@ -76,7 +76,7 @@ export function SideNav({
           style={{
             width: collapsed ? 28 : 32,
             height: collapsed ? 28 : 32,
-            padding: collapsed ? 6 : 8,
+            padding: collapsed ? 4 : 5,
             border: `1px solid ${G.border}`,
             borderRadius: RADIUS.md,
             background: 'transparent',
@@ -89,8 +89,8 @@ export function SideNav({
           }}
         >
           <svg
-            width="18"
-            height="18"
+            width="21"
+            height="21"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

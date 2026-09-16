@@ -1436,13 +1436,6 @@ export function DispatchTab({
                 </div>
               </details>
 
-              <RouteFromTo
-                compact
-                origin={l.origin}
-                destination={l.destination}
-                style={{ marginTop: 8 }}
-              />
-
               <div
                 style={{
                   display: 'flex',
@@ -1492,6 +1485,13 @@ export function DispatchTab({
                   {l.trailerNo ? `#${l.trailerNo}` : 'No trailer'}
                 </span>
               </div>
+
+              <RouteFromTo
+                compact
+                origin={l.origin}
+                destination={l.destination}
+                style={{ marginTop: 8 }}
+              />
 
               {l.notes && (
                 <div

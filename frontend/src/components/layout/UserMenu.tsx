@@ -162,13 +162,27 @@ export function UserMenu({
         <span
           style={{
             color: G.muted,
-            fontSize: 10,
             marginLeft: 2,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             transform: open ? 'rotate(180deg)' : 'none',
             transition: 'transform .15s ease',
           }}
         >
-          ▾
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.75"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="m5 9 7 7 7-7" />
+          </svg>
         </span>
       </button>
 
