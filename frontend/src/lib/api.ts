@@ -96,7 +96,16 @@ export async function api<T = any>(
       'detail' in body &&
       (body as { detail?: unknown }).detail
     ) {
-      msg = String((body as { detail: unknown }).detail);
+      msg = String((body as { detail?: unknown }).detail);
+    }
+    if (
+      res.status === 503 &&
+      typeof body === 'object' &&
+      body &&
+      'message' in body &&
+      (body as { message?: unknown }).message
+    ) {
+      msg = String((body as { message: unknown }).message);
     }
     throw new ApiError(res.status, msg, body);
   }

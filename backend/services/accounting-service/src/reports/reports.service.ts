@@ -1,7 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { getTenantStore } from '@tripsheet/tenant-runtime';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AnalyticsReport,
@@ -15,6 +20,8 @@ import {
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   constructor(
     private readonly http: HttpService,
     private readonly config: ConfigService,
@@ -22,6 +29,37 @@ export class ReportsService {
   ) {}
 
   async getSummary(companyId: string): Promise<CompanyReportSummary> {
+    try {
+      return await this.buildSummary(companyId);
+    } catch (e) {
+      this.logger.error(`getSummary failed companyId=${companyId}`, e);
+      throw this.asReportsUnavailable(e);
+    }
+  }
+
+  async getAnalytics(companyId: string): Promise<AnalyticsReport> {
+    try {
+      return await this.buildAnalytics(companyId);
+    } catch (e) {
+      this.logger.error(`getAnalytics failed companyId=${companyId}`, e);
+      throw this.asReportsUnavailable(e);
+    }
+  }
+
+  private asReportsUnavailable(cause: unknown): ServiceUnavailableException {
+    const msg = String((cause as Error)?.message || cause || '');
+    const schemaHint =
+      /does not exist|Unknown table|relation .* does not exist|P2021/i.test(
+        msg,
+      );
+    return new ServiceUnavailableException(
+      schemaHint
+        ? 'Reports database schema is out of date for this company. Run POST /tenants/schema-migrate-all on company-service (staging deploy does this after migrate).'
+        : 'Reports data is temporarily unavailable. Check accounting-service logs.',
+    );
+  }
+
+  private async buildSummary(companyId: string): Promise<CompanyReportSummary> {
     const fleetUrl = this.config.get<string>(
       'FLEET_SERVICE_URL',
       'http://localhost:3004',
@@ -32,11 +70,13 @@ export class ReportsService {
     );
 
     const [loads, assets, tripSheets, settlements] = await Promise.all([
-      this.fetchJson<LoadRecord[]>(`${fleetUrl}/loads`, { companyId }),
-      this.fetchJson<AssetRecord[]>(`${fleetUrl}/assets`, { companyId }),
-      this.fetchJson<TripSheetRecord[]>(`${tripsheetUrl}/trip-sheets`, {
+      this.fetchJson<LoadRecord[]>(`${fleetUrl}/loads`, { companyId }, companyId),
+      this.fetchJson<AssetRecord[]>(`${fleetUrl}/assets`, { companyId }, companyId),
+      this.fetchJson<TripSheetRecord[]>(
+        `${tripsheetUrl}/trip-sheets`,
+        { companyId },
         companyId,
-      }),
+      ),
       this.prisma.settlement.findMany({ where: { companyId } }),
     ]);
 
@@ -120,7 +160,7 @@ export class ReportsService {
     };
   }
 
-  async getAnalytics(companyId: string): Promise<AnalyticsReport> {
+  private async buildAnalytics(companyId: string): Promise<AnalyticsReport> {
     const fleetUrl = this.config.get<string>(
       'FLEET_SERVICE_URL',
       'http://localhost:3004',
@@ -132,13 +172,17 @@ export class ReportsService {
 
     const [loads, tripSheets, maintenance, invoices, settlements] =
       await Promise.all([
-        this.fetchJson<LoadRecord[]>(`${fleetUrl}/loads`, { companyId }),
-        this.fetchJson<TripSheetRecord[]>(`${tripsheetUrl}/trip-sheets`, {
+        this.fetchJson<LoadRecord[]>(`${fleetUrl}/loads`, { companyId }, companyId),
+        this.fetchJson<TripSheetRecord[]>(
+          `${tripsheetUrl}/trip-sheets`,
+          { companyId },
           companyId,
-        }),
-        this.fetchJson<MaintenanceRecord[]>(`${fleetUrl}/maintenance`, {
+        ),
+        this.fetchJson<MaintenanceRecord[]>(
+          `${fleetUrl}/maintenance`,
+          { companyId },
           companyId,
-        }),
+        ),
         this.prisma.invoice.findMany({ where: { companyId } }),
         this.prisma.settlement.findMany({ where: { companyId } }),
       ]);
@@ -275,16 +319,37 @@ export class ReportsService {
     }, 0);
   }
 
+  private serviceMeshHeaders(companyId: string): Record<string, string> {
+    const key =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    const store = getTenantStore();
+    const headers: Record<string, string> = {
+      'x-internal-api-key': key,
+      'x-company-id': companyId,
+    };
+    if (store?.routingMode) headers['x-tenant-routing'] = store.routingMode;
+    if (store?.dbName) headers['x-tenant-db-name'] = store.dbName;
+    if (store?.tenantKey) headers['x-tenant-key'] = store.tenantKey;
+    if (store?.tenantStatus) headers['x-tenant-status'] = store.tenantStatus;
+    return headers;
+  }
+
   private async fetchJson<T>(
     url: string,
     params: Record<string, string>,
+    companyId: string,
   ): Promise<T> {
     try {
       const response = await firstValueFrom(
-        this.http.get<T>(url, { params, timeout: 8000 }),
+        this.http.get<T>(url, {
+          params,
+          headers: this.serviceMeshHeaders(companyId),
+          timeout: 8000,
+        }),
       );
       return response.data;
-    } catch {
+    } catch (e) {
+      this.logger.warn(`fetchJson failed url=${url} ${String(e)}`);
       return [] as T;
     }
   }

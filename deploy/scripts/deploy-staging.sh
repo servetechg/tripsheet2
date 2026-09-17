@@ -116,5 +116,18 @@ curl -fsS "https://${STAGING_DOMAIN}/health" >/dev/null 2>&1 \
   || curl -fsS "http://${STAGING_DOMAIN}/health" >/dev/null 2>&1 \
   || echo "WARN: staging /health not reachable yet (DNS/TLS may still be provisioning)"
 
+echo "==> Tenant schema migrate-all (accounting/notification/fleet schemas per company DB)"
+for _ in $(seq 1 20); do
+  if docker exec staging-company-service wget -qO- "http://127.0.0.1:3002/health" >/dev/null 2>&1; then
+    if docker exec staging-company-service node -e "fetch('http://127.0.0.1:3002/tenants/schema-migrate-all',{method:'POST'}).then(async r=>{const t=await r.text();console.log(t); if(!r.ok) process.exit(1)})"; then
+      echo "  ok schema-migrate-all"
+    else
+      echo "  WARN schema-migrate-all failed — Reports/SMS may 500 until this succeeds"
+    fi
+    break
+  fi
+  sleep 3
+done
+
 echo "==> Staging deployed (${IMAGE_TAG})"
 echo "    URL: https://${STAGING_DOMAIN}"

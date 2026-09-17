@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
@@ -6,6 +12,8 @@ import { SmsService } from '../sms/sms.service';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
@@ -13,13 +21,23 @@ export class NotificationsService {
     private readonly smsService: SmsService,
   ) {}
 
-  findAll(companyId?: string, limit = 50) {
+  async findAll(companyId?: string, limit = 50) {
     const take = Math.min(Math.max(limit, 1), 200);
-    return this.prisma.notificationLog.findMany({
-      where: companyId ? { companyId } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take,
-    });
+    try {
+      return await this.prisma.notificationLog.findMany({
+        where: companyId ? { companyId } : undefined,
+        orderBy: { createdAt: 'desc' },
+        take,
+      });
+    } catch (e) {
+      this.logger.error(`findAll notifications failed companyId=${companyId}`, e);
+      const msg = String((e as Error)?.message || e || '');
+      throw new ServiceUnavailableException(
+        /does not exist|Unknown table|P2021/i.test(msg)
+          ? 'Notification log schema is out of date for this company. Run POST /tenants/schema-migrate-all on company-service.'
+          : 'Notification log is temporarily unavailable.',
+      );
+    }
   }
 
   async log(body: Record<string, unknown>) {
