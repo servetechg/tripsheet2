@@ -20,6 +20,7 @@ import { DriverProfile } from './DriverProfile';
 import { matchesDriverRef } from '@/lib/driverIds';
 import { useCan } from '@/lib/permissions';
 import { EmailChangeModal } from '@/components/account/EmailChangeModal';
+import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
 
 export function DriversTab({
   company,
@@ -37,6 +38,7 @@ export function DriversTab({
 }: any) {
   const { can } = useCan();
   const confirm = useConfirm();
+  const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [view, setView] = useState('list');
   const [selectedDriver, setSD] = useState<any>(null);
   const [show, setShow] = useState(false);
@@ -98,6 +100,34 @@ export function DriversTab({
       notify('Regenerate this invite before sending', 'error');
       return;
     }
+    if (channel === 'email') {
+      const emailNorm = to.toLowerCase();
+      const existingAccount = (users || []).find(
+        (u: any) =>
+          String(u.email || '').toLowerCase() === emailNorm &&
+          (u.status || u.lifecycleStatus || 'active') !== 'archived',
+      );
+      if (existingAccount) {
+        notify(
+          'This email already has an account or driver profile. Use “Change email” on their record instead of a new invite.',
+          'error',
+        );
+        return;
+      }
+      const pendingDup = pendingInvites.find(
+        (i: any) =>
+          i.status === 'pending' &&
+          i.id !== generatedInviteId &&
+          String(i.email || '').toLowerCase() === emailNorm,
+      );
+      if (pendingDup) {
+        notify(
+          'Another pending invite already uses this email. Resend or revoke that invite first.',
+          'error',
+        );
+        return;
+      }
+    }
     setSending(channel);
     try {
       const res = await invitesApi.send(generatedInviteId, { channel, to });
@@ -106,9 +136,9 @@ export function DriversTab({
           `Provider rejected the ${channel === 'email' ? 'email' : 'SMS'} — check delivery settings`,
           'error',
         );
-      } else if (res.status === 'queued' || res.status === 'simulated') {
+      } else if (channel === 'email' && res.status === 'queued') {
         notify(
-          `Invite logged for ${to} — ${channel === 'email' ? 'SMTP' : 'Twilio'} is not configured yet`,
+          `Invite logged for ${to} — SMTP is not configured yet`,
         );
       } else {
         notify(`Invite sent to ${to}`);
@@ -890,12 +920,14 @@ export function DriversTab({
                     onChange={(e) => setInvitePhone(e.target.value)}
                     placeholder="(403) 555-0100"
                     style={{ marginBottom: 0 }}
+                    disabled={!smsEnabled}
                   />
                 </div>
                 <Btn
                   size="md"
                   variant="outline"
-                  disabled={sending !== null}
+                  disabled={sending !== null || !smsEnabled}
+                  title={smsEnabled ? undefined : SMS_DISABLED_HINT}
                   onClick={() => void sendInvite('sms')}
                   style={{
                     height: 42,
@@ -907,6 +939,11 @@ export function DriversTab({
                   {sending === 'sms' ? 'Sending…' : 'Send SMS'}
                 </Btn>
               </div>
+              {!smsEnabled ? (
+                <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
+                  {SMS_DISABLED_HINT}
+                </div>
+              ) : null}
             </div>
           )}
           <div style={{ fontSize: 11, color: G.muted }}>

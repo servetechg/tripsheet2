@@ -1595,6 +1595,24 @@ export class AuthService {
     };
   }
 
+  /** Internal invite duplicate guard. */
+  async lookupUserByEmail(email: string) {
+    const normalized = email.toLowerCase().trim();
+    if (!normalized) return { found: false as const };
+    const user = await this.prisma.user.findUnique({
+      where: { email: normalized },
+    });
+    if (!user) return { found: false as const };
+    return {
+      found: true as const,
+      id: user.id,
+      email: user.email,
+      companyId: user.companyId,
+      status: user.status,
+      role: user.role,
+    };
+  }
+
   /**
    * Invite / service retries: create user, or return existing if same email.
    * Only for internal service calls — not for public registration.

@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -75,6 +76,22 @@ export class InternalAuthController {
       email: 'driver-service@internal',
       role: 'system',
     });
+  }
+
+  /** Invite guard — lookup auth user by email (service-to-service). */
+  @Get('users/lookup')
+  lookupUserByEmail(
+    @Headers('x-internal-api-key') key: string | undefined,
+    @Query('email') email?: string,
+  ) {
+    this.assertKey(key);
+    const normalized = String(email || '')
+      .trim()
+      .toLowerCase();
+    if (!normalized) {
+      throw new BadRequestException('email query parameter is required');
+    }
+    return this.authService.lookupUserByEmail(normalized);
   }
 
   /** Primary outbound sender for a tenant (company owner / first admin). */

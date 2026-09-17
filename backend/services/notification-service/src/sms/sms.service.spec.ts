@@ -1,6 +1,27 @@
 import { BadRequestException } from '@nestjs/common';
 import { SmsService } from './sms.service';
 
+const messagesCreate = jest.fn();
+
+jest.mock('twilio', () => {
+  return jest.fn(() => ({
+    messages: { create: messagesCreate },
+  }));
+});
+
+function twilioConfig() {
+  return {
+    get: jest.fn((key: string) => {
+      const values: Record<string, string | undefined> = {
+        TWILIO_ACCOUNT_SID: 'AC_test',
+        TWILIO_AUTH_TOKEN: 'auth_test',
+        TWILIO_FROM_NUMBER: '+15550001111',
+      };
+      return values[key];
+    }),
+  };
+}
+
 describe('SmsService', () => {
   let service: SmsService;
   let prisma: {
@@ -15,9 +36,9 @@ describe('SmsService', () => {
   let config: {
     get: jest.Mock;
   };
-  let consoleSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    messagesCreate.mockReset();
     prisma = {
       notificationLog: {
         create: jest.fn(),
@@ -37,50 +58,25 @@ describe('SmsService', () => {
         return values[key];
       }),
     };
-    consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
     service = new SmsService(prisma as any, redis as any, config as any);
   });
 
-  afterEach(() => {
-    consoleSpy.mockRestore();
-  });
-
   describe('send', () => {
-    it('simulates SMS without Twilio credentials', async () => {
-      redis.incr.mockResolvedValue(1);
-      redis.expire.mockResolvedValue(undefined);
-      prisma.notificationLog.create.mockResolvedValue({
-        id: 'n1',
-        status: 'simulated',
-        to: '+15551234567',
-        body: 'Hello',
-      });
-
-      const result = await service.send({
-        to: '+15551234567',
-        body: 'Hello',
-        companyId: 'c1',
-      });
-
-      expect(result.status).toBe('simulated');
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[SMS simulated] to=+15551234567 body=Hello',
-      );
-      expect(prisma.notificationLog.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          companyId: 'c1',
-          channel: 'sms',
+    it('rejects SMS when Twilio is not configured', async () => {
+      await expect(
+        service.send({
           to: '+15551234567',
           body: 'Hello',
-          status: 'simulated',
-          providerId: null,
+          companyId: 'c1',
         }),
-      });
-      expect(redis.incr).toHaveBeenCalled();
-      expect(redis.expire).toHaveBeenCalledWith(expect.any(String), 3600);
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.notificationLog.create).not.toHaveBeenCalled();
+      expect(redis.incr).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException when rate limit is exceeded', async () => {
+      service = new SmsService(prisma as any, redis as any, twilioConfig() as any);
       redis.incr.mockResolvedValue(21);
 
       await expect(
@@ -96,6 +92,7 @@ describe('SmsService', () => {
     });
 
     it('uses global scope when companyId is omitted', async () => {
+      service = new SmsService(prisma as any, redis as any, twilioConfig() as any);
       redis.incr.mockResolvedValue(21);
 
       await expect(

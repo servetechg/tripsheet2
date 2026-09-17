@@ -355,7 +355,7 @@ export function ReportsTab({
               <div style={{ textAlign: 'right' }}>
                 <Pill
                   color={
-                    n.status === 'sent' || n.status === 'simulated'
+                    n.status === 'sent'
                       ? G.success
                       : n.status === 'failed'
                         ? G.danger

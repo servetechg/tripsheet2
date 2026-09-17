@@ -9,6 +9,9 @@ import { SendSmsDto } from './dto/send-sms.dto';
 const SMS_RATE_LIMIT = 20;
 const SMS_RATE_LIMIT_TTL_SECONDS = 3600;
 
+export const SMS_DISABLED_MESSAGE =
+  'SMS is disabled until Twilio is configured (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER).';
+
 @Injectable()
 export class SmsService {
   private twilioClient: ReturnType<typeof twilio> | null = null;
@@ -35,26 +38,25 @@ export class SmsService {
   }
 
   async send(dto: SendSmsDto) {
+    if (!this.isTwilioConfigured() || !this.twilioClient) {
+      throw new BadRequestException(SMS_DISABLED_MESSAGE);
+    }
+
     await this.enforceRateLimit(dto.companyId);
 
     let status: string;
     let providerId: string | null = null;
 
-    if (this.isTwilioConfigured() && this.twilioClient) {
-      try {
-        const message = await this.twilioClient.messages.create({
-          to: dto.to,
-          from: this.config.get<string>('TWILIO_FROM_NUMBER')!,
-          body: dto.body,
-        });
-        status = 'sent';
-        providerId = message.sid;
-      } catch {
-        status = 'failed';
-      }
-    } else {
-      status = 'simulated';
-      console.log(`[SMS simulated] to=${dto.to} body=${dto.body}`);
+    try {
+      const message = await this.twilioClient.messages.create({
+        to: dto.to,
+        from: this.config.get<string>('TWILIO_FROM_NUMBER')!,
+        body: dto.body,
+      });
+      status = 'sent';
+      providerId = message.sid;
+    } catch {
+      status = 'failed';
     }
 
     return this.prisma.notificationLog.create({

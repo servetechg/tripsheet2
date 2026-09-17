@@ -35,6 +35,7 @@ import { lifecycleAllowsDispatch, availabilityAllowsDispatch, DRIVER_LIFECYCLE_L
 import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
 import { canAssignAsset } from '@/lib/assetStatus';
 import { useCan } from '@/lib/permissions';
+import { useSmsEnabled } from '@/hooks/useSmsEnabled';
 
 type FormErrors = Partial<
   Record<
@@ -78,6 +79,7 @@ export function DispatchTab({
 }: any) {
   const { can } = useCan();
   const confirm = useConfirm();
+  const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [show, setShow] = useState(false);
   const [editLoad, setEditLoad] = useState<any>(null);
   const [initialF, setInitialF] = useState<any>(null);
@@ -524,7 +526,7 @@ export function DispatchTab({
           const driver =
             drivers.find((d: any) => d.id === body.driverId) ||
             users.find((u: any) => u.id === body.driverId);
-          if (driver?.phone) {
+          if (smsEnabled && driver?.phone) {
             try {
               await notificationsApi.sendSms({
                 to: String(driver.phone),
