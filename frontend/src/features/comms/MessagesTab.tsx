@@ -4,6 +4,7 @@ import { Btn, Card, Inp, Sel, SectionTitle } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
 import { messagesApi, commentsApi, notificationsApi, auditApi } from '@/lib/api';
+import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
 
 export function MessagesTab({
   company,
@@ -12,6 +13,7 @@ export function MessagesTab({
   adminUser,
   apiEnabled,
 }: any) {
+  const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [msgs, setMsgs] = useState<any[]>([]);
   const [comments, setComments] = useState<any[]>([]);
   const [loadId, setLoadId] = useState('');
@@ -215,19 +217,28 @@ export function MessagesTab({
 
       <Card>
         <SectionTitle>Customer / manual SMS</SectionTitle>
+        {!smsEnabled ? (
+          <div style={{ fontSize: 13, color: G.muted, marginBottom: 12 }}>
+            {SMS_DISABLED_HINT}
+          </div>
+        ) : null}
         <Inp
           label="To phone"
           phone
           value={smsTo}
           onChange={(e: any) => setSmsTo(e.target.value)}
           placeholder="(403) 555-0100"
+          disabled={!smsEnabled}
         />
         <Inp
           label="Body"
           value={smsBody}
           onChange={(e: any) => setSmsBody(e.target.value)}
+          disabled={!smsEnabled}
         />
-        <Btn onClick={() => void sendSms()}>Send SMS</Btn>
+        <Btn disabled={!smsEnabled} title={smsEnabled ? undefined : SMS_DISABLED_HINT} onClick={() => void sendSms()}>
+          Send SMS
+        </Btn>
       </Card>
     </div>
   );

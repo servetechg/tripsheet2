@@ -67,9 +67,11 @@ export class NotificationsService {
   async getHealthDetail() {
     const redisOk = await this.redis.ping();
     const email = this.emailService.getPlatformStatus();
+    const smsEnabled = this.smsService.isTwilioConfigured();
     return {
       redis: redisOk ? 'ok' : 'down',
-      twilioConfigured: this.smsService.isTwilioConfigured(),
+      smsEnabled,
+      twilioConfigured: smsEnabled,
       smtpConfigured: email.smtpConfigured,
       platformEmailReady: email.platformReady,
       emailProvider: email.provider,

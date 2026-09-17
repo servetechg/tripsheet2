@@ -168,6 +168,31 @@ export function UsersPanel({
       notify('Name and email are required', 'error');
       return;
     }
+    const emailNorm = inviteForm.email.trim().toLowerCase();
+    const existingMember = staff.find(
+      (u) =>
+        String(u.email || '').toLowerCase() === emailNorm &&
+        (u.status || 'active') !== 'archived',
+    );
+    if (existingMember) {
+      notify(
+        'This email already belongs to a team member. They can sign in — no new invite is needed.',
+        'error',
+      );
+      return;
+    }
+    const pendingDup = pendingInvites.find(
+      (i) =>
+        i.status === 'pending' &&
+        String(i.email || '').toLowerCase() === emailNorm,
+    );
+    if (pendingDup) {
+      notify(
+        'A pending invite already exists for this email. Resend or revoke it instead.',
+        'error',
+      );
+      return;
+    }
     setInviteBusy(true);
     try {
       const inv = await invitesApi.create(cid, {

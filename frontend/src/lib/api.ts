@@ -1284,6 +1284,11 @@ export const auditApi = {
 };
 
 export const notificationsApi = {
+  deliveryStatus: () =>
+    api<{
+      smsEnabled: boolean;
+      twilioConfigured: boolean;
+    }>('/notifications/health/detail'),
   list: (companyId: string, limit = 50) =>
     api<any[]>(
       `/notifications?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,

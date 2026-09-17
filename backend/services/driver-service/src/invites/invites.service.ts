@@ -67,6 +67,13 @@ export class InvitesService {
       assertPermission('drivers.invite');
     }
 
+    const emailForGuard = dto.email?.trim().toLowerCase() || '';
+    if (emailForGuard) {
+      await this.assertCanInviteEmail(dto.companyId, emailForGuard, {
+        kind,
+      });
+    }
+
     const ttlDays = await this.fetchInviteTtlDays(dto.companyId);
     const token = randomBytes(16).toString('hex');
     const createdAt = new Date().toISOString();
@@ -149,6 +156,13 @@ export class InvitesService {
       throw new BadRequestException('Enter a valid email address');
     }
 
+    if (channel === 'email') {
+      await this.assertCanInviteEmail(invite.companyId, to.toLowerCase(), {
+        excludeInviteId: invite.id,
+        kind: invite.kind === 'staff' ? 'staff' : 'driver',
+      });
+    }
+
     const notifyUrl =
       this.config.get<string>('NOTIFICATION_SERVICE_URL') ||
       'http://localhost:3008';
@@ -211,7 +225,9 @@ export class InvitesService {
         `invite ${channel} send failed: HTTP ${res.status} ${detail.slice(0, 200)}`,
       );
       throw new BadRequestException(
-        `Could not send the invite by ${channel}. Check notification settings.`,
+        channel === 'sms'
+          ? 'SMS is disabled until Twilio is configured on notification-service. Set TWILIO_* in backend/.env and restart notification-service.'
+          : `Could not send the invite by ${channel}. Check notification settings.`,
       );
     }
 
@@ -959,6 +975,114 @@ export class InvitesService {
     } catch (e) {
       if (e instanceof BadRequestException) throw e;
       this.logger.warn(`ensure-driver-schema error: ${String(e)}`);
+    }
+  }
+
+  private normalizeInviteEmail(email: string): string {
+    return email.trim().toLowerCase();
+  }
+
+  private inviteStillPending(row: {
+    status: string;
+    expiresAt: string | null;
+  }): boolean {
+    if (row.status !== 'pending') return false;
+    if (!row.expiresAt) return true;
+    const t = Date.parse(row.expiresAt);
+    return !Number.isFinite(t) || t > Date.now();
+  }
+
+  private async assertCanInviteEmail(
+    companyId: string,
+    emailRaw: string,
+    opts?: {
+      excludeInviteId?: string;
+      kind?: 'driver' | 'staff';
+    },
+  ): Promise<void> {
+    const email = this.normalizeInviteEmail(emailRaw);
+    if (!email) return;
+
+    const pending = await this.prisma.invite.findMany({
+      where: { companyId, status: 'pending' },
+    });
+    for (const inv of pending) {
+      if (opts?.excludeInviteId && inv.id === opts.excludeInviteId) continue;
+      if (!this.inviteStillPending(inv)) continue;
+      if (this.normalizeInviteEmail(inv.email || '') === email) {
+        throw new ConflictException(
+          'A pending invite already exists for this email. Resend that invite or revoke it before inviting again.',
+        );
+      }
+    }
+
+    const driver = await this.prisma.driver.findFirst({
+      where: { companyId, email },
+    });
+    if (driver) {
+      throw new ConflictException(
+        'A driver profile with this email already exists for this company.',
+      );
+    }
+
+    const auth = await this.lookupAuthUserByEmail(email);
+    if (auth?.found) {
+      if (auth.status === 'archived') {
+        return;
+      }
+      if (auth.companyId === companyId) {
+        throw new ConflictException(
+          `This email already belongs to an active ${auth.role} account in your company. They can sign in directly — a new invite is not needed.`,
+        );
+      }
+      throw new ConflictException(
+        'This email is already registered on the platform under another company.',
+      );
+    }
+  }
+
+  private async lookupAuthUserByEmail(email: string): Promise<
+    | { found: false }
+    | {
+        found: true;
+        id: string;
+        email: string;
+        companyId: string | null;
+        status: string;
+        role: string;
+      }
+  > {
+    const baseUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
+    const apiKey =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    try {
+      const res = await fetch(
+        `${baseUrl.replace(/\/$/, '')}/internal/users/lookup?email=${encodeURIComponent(email)}`,
+        { headers: { 'x-internal-api-key': apiKey } },
+      );
+      if (!res.ok) {
+        this.logger.warn(`auth email lookup failed: HTTP ${res.status}`);
+        throw new BadRequestException(
+          'Could not verify whether this email is already registered. Try again in a moment.',
+        );
+      }
+      return (await res.json()) as
+        | { found: false }
+        | {
+            found: true;
+            id: string;
+            email: string;
+            companyId: string | null;
+            status: string;
+            role: string;
+          };
+    } catch (e) {
+      if (e instanceof HttpException) throw e;
+      this.logger.warn(`auth email lookup error: ${String(e)}`);
+      throw new BadRequestException(
+        'Could not verify whether this email is already registered. Try again in a moment.',
+      );
     }
   }
 

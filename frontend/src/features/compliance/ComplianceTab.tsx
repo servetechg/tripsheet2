@@ -4,6 +4,7 @@ import { Btn, Card, SectionTitle, Pill, StatCard, StatsGrid, Icons } from '@/com
 import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { auditApi, notificationsApi } from '@/lib/api';
+import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
 import { humanizeEnum } from '@/lib/format';
 
 const COMPLIANCE_TYPES = new Set([
@@ -91,6 +92,7 @@ export function ComplianceTab({
   apiEnabled,
   onGoDrivers,
 }: any) {
+  const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [audit, setAudit] = useState<AuditItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -296,7 +298,8 @@ export function ComplianceTab({
           </Btn>
           <Btn
             size="sm"
-            disabled={busy}
+            disabled={busy || !smsEnabled}
+            title={smsEnabled ? undefined : SMS_DISABLED_HINT}
             onClick={() => void sendExpiryReminders()}
             style={{
               height: 36,
