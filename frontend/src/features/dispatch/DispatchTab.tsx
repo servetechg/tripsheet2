@@ -592,8 +592,13 @@ export function DispatchTab({
     const stops = [f.stop1, f.stop2]
       .filter((s) => !blank(s))
       .map((location, i) => ({ seq: i + 1, location }));
+    const selectedDriver =
+      drivers.find((d: any) => d.id === f.driverId) ||
+      users.find((u: any) => u.id === f.driverId);
     return {
-      driverId: f.driverId,
+      driverId: selectedDriver
+        ? driverRecordIdOf(selectedDriver)
+        : f.driverId,
       truckId: f.truckId,
       trailerId: f.trailerId,
       brokerId: f.brokerId || undefined,
