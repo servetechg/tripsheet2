@@ -56,25 +56,60 @@ export function ReportsTab({
   const [analytics, setAnalytics] = useState<any>(null);
   const [smsLog, setSmsLog] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [view, setView] = useState<'ops' | 'analytics'>('ops');
 
   const load = async () => {
     if (!apiEnabled) return;
     setLoading(true);
-    try {
-      const [s, a, n] = await Promise.all([
-        reportsApi.summary(company.id),
-        reportsApi.analytics(company.id),
-        notificationsApi.list(company.id, 20),
-      ]);
-      setSummary(s);
-      setAnalytics(a);
-      setSmsLog(n);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to load reports', 'error');
-    } finally {
-      setLoading(false);
+    setLoadErrors([]);
+    const errors: string[] = [];
+
+    const [summaryRes, analyticsRes, smsRes] = await Promise.allSettled([
+      reportsApi.summary(company.id),
+      reportsApi.analytics(company.id),
+      notificationsApi.list(company.id, 50),
+    ]);
+
+    if (summaryRes.status === 'fulfilled') {
+      setSummary(summaryRes.value);
+    } else {
+      setSummary(null);
+      errors.push(
+        `Ops summary: ${summaryRes.reason?.message || 'request failed'}`,
+      );
     }
+
+    if (analyticsRes.status === 'fulfilled') {
+      setAnalytics(analyticsRes.value);
+    } else {
+      setAnalytics(null);
+      errors.push(
+        `Analytics: ${analyticsRes.reason?.message || 'request failed'}`,
+      );
+    }
+
+    if (smsRes.status === 'fulfilled') {
+      const raw = smsRes.value;
+      const rows = Array.isArray(raw) ? raw : [];
+      setSmsLog(rows.filter((n) => n?.channel === 'sms').slice(0, 20));
+    } else {
+      setSmsLog([]);
+      errors.push(`Recent SMS: ${smsRes.reason?.message || 'request failed'}`);
+    }
+
+    if (errors.length) {
+      setLoadErrors(errors);
+      if (errors.length >= 2) {
+        notify(
+          'Some report sections failed — deploy latest company-service and run schema-migrate-all on staging',
+          'error',
+        );
+      } else {
+        notify(errors[0], 'error');
+      }
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -127,6 +162,26 @@ export function ReportsTab({
           </Btn>
         </div>
       </div>
+
+      {loadErrors.length > 0 ? (
+        <div
+          style={{
+            background: G.errTint,
+            border: `1px solid ${G.danger}44`,
+            borderRadius: 10,
+            padding: '12px 14px',
+            fontSize: 13,
+            color: G.errText,
+            marginBottom: 16,
+          }}
+        >
+          {loadErrors.map((line) => (
+            <div key={line} style={{ marginBottom: 4 }}>
+              {line}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {view === 'ops' && (
         <>

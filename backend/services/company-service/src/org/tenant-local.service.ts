@@ -374,6 +374,17 @@ export class TenantLocalService {
     }
   }
 
+  /** Accounting + notification Prisma parity (018). */
+  async ensureAccountingNotificationParitySchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('018_accounting_notification_prisma_parity.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
   /** Apply all org-side tenant SQL migrations (idempotent). */
   async ensureAllTenantOrgSchemas(companyId: string) {
     await this.ensurePhase5Schema(companyId);
@@ -390,6 +401,7 @@ export class TenantLocalService {
     await this.ensureMdmBorderSchema(companyId);
     await this.ensureMdmOpsSchema(companyId);
     await this.ensureMdmPhase8InvoiceBrokerSchema(companyId);
+    await this.ensureAccountingNotificationParitySchema(companyId);
     await this.ensureDriverChapter6Schema(companyId);
     await this.ensureDriverChapter6Phase4567Schema(companyId);
   }

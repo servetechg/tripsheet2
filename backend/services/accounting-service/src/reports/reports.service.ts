@@ -8,6 +8,7 @@ import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { getTenantStore } from '@tripsheet/tenant-runtime';
 import { PrismaService } from '../prisma/prisma.service';
+import { withTenantSchemaRetry } from '../prisma/tenant-schema-errors';
 import {
   AnalyticsReport,
   AssetRecord,
@@ -77,7 +78,9 @@ export class ReportsService {
         { companyId },
         companyId,
       ),
-      this.prisma.settlement.findMany({ where: { companyId } }),
+      withTenantSchemaRetry(companyId, 'reports.settlements', () =>
+        this.prisma.settlement.findMany({ where: { companyId } }),
+      ),
     ]);
 
     const driverIds = new Set<string>();
@@ -183,8 +186,12 @@ export class ReportsService {
           { companyId },
           companyId,
         ),
-        this.prisma.invoice.findMany({ where: { companyId } }),
-        this.prisma.settlement.findMany({ where: { companyId } }),
+        withTenantSchemaRetry(companyId, 'reports.invoices', () =>
+          this.prisma.invoice.findMany({ where: { companyId } }),
+        ),
+        withTenantSchemaRetry(companyId, 'reports.settlements', () =>
+          this.prisma.settlement.findMany({ where: { companyId } }),
+        ),
       ]);
 
     const laneMap = new Map<string, { revenue: number; loads: number }>();

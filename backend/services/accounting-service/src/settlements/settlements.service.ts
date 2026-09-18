@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { withTenantSchemaRetry } from '../prisma/tenant-schema-errors';
 import { CreateSettlementDto, SettlementLineDto } from './dto/create-settlement.dto';
 import { UpdateSettlementDto } from './dto/update-settlement.dto';
 
@@ -19,14 +20,16 @@ export class SettlementsService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll(companyId?: string, driverId?: string, status?: string) {
-    return this.prisma.settlement.findMany({
-      where: {
-        ...(companyId ? { companyId } : {}),
-        ...(driverId ? { driverId } : {}),
-        ...(status ? { status } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return withTenantSchemaRetry(companyId, 'settlements.findAll', () =>
+      this.prisma.settlement.findMany({
+        where: {
+          ...(companyId ? { companyId } : {}),
+          ...(driverId ? { driverId } : {}),
+          ...(status ? { status } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async findOne(id: string) {

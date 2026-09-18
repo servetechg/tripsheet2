@@ -9,6 +9,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
 import { SmsService } from '../sms/sms.service';
+import {
+  isTenantSchemaDriftError,
+  repairTenantOrgSchemas,
+} from '@tripsheet/tenant-runtime';
 
 @Injectable()
 export class NotificationsService {
@@ -23,17 +27,28 @@ export class NotificationsService {
 
   async findAll(companyId?: string, limit = 50) {
     const take = Math.min(Math.max(limit, 1), 200);
-    try {
-      return await this.prisma.notificationLog.findMany({
+    const query = () =>
+      this.prisma.notificationLog.findMany({
         where: companyId ? { companyId } : undefined,
         orderBy: { createdAt: 'desc' },
         take,
       });
+    try {
+      return await query();
     } catch (e) {
+      if (companyId && isTenantSchemaDriftError(e)) {
+        const repaired = await repairTenantOrgSchemas(companyId);
+        if (repaired) {
+          try {
+            return await query();
+          } catch (retryErr) {
+            e = retryErr;
+          }
+        }
+      }
       this.logger.error(`findAll notifications failed companyId=${companyId}`, e);
-      const msg = String((e as Error)?.message || e || '');
       throw new ServiceUnavailableException(
-        /does not exist|Unknown table|P2021/i.test(msg)
+        isTenantSchemaDriftError(e)
           ? 'Notification log schema is out of date for this company. Run POST /tenants/schema-migrate-all on company-service.'
           : 'Notification log is temporarily unavailable.',
       );

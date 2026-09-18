@@ -7,3 +7,4 @@ export * from './tenant-context.middleware';
 export * from './tenant-connection.middleware';
 export * from './tenant-scope.interceptor';
 export * from './tenant-runtime.module';
+export * from './tenant-schema-repair';

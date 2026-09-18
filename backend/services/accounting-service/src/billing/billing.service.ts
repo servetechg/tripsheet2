@@ -4,17 +4,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { withTenantSchemaRetry } from '../prisma/tenant-schema-errors';
 
 @Injectable()
 export class BillingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private guard<T>(
+    scope: string,
+    companyId: string | undefined,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    return withTenantSchemaRetry(companyId, scope, run);
+  }
+
   // --- Chart of accounts ---
   listAccounts(companyId?: string) {
-    return this.prisma.ledgerAccount.findMany({
-      where: companyId ? { companyId } : {},
-      orderBy: { code: 'asc' },
-    });
+    return this.guard('billing.listAccounts', companyId, () =>
+      this.prisma.ledgerAccount.findMany({
+        where: companyId ? { companyId } : {},
+        orderBy: { code: 'asc' },
+      }),
+    );
   }
 
   async upsertAccount(body: Record<string, unknown>) {
@@ -50,13 +61,15 @@ export class BillingService {
 
   // --- Invoices ---
   listInvoices(companyId?: string, status?: string) {
-    return this.prisma.invoice.findMany({
-      where: {
-        ...(companyId ? { companyId } : {}),
-        ...(status ? { status } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.guard('billing.listInvoices', companyId, () =>
+      this.prisma.invoice.findMany({
+        where: {
+          ...(companyId ? { companyId } : {}),
+          ...(status ? { status } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async createInvoice(body: Record<string, unknown>) {
@@ -145,13 +158,15 @@ export class BillingService {
 
   // --- Bills ---
   listBills(companyId?: string, status?: string) {
-    return this.prisma.bill.findMany({
-      where: {
-        ...(companyId ? { companyId } : {}),
-        ...(status ? { status } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.guard('billing.listBills', companyId, () =>
+      this.prisma.bill.findMany({
+        where: {
+          ...(companyId ? { companyId } : {}),
+          ...(status ? { status } : {}),
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async createBill(body: Record<string, unknown>) {
@@ -210,10 +225,12 @@ export class BillingService {
 
   // --- Payments ---
   listPayments(companyId?: string) {
-    return this.prisma.payment.findMany({
-      where: companyId ? { companyId } : {},
-      orderBy: { createdAt: 'desc' },
-    });
+    return this.guard('billing.listPayments', companyId, () =>
+      this.prisma.payment.findMany({
+        where: companyId ? { companyId } : {},
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
   }
 
   async createPayment(body: Record<string, unknown>) {

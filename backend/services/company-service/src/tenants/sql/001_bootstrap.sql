@@ -299,8 +299,8 @@ CREATE TABLE IF NOT EXISTS accounting."Settlement" (
   "companyId" TEXT NOT NULL,
   "driverId" TEXT NOT NULL,
   "driverName" TEXT NOT NULL DEFAULT '',
-  "periodStart" TEXT NOT NULL,
-  "periodEnd" TEXT NOT NULL,
+  "periodStart" TIMESTAMP(3) NOT NULL,
+  "periodEnd" TIMESTAMP(3) NOT NULL,
   "currency" TEXT NOT NULL DEFAULT 'CAD',
   "status" TEXT NOT NULL DEFAULT 'draft',
   "totalAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -366,19 +366,25 @@ CREATE TABLE IF NOT EXISTS accounting."Payment" (
   "amount" DOUBLE PRECISION NOT NULL,
   "paidAt" TEXT NOT NULL,
   "method" TEXT NOT NULL DEFAULT 'ach',
-  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  "reference" TEXT NOT NULL DEFAULT '',
+  "notes" TEXT NOT NULL DEFAULT '',
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- ── notification ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS notification."NotificationLog" (
   "id" TEXT PRIMARY KEY,
   "companyId" TEXT,
+  "channel" TEXT NOT NULL DEFAULT 'sms',
   "to" TEXT NOT NULL,
   "body" TEXT NOT NULL,
   "status" TEXT NOT NULL DEFAULT 'queued',
+  "providerId" TEXT,
   "meta" JSONB,
   "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+CREATE INDEX IF NOT EXISTS "NotificationLog_channel_idx" ON notification."NotificationLog"("channel");
 
 CREATE TABLE IF NOT EXISTS notification."Message" (
   "id" TEXT PRIMARY KEY,
