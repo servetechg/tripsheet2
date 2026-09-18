@@ -65,7 +65,7 @@ Optional E2E tenant (not in default seed): `npm run seed:e2e` → MKX owner/driv
 cd backend && npm run dev:setup      # new machine: infra + migrate + platform seed
 cd backend && npm run dev:reset -- --yes --stop   # wipe local DBs + re-seed
 cd backend && npm run dev:stop       # free ports before restart (Windows)
-cd backend && npm run migrate:all    # after git pull when schemas changed
+cd backend && npm run dev:sync       # after git pull (build shared + migrate platform + tenant SQL)
 cd backend && npm run start:dev      # all services
 cd frontend && npm run dev
 ```

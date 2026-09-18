@@ -96,7 +96,13 @@ async function main() {
   run(BACKEND_ROOT, 'node', ['scripts/migrate-all.mjs']);
   run(BACKEND_ROOT, 'node', ['scripts/seed-platform.mjs']);
 
+  const companyService = path.join(BACKEND_ROOT, 'services', 'company-service');
+  if (existsSync(companyService)) {
+    run(companyService, 'npm', ['run', 'schema:migrate-all'], { optional: true });
+  }
+
   console.log('\n==> Dev setup complete ==');
+  console.log('After git pull (existing machine): npm run dev:sync');
   console.log('Start backend:  cd backend && npm run start:dev');
   console.log('Start frontend: cd frontend && npm install && npm run dev');
   console.log('Login: admin@tripsheet.io / admin123');

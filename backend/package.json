@@ -23,6 +23,7 @@
     "dev:setup": "node scripts/dev-setup.mjs",
     "dev:reset": "node scripts/dev-reset.mjs",
     "dev:stop": "powershell -NoProfile -File scripts/dev-stop.ps1",
+    "dev:sync": "node scripts/dev-sync.mjs",
     "migrate:all": "node scripts/migrate-all.mjs",
     "migrate:status": "node scripts/migrate-all.mjs --status",
     "seed:platform": "node scripts/seed-platform.mjs",

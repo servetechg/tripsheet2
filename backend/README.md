@@ -88,11 +88,21 @@ This builds shared packages, copies `.env` files, installs dependencies, starts 
 
 No demo companies, drivers, or tenant databases.
 
-### After `git pull` (schema changed)
+### After `git pull` (every teammate — one command)
 
 ```powershell
-npm run migrate:all      # apply pending migrations (does not delete data)
-npm run migrate:status     # show which services are behind
+cd backend
+npm run dev:sync
+```
+
+This builds `shared/` and `@tripsheet/tenant-runtime` (fixes notification-service TS export errors after pull), starts Postgres/Redis if needed, runs **platform** `migrate:all`, then **tenant** `schema-migrate-all` on every active company DB (Reports/Accounting parity SQL).
+
+Then `npm run start:dev` (restart if it was already running).
+
+Optional checks:
+
+```powershell
+npm run migrate:status   # platform Prisma only — which services are behind
 ```
 
 ### Clean local dev (fix bad/orphan data)
