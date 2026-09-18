@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { G, FONT_MONO, RADIUS, labelBase } from '@/lib/theme';
 import {
   Btn,
@@ -36,6 +36,18 @@ import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
 import { canAssignAsset } from '@/lib/assetStatus';
 import { useCan } from '@/lib/permissions';
 import { useSmsEnabled } from '@/hooks/useSmsEnabled';
+import type { GeoapifyAddress } from '@/lib/geoapify';
+import {
+  allowedCountriesForDestination,
+  allowedCountriesForOrigin,
+  countryLabel,
+  customsProgramForRoute,
+  inferCountryFromAddress,
+  normalizeTripCountry,
+  oppositeCountry,
+  validateRouteCountries,
+  type TripCountry,
+} from '@/lib/dispatchLocations';
 
 type FormErrors = Partial<
   Record<
@@ -109,6 +121,8 @@ export function DispatchTab({
     portOfEntryName: '',
     originLocationId: '',
     destinationLocationId: '',
+    originCountry: '' as TripCountry | '',
+    destinationCountry: '' as TripCountry | '',
     origin: '',
     destination: '',
     pickupTime: '',
@@ -205,6 +219,127 @@ export function DispatchTab({
     });
   };
 
+  const countryFromMaster = (locationId: string): TripCountry | '' => {
+    if (!locationId) return '';
+    const loc = mdmLocations.find((x: any) => x.id === locationId);
+    return normalizeTripCountry(loc?.country) || '';
+  };
+
+  const destinationConflictsOrigin = (
+    crossBorder: boolean,
+    originCountry: TripCountry | '',
+    destinationCountry: TripCountry | '',
+  ) => {
+    if (!originCountry || !destinationCountry) return false;
+    return crossBorder
+      ? originCountry === destinationCountry
+      : originCountry !== destinationCountry;
+  };
+
+  const clearDestinationIfNeeded = (
+    prev: typeof f,
+    originCountry: TripCountry | '',
+  ) => {
+    if (
+      !originCountry ||
+      !prev.destinationCountry ||
+      !destinationConflictsOrigin(
+        prev.crossBorder,
+        originCountry,
+        prev.destinationCountry,
+      )
+    ) {
+      return {};
+    }
+    return {
+      destination: '',
+      destinationLocationId: '',
+      destinationCountry: '' as TripCountry | '',
+    };
+  };
+
+  const clearOriginIfNeeded = (
+    prev: typeof f,
+    destinationCountry: TripCountry | '',
+  ) => {
+    if (
+      !destinationCountry ||
+      !prev.originCountry ||
+      !destinationConflictsOrigin(
+        prev.crossBorder,
+        prev.originCountry,
+        destinationCountry,
+      )
+    ) {
+      return {};
+    }
+    return {
+      origin: '',
+      originLocationId: '',
+      originCountry: '' as TripCountry | '',
+    };
+  };
+
+  const formatAddressLabel = (addr: GeoapifyAddress) =>
+    addr.formatted ||
+    addr.address_line1 ||
+    [addr.city, addr.state_code, addr.postcode, addr.country]
+      .filter(Boolean)
+      .join(', ');
+
+  const originAllowed = useMemo(
+    () => allowedCountriesForOrigin(f.crossBorder, f.destinationCountry),
+    [f.crossBorder, f.destinationCountry],
+  );
+  const destinationAllowed = useMemo(
+    () => allowedCountriesForDestination(f.crossBorder, f.originCountry),
+    [f.crossBorder, f.originCountry],
+  );
+
+  const masterLocationsFor = (allowed: TripCountry[]) =>
+    mdmLocations.filter((loc: any) => {
+      const c = normalizeTripCountry(loc.country) || 'CA';
+      return allowed.includes(c);
+    });
+
+  const formatMasterOption = (loc: any) => {
+    const c = normalizeTripCountry(loc.country) || 'CA';
+    const place = [loc.name || loc.city, loc.city, loc.region]
+      .filter(Boolean)
+      .join(' · ');
+    return `${place} · ${countryLabel(c)}`;
+  };
+
+  useEffect(() => {
+    if (!f.crossBorder) return;
+    const program = customsProgramForRoute(f.originCountry, f.destinationCountry);
+    if (!program || f.customsProgram === program) return;
+    setF((x) => ({ ...x, customsProgram: program }));
+  }, [f.crossBorder, f.originCountry, f.destinationCountry, f.customsProgram]);
+
+  useEffect(() => {
+    if (!show || mdmLocations.length === 0) return;
+    setF((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      if (!prev.originCountry && prev.originLocationId) {
+        const c = countryFromMaster(prev.originLocationId);
+        if (c) {
+          next.originCountry = c;
+          changed = true;
+        }
+      }
+      if (!prev.destinationCountry && prev.destinationLocationId) {
+        const c = countryFromMaster(prev.destinationLocationId);
+        if (c) {
+          next.destinationCountry = c;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [show, mdmLocations]);
+
   useEffect(() => {
     if (!apiEnabled || !f.driverId) return;
     const driver = drivers.find((d: any) => d.id === f.driverId);
@@ -273,6 +408,14 @@ export function DispatchTab({
       portOfEntryName: l.portOfEntryName || '',
       originLocationId: l.originLocationId || '',
       destinationLocationId: l.destinationLocationId || '',
+      originCountry:
+        countryFromMaster(l.originLocationId || '') ||
+        inferCountryFromAddress(l.origin) ||
+        ('' as TripCountry | ''),
+      destinationCountry:
+        countryFromMaster(l.destinationLocationId || '') ||
+        inferCountryFromAddress(l.destination) ||
+        ('' as TripCountry | ''),
       origin: l.origin || '',
       destination: l.destination || '',
       pickupTime: toDatetimeLocal(l.pickupTime || ''),
@@ -346,6 +489,12 @@ export function DispatchTab({
     }
     if (blank(f.pickupTime)) errs.pickupTime = 'Pickup date & time is required';
 
+    Object.assign(errs, validateRouteCountries(
+      f.crossBorder,
+      f.originCountry,
+      f.destinationCountry,
+    ));
+
     if (f.crossBorder) {
       if (blank(f.portOfEntryId)) {
         errs.portOfEntryId = 'Port of entry is required for cross-border';
@@ -362,6 +511,17 @@ export function DispatchTab({
         !f.customsAci
       ) {
         errs.customsProgram = 'Selected port does not support ACI';
+      }
+      const expected = customsProgramForRoute(
+        f.originCountry,
+        f.destinationCountry,
+      );
+      if (
+        expected &&
+        f.customsProgram &&
+        f.customsProgram !== expected
+      ) {
+        errs.customsProgram = `Use ${expected} for ${countryLabel(f.originCountry)} → ${countryLabel(f.destinationCountry)}`;
       }
     }
 
@@ -925,22 +1085,41 @@ export function DispatchTab({
               value={f.crossBorder ? 'yes' : 'no'}
               onChange={(e: any) => {
                 const on = e.target.value === 'yes';
-                setF((x) => ({
-                  ...x,
-                  crossBorder: on,
-                  ...(on
-                    ? {}
-                    : {
-                        portOfEntryId: '',
-                        portOfEntryCode: '',
-                        portOfEntryName: '',
-                        customsProgram: '',
-                        customsAce: false,
-                        customsAci: false,
-                        customsPaps: false,
-                        customsPars: false,
-                      }),
-                }));
+                setF((x) => {
+                  const next = {
+                    ...x,
+                    crossBorder: on,
+                    ...(on
+                      ? {}
+                      : {
+                          portOfEntryId: '',
+                          portOfEntryCode: '',
+                          portOfEntryName: '',
+                          customsProgram: '',
+                          customsAce: false,
+                          customsAci: false,
+                          customsPaps: false,
+                          customsPars: false,
+                        }),
+                  };
+                  if (
+                    next.originCountry &&
+                    next.destinationCountry &&
+                    destinationConflictsOrigin(
+                      on,
+                      next.originCountry,
+                      next.destinationCountry,
+                    )
+                  ) {
+                    return {
+                      ...next,
+                      destination: '',
+                      destinationLocationId: '',
+                      destinationCountry: '' as TripCountry | '',
+                    };
+                  }
+                  return next;
+                });
               }}
             >
               <option value="no">No — domestic</option>
@@ -1010,20 +1189,38 @@ export function DispatchTab({
               onChange={(e: any) => {
                 const id = e.target.value;
                 const loc = mdmLocations.find((x: any) => x.id === id);
-                upd('originLocationId', id);
-                if (loc) {
-                  const label = [loc.name, loc.city, loc.region]
-                    .filter(Boolean)
-                    .join(', ');
-                  if (label) upd('origin', label);
-                }
+                const originCountry = loc
+                  ? normalizeTripCountry(loc.country) || 'CA'
+                  : ('' as TripCountry | '');
+                setF((x) => {
+                  const label = loc
+                    ? [loc.name, loc.city, loc.region, loc.country === 'US' ? 'United States' : loc.country === 'CA' ? 'Canada' : '']
+                        .filter(Boolean)
+                        .join(', ')
+                    : x.origin;
+                  return {
+                    ...x,
+                    originLocationId: id,
+                    origin: label || x.origin,
+                    originCountry,
+                    ...clearDestinationIfNeeded(
+                      { ...x, originCountry },
+                      originCountry,
+                    ),
+                  };
+                });
+                setFieldErr((e) => {
+                  const next = { ...e };
+                  delete next.origin;
+                  delete next.destination;
+                  return next;
+                });
               }}
             >
               <option value="">— Or type below —</option>
-              {mdmLocations.map((loc: any) => (
+              {masterLocationsFor(originAllowed).map((loc: any) => (
                 <option key={loc.id} value={loc.id}>
-                  {loc.name || loc.city}
-                  {loc.city ? ` · ${loc.city}` : ''}
+                  {formatMasterOption(loc)}
                 </option>
               ))}
             </Sel>
@@ -1033,24 +1230,50 @@ export function DispatchTab({
               onChange={(e: any) => {
                 const id = e.target.value;
                 const loc = mdmLocations.find((x: any) => x.id === id);
-                upd('destinationLocationId', id);
-                if (loc) {
-                  const label = [loc.name, loc.city, loc.region]
-                    .filter(Boolean)
-                    .join(', ');
-                  if (label) upd('destination', label);
-                }
+                const destinationCountry = loc
+                  ? normalizeTripCountry(loc.country) || 'CA'
+                  : ('' as TripCountry | '');
+                setF((x) => {
+                  const label = loc
+                    ? [loc.name, loc.city, loc.region, loc.country === 'US' ? 'United States' : loc.country === 'CA' ? 'Canada' : '']
+                        .filter(Boolean)
+                        .join(', ')
+                    : x.destination;
+                  return {
+                    ...x,
+                    destinationLocationId: id,
+                    destination: label || x.destination,
+                    destinationCountry,
+                    ...clearOriginIfNeeded(
+                      { ...x, destinationCountry },
+                      destinationCountry,
+                    ),
+                  };
+                });
+                setFieldErr((e) => {
+                  const next = { ...e };
+                  delete next.origin;
+                  delete next.destination;
+                  return next;
+                });
               }}
             >
               <option value="">— Or type below —</option>
-              {mdmLocations.map((loc: any) => (
+              {masterLocationsFor(destinationAllowed).map((loc: any) => (
                 <option key={loc.id} value={loc.id}>
-                  {loc.name || loc.city}
-                  {loc.city ? ` · ${loc.city}` : ''}
+                  {formatMasterOption(loc)}
                 </option>
               ))}
             </Sel>
           </G2>
+          {f.crossBorder && f.originCountry && (
+            <div style={{ fontSize: 11, color: G.muted, marginBottom: 10 }}>
+              Cross-border: destination must be in{' '}
+              <strong style={{ color: G.text }}>
+                {countryLabel(oppositeCountry(f.originCountry))}
+              </strong>
+            </div>
+          )}
           <G2 cols={2}>
             <div>
               <Sel
@@ -1100,30 +1323,90 @@ export function DispatchTab({
               label="Origin"
               required
               value={f.origin}
-              onChange={(v) => upd('origin', v)}
+              allowedCountries={originAllowed}
+              onChange={(v) =>
+                setF((x) => ({
+                  ...x,
+                  origin: v,
+                  originLocationId: '',
+                  originCountry: '' as TripCountry | '',
+                }))
+              }
               onSelectAddress={(addr) => {
-                const label =
-                  addr.formatted ||
-                  addr.address_line1 ||
-                  [addr.city, addr.state_code].filter(Boolean).join(', ');
-                upd('origin', label);
+                const label = formatAddressLabel(addr);
+                const originCountry =
+                  normalizeTripCountry(addr.country_code) || '';
+                setF((x) => ({
+                  ...x,
+                  origin: label,
+                  originLocationId: '',
+                  originCountry,
+                  ...clearDestinationIfNeeded(
+                    { ...x, originCountry },
+                    originCountry,
+                  ),
+                }));
+                setFieldErr((e) => {
+                  const next = { ...e };
+                  delete next.origin;
+                  delete next.destination;
+                  return next;
+                });
               }}
               placeholder="Search city, facility, or address…"
+              hint={
+                f.crossBorder && f.destinationCountry
+                  ? `Showing ${countryLabel(f.destinationCountry === 'US' ? 'CA' : 'US')} origins only`
+                  : f.destinationCountry && !f.crossBorder
+                    ? `Showing ${countryLabel(f.destinationCountry)} only`
+                    : 'Pick a suggestion so country is detected'
+              }
               error={fieldErr.origin}
             />
             <AddressAutocomplete
               label="Destination"
               required
               value={f.destination}
-              onChange={(v) => upd('destination', v)}
+              allowedCountries={destinationAllowed}
+              onChange={(v) =>
+                setF((x) => ({
+                  ...x,
+                  destination: v,
+                  destinationLocationId: '',
+                  destinationCountry: '' as TripCountry | '',
+                }))
+              }
               onSelectAddress={(addr) => {
-                const label =
-                  addr.formatted ||
-                  addr.address_line1 ||
-                  [addr.city, addr.state_code].filter(Boolean).join(', ');
-                upd('destination', label);
+                const label = formatAddressLabel(addr);
+                const destinationCountry =
+                  normalizeTripCountry(addr.country_code) || '';
+                setF((x) => ({
+                  ...x,
+                  destination: label,
+                  destinationLocationId: '',
+                  destinationCountry,
+                  ...clearOriginIfNeeded(
+                    { ...x, destinationCountry },
+                    destinationCountry,
+                  ),
+                }));
+                setFieldErr((e) => {
+                  const next = { ...e };
+                  delete next.origin;
+                  delete next.destination;
+                  return next;
+                });
               }}
               placeholder="Search city, facility, or address…"
+              hint={
+                f.crossBorder && f.originCountry
+                  ? `Showing ${countryLabel(oppositeCountry(f.originCountry))} only`
+                  : f.originCountry && !f.crossBorder
+                    ? `Showing ${countryLabel(f.originCountry)} only`
+                    : f.crossBorder
+                      ? 'Select origin first, or pick destination to set direction'
+                      : 'Pick a suggestion so country is detected'
+              }
               error={fieldErr.destination}
             />
           </G2>

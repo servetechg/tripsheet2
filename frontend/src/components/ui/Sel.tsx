@@ -4,13 +4,29 @@ import { Icons } from './Icons';
 
 export interface SelProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: ReactNode;
+  hint?: string;
+  error?: string;
+  required?: boolean;
   style?: CSSProperties;
+  selectStyle?: CSSProperties;
   children?: ReactNode;
   /** Compact inline select for toolbars / card actions (no label spacing). */
   compact?: boolean;
 }
 
-export function Sel({ label, children, style: sx, id, compact, ...p }: SelProps) {
+export function Sel({
+  label,
+  hint,
+  error,
+  required,
+  children,
+  style: sx,
+  selectStyle,
+  id,
+  compact,
+  disabled,
+  ...p
+}: SelProps) {
   const autoId = useId();
   const selectId = id ?? autoId;
 
@@ -19,18 +35,21 @@ export function Sel({ label, children, style: sx, id, compact, ...p }: SelProps)
       {label ? (
         <label htmlFor={selectId} style={labelBase()}>
           {label}
+          {required ? <span style={{ color: G.danger, marginLeft: 4 }}>*</span> : null}
         </label>
       ) : null}
       <div style={{ position: 'relative', display: compact ? 'inline-block' : 'block' }}>
         <select
           id={selectId}
           className="ts-input ts-select"
+          disabled={disabled}
           style={{
             ...inputBase(),
             appearance: 'none',
             WebkitAppearance: 'none',
             MozAppearance: 'none',
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.6 : 1,
             ...(compact
               ? {
                   width: 'auto',
@@ -45,6 +64,13 @@ export function Sel({ label, children, style: sx, id, compact, ...p }: SelProps)
                   paddingRight: 36,
                   width: '100%',
                 }),
+            ...(error
+              ? {
+                  borderColor: G.danger,
+                  boxShadow: `0 0 0 3px ${G.danger}22`,
+                }
+              : {}),
+            ...selectStyle,
           }}
           {...p}
         >
@@ -66,6 +92,11 @@ export function Sel({ label, children, style: sx, id, compact, ...p }: SelProps)
           {Icons.chevronDown({ size: 16, color: G.muted })}
         </span>
       </div>
+      {error ? (
+        <div style={{ fontSize: 11, color: G.danger, marginTop: 4 }}>{error}</div>
+      ) : hint ? (
+        <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>{hint}</div>
+      ) : null}
     </div>
   );
 }

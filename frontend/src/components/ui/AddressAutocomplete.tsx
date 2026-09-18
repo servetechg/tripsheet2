@@ -20,6 +20,8 @@ export interface AddressAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onSelectAddress?: (address: GeoapifyAddress) => void;
+  /** Restrict suggestions to these countries (ISO2 uppercase). Default: US + CA. */
+  allowedCountries?: Array<'US' | 'CA'>;
   placeholder?: string;
   hint?: string;
   error?: string;
@@ -37,6 +39,7 @@ export function AddressAutocomplete({
   value,
   onChange,
   onSelectAddress,
+  allowedCountries = ['US', 'CA'],
   placeholder = 'Start typing address (US & Canada)...',
   hint,
   error,
@@ -48,6 +51,15 @@ export function AddressAutocomplete({
   name,
   autoComplete = 'off',
 }: AddressAutocompleteProps) {
+  const geoCountries = allowedCountries.map((c) =>
+    c.toLowerCase() as 'us' | 'ca',
+  );
+  const countryHint =
+    allowedCountries.length === 1
+      ? allowedCountries[0] === 'CA'
+        ? 'Canada only'
+        : 'United States only'
+      : 'US & Canada';
   const autoId = useId();
   const inputId = id ?? autoId;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -76,9 +88,15 @@ export function AddressAutocomplete({
     setLoading(true);
 
     const timer = window.setTimeout(() => {
-      searchGeoapifyAutocomplete(trimmed, abortCtrl.signal)
+      searchGeoapifyAutocomplete(trimmed, abortCtrl.signal, geoCountries)
         .then((results) => {
-          setSuggestions(results);
+          const allowed = new Set(
+            allowedCountries.map((c) => c.toLowerCase()),
+          );
+          const filtered = results.filter((addr) =>
+            allowed.has(String(addr.country_code || '').toLowerCase()),
+          );
+          setSuggestions(filtered);
           setHighlight(0);
         })
         .catch(() => {
@@ -93,7 +111,7 @@ export function AddressAutocomplete({
       window.clearTimeout(timer);
       abortCtrl.abort();
     };
-  }, [value, open, disabled]);
+  }, [value, open, disabled, allowedCountries.join(','), geoCountries.join(',')]);
 
   // Click outside listener
   useEffect(() => {
@@ -191,8 +209,12 @@ export function AddressAutocomplete({
             ...inputBase(),
             paddingLeft: 34,
             paddingRight: loading ? 38 : 12,
-            borderColor: error ? G.danger : undefined,
-            boxShadow: error ? `0 0 0 3px ${G.danger}22` : undefined,
+            ...(error
+              ? {
+                  borderColor: G.danger,
+                  boxShadow: `0 0 0 3px ${G.danger}22`,
+                }
+              : {}),
             ...inputStyle,
           }}
         />
@@ -230,6 +252,32 @@ export function AddressAutocomplete({
       ) : null}
 
       {/* Suggestions Dropdown */}
+      {open &&
+        !loading &&
+        (value || '').trim().length >= 2 &&
+        suggestions.length === 0 &&
+        !disabled && (
+          <div
+            style={{
+              position: 'absolute',
+              zIndex: 60,
+              left: 0,
+              right: 0,
+              top: '100%',
+              marginTop: 4,
+              padding: '10px 12px',
+              background: G.card,
+              border: `1px solid ${G.border2}`,
+              borderRadius: RADIUS.md,
+              fontSize: 12,
+              color: G.muted,
+            }}
+          >
+            No {countryHint.toLowerCase()} locations found. Try city name or
+            postal/ZIP code.
+          </div>
+        )}
+
       {open && suggestions.length > 0 && !disabled && (
         <div
           id={`${inputId}-list`}
@@ -340,7 +388,7 @@ export function AddressAutocomplete({
               alignItems: 'center',
             }}
           >
-            <span>US & Canada only</span>
+            <span>{countryHint}</span>
             <span>⚡ Powered by Geoapify</span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 :root,
 [data-theme='light'] {
+  color-scheme: light;
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
@@ -28,6 +29,7 @@
   --color-muted: #64748B;
   --color-muted-2: #475569;
   --color-border: #E2E8F0;
+  --color-border-2: #CBD5E1;
   --color-nav-active: rgba(61, 140, 255, 0.10);
   --scrollbar-size: 6px;
   --scrollbar-thumb: rgba(100, 116, 139, 0.35);
@@ -35,6 +37,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --color-primary: #3D8CFF;
   --color-primary-hover: #5BA0FF;
   --color-success: #34D399;
@@ -49,6 +52,7 @@
   --color-muted: #8A94AD;
   --color-muted-2: #A8B0C4;
   --color-border: #1E293B;
+  --color-border-2: #2A3448;
   --color-nav-active: #1A2332;
   --scrollbar-size: 6px;
   --scrollbar-thumb: rgba(138, 148, 173, 0.28);

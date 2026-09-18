@@ -191,8 +191,12 @@ export function DatePickerInput({
           width: '100%',
           paddingRight: 40,
           cursor: disabled ? 'not-allowed' : 'pointer',
-          borderColor: error ? G.danger : G.border,
-          boxShadow: error ? `0 0 0 3px ${G.danger}22` : undefined,
+          ...(error
+            ? {
+                borderColor: G.danger,
+                boxShadow: `0 0 0 3px ${G.danger}22`,
+              }
+            : {}),
           color: display ? G.text : G.muted,
           ...style,
         }}

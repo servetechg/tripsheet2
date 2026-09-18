@@ -148,8 +148,12 @@ export function FieldInp({
           id={inputId}
           style={{
             ...inputBase(),
-            borderColor: error ? G.danger : G.border,
-            boxShadow: error ? `0 0 0 3px ${G.danger}22` : undefined,
+            ...(error
+              ? {
+                  borderColor: G.danger,
+                  boxShadow: `0 0 0 3px ${G.danger}22`,
+                }
+              : {}),
             ...(showToggle ? { paddingRight: 44 } : {}),
             ...inputStyle,
           }}

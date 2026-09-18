@@ -132,6 +132,15 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
     });
   };
 
+  const resetNewForm = () => {
+    setName('');
+    setDescription('');
+    setBaseRole('dispatcher');
+    setCloneFrom('');
+    setChecked(new Set());
+    setSelectedId('new');
+  };
+
   const save = async () => {
     if (!name.trim()) {
       notify('Role name is required', 'error');
@@ -149,7 +158,7 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
         });
         notify(`Created ${created.name}`);
         await load();
-        setSelectedId(created.id);
+        resetNewForm();
       } else {
         await companiesApi.updateCustomRole(companyId, selectedId, {
           name: name.trim(),

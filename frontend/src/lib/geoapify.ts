@@ -27,21 +27,27 @@ const GEOAPIFY_API_KEY =
  * Searches address suggestions in USA and Canada using Geoapify Autocomplete API.
  * Returns an empty array if the key is missing, the query is too short, or an error occurs.
  */
+export type GeoCountryCode = 'us' | 'ca';
+
 export async function searchGeoapifyAutocomplete(
   query: string,
   signal?: AbortSignal,
+  countryCodes: GeoCountryCode[] = ['us', 'ca'],
 ): Promise<GeoapifyAddress[]> {
   const trimmed = query.trim();
   if (!trimmed || trimmed.length < 2 || !GEOAPIFY_API_KEY) {
     return [];
   }
 
+  const codes = countryCodes.length
+    ? countryCodes.map((c) => c.toLowerCase() as GeoCountryCode)
+    : (['us', 'ca'] as GeoCountryCode[]);
+
   const url = new URL('https://api.geoapify.com/v1/geocode/autocomplete');
   url.searchParams.set('text', trimmed);
   url.searchParams.set('format', 'json');
-  // Restrict to USA and Canada only
-  url.searchParams.set('filter', 'countrycode:us,ca');
-  url.searchParams.set('limit', '8');
+  url.searchParams.set('filter', `countrycode:${codes.join(',')}`);
+  url.searchParams.set('limit', '10');
   url.searchParams.set('apiKey', GEOAPIFY_API_KEY);
 
   try {

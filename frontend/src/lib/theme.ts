@@ -111,6 +111,7 @@ function syncCssVars(t: ThemeTokens): void {
   root.setProperty('--color-muted', t.muted);
   root.setProperty('--color-muted-2', t.muted2);
   root.setProperty('--color-border', t.border);
+  root.setProperty('--color-border-2', t.border2);
   root.setProperty('--color-nav-active', t.navActive);
   root.setProperty('--color-success', t.success);
   root.setProperty('--color-warning', t.warning);
@@ -164,7 +165,7 @@ export const pageCentered = (): CSSProperties => ({
 export const inputBase = (): CSSProperties => ({
   width: '100%',
   background: G.card2,
-  border: `1px solid ${G.border}`,
+  border: `1px solid ${G.border2}`,
   borderRadius: RADIUS.md,
   padding: '11px 14px',
   minHeight: 42,

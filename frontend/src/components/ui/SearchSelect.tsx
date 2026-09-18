@@ -161,8 +161,12 @@ export function SearchSelect({
         onKeyDown={onKeyDown}
         style={{
           ...inputBase(),
-          borderColor: error ? G.danger : G.border,
-          boxShadow: error ? `0 0 0 1px ${G.danger}55` : undefined,
+          ...(error
+            ? {
+                borderColor: G.danger,
+                boxShadow: `0 0 0 3px ${G.danger}22`,
+              }
+            : {}),
         }}
       />
       {error && (
