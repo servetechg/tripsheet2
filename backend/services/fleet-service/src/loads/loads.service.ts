@@ -38,14 +38,28 @@ export class LoadsService {
   ) {}
 
   findAll(query: ListLoadsDto) {
+    const driverWhere = this.driverIdFilter(query.driverId);
     return this.prisma.load.findMany({
       where: {
         ...(query.companyId ? { companyId: query.companyId } : {}),
         ...(query.status ? { status: query.status } : {}),
-        ...(query.driverId ? { driverId: query.driverId } : {}),
+        ...driverWhere,
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /** Match loads by driver record id or legacy auth user id on the same driver. */
+  private driverIdFilter(driverId?: string) {
+    if (!driverId) return {};
+    if (driverId === '___no_driver___') {
+      return { driverId: '___no_driver___' };
+    }
+    const store = getTenantStore();
+    const ids = new Set<string>([driverId]);
+    if (store?.userId) ids.add(store.userId);
+    if (ids.size === 1) return { driverId };
+    return { driverId: { in: [...ids] } };
   }
 
   findActive(query: ActiveLoadsDto) {
@@ -68,6 +82,11 @@ export class LoadsService {
         'driverId, origin, and destination are required',
       );
     }
+
+    dto.driverId = await this.resolveDriverRecordId(
+      dto.driverId.trim(),
+      dto.companyId,
+    );
 
     await this.assertNoActiveLoad(dto.driverId);
     await this.assertDriverAssignable(dto.driverId, dto.companyId);
@@ -152,6 +171,13 @@ export class LoadsService {
     const isActive = ACTIVE_STATUSES.includes(
       nextStatus as (typeof ACTIVE_STATUSES)[number],
     );
+
+    if (dto.driverId !== undefined) {
+      dto.driverId = await this.resolveDriverRecordId(
+        dto.driverId.trim(),
+        existing.companyId,
+      );
+    }
 
     if (
       dto.driverId !== undefined &&
@@ -334,10 +360,38 @@ export class LoadsService {
     }
   }
 
+  private async resolveDriverRecordId(
+    driverId: string,
+    companyId: string,
+  ): Promise<string> {
+    const base =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    const headers: Record<string, string> = {
+      'x-company-id': companyId,
+      ...(getTenantStore()?.userId
+        ? { 'x-user-id': getTenantStore()!.userId! }
+        : {}),
+    };
+    try {
+      const res = await fetch(
+        `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}`,
+        { headers },
+      );
+      if (res.ok) {
+        const row = (await res.json()) as { id?: string };
+        if (row?.id) return String(row.id);
+      }
+    } catch (e) {
+      this.logger.warn(`resolveDriverRecordId failed: ${String(e)}`);
+    }
+    return driverId;
+  }
+
   private async assertNoActiveLoad(driverId: string, excludeId?: string) {
     const active = await this.prisma.load.findFirst({
       where: {
-        driverId,
+        ...this.driverIdFilter(driverId),
         status: { in: [...ACTIVE_STATUSES] },
         ...(excludeId ? { id: { not: excludeId } } : {}),
       },

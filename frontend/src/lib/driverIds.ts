@@ -22,3 +22,16 @@ export function matchesDriverRef(
   }
   return false;
 }
+
+/** Current assignment for driver UI (in transit first, then assigned). */
+export function pickCurrentDriverLoad<T extends { driverId?: string; status?: string }>(
+  loads: T[],
+  driver: { id: string; driverRecordId?: string | null },
+): T | null {
+  const mine = loads.filter((l) => matchesDriverRef(l.driverId, driver));
+  return (
+    mine.find((l) => l.status === 'in_transit') ||
+    mine.find((l) => l.status === 'assigned') ||
+    null
+  );
+}

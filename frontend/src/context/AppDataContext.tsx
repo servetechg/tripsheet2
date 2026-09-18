@@ -237,7 +237,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         let man: Manifest[] = [];
         let carrier: CarrierProfile | null = null;
 
-        if (!driverScope) {
+        if (driverScope) {
+          lds = await loadsApi.list({ companyId }).catch(() => []);
+        } else {
           [inv, ast, lds, man, carrier] = await Promise.all([
             invitesApi.list(companyId).catch(() => []),
             assetsApi.list(companyId).catch(() => []),

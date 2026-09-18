@@ -23,6 +23,7 @@ import {
 import {
   driverRecordIdOf,
   matchesDriverRef,
+  pickCurrentDriverLoad,
 } from '@/lib/driverIds';
 
 export function DriverDashboard({
@@ -55,10 +56,7 @@ export function DriverDashboard({
   const sortedSheets = [...mySheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
-  const myLoad = loads.find(
-    (l: any) =>
-      matchesDriverRef(l.driverId, user) && l.status === 'in_transit',
-  );
+  const myLoad = pickCurrentDriverLoad(loads, user);
   const myDocs = (driverDocs || []).filter(
     (d: any) =>
       matchesDriverRef(d.driverId, user) && d.type !== '__contract__',
