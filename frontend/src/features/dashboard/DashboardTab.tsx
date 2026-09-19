@@ -56,11 +56,14 @@ function CustomBarTooltip({
   return (
     <div
       style={{
-        background: '#151C2C',
+        background: G.card,
         border: `1px solid ${G.border}`,
         borderRadius: 8,
         padding: '6px 10px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        boxShadow:
+          G.mode === 'light'
+            ? '0 4px 16px rgba(15, 23, 42, 0.12)'
+            : '0 4px 16px rgba(0,0,0,0.6)',
         fontSize: 12,
         whiteSpace: 'nowrap',
         zIndex: 1000,
@@ -144,7 +147,13 @@ function BarChart({
           />
           <RechartsTooltip
             content={<CustomBarTooltip seriesNames={seriesNames} />}
-            cursor={{ fill: 'rgba(255, 255, 255, 0.03)', radius: 4 }}
+            cursor={{
+              fill:
+                G.mode === 'light'
+                  ? 'rgba(0, 0, 0, 0.04)'
+                  : 'rgba(255, 255, 255, 0.03)',
+              radius: 4,
+            }}
             wrapperStyle={{ zIndex: 1000, pointerEvents: 'none' }}
             allowEscapeViewBox={{ x: true, y: true }}
           />
@@ -172,11 +181,14 @@ function DonutTooltip({ active, payload, coordinate }: any) {
   return (
     <div
       style={{
-        background: '#151C2C',
+        background: G.card,
         border: `1px solid ${G.border}`,
         borderRadius: 8,
         padding: '4px 8px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        boxShadow:
+          G.mode === 'light'
+            ? '0 4px 16px rgba(15, 23, 42, 0.12)'
+            : '0 4px 16px rgba(0,0,0,0.6)',
         fontSize: 11,
         whiteSpace: 'nowrap',
         zIndex: 1000,
