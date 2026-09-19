@@ -155,21 +155,28 @@ export function BackButton({
   label = 'BACK',
   style: sx,
   className,
+  onDark,
   ...rest
 }: {
   onClick?: () => void;
   label?: ReactNode;
   style?: CSSProperties;
   className?: string;
+  onDark?: boolean;
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const defaultBorder = onDark ? 'rgba(255, 255, 255, 0.2)' : G.border;
+  const defaultColor = onDark ? '#e2e8f0' : G.muted2;
+  const hoverColor = onDark ? '#ffffff' : G.text;
+  const hoverBorder = G.gold;
+
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        background: 'rgba(255, 255, 255, 0.03)',
-        border: `1px solid ${G.border}`,
-        color: G.muted2,
+        background: onDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+        border: `1px solid ${defaultBorder}`,
+        color: defaultColor,
         borderRadius: RADIUS.md,
         padding: '7px 14px',
         fontSize: 12,
@@ -182,12 +189,12 @@ export function BackButton({
         ...sx,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = G.gold;
-        e.currentTarget.style.color = G.text;
+        e.currentTarget.style.borderColor = hoverBorder;
+        e.currentTarget.style.color = hoverColor;
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = G.border;
-        e.currentTarget.style.color = G.muted2;
+        e.currentTarget.style.borderColor = defaultBorder;
+        e.currentTarget.style.color = defaultColor;
       }}
       className={className}
       {...rest}

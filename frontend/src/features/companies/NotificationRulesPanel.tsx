@@ -427,9 +427,8 @@ export function NotificationRulesPanel({
       {/* Modern Context Callout Banner */}
       <div
         style={{
-          background:
-            'linear-gradient(135deg, rgba(61, 140, 255, 0.08) 0%, rgba(26, 34, 52, 0.8) 100%)',
-          border: `1px solid rgba(61, 140, 255, 0.22)`,
+          background: G.card2,
+          border: `1px solid ${G.border}`,
           borderRadius: RADIUS.md,
           padding: '14px 18px',
           display: 'flex',

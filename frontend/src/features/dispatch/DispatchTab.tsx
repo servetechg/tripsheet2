@@ -102,6 +102,7 @@ export function DispatchTab({
   const [carriers, setCarriers] = useState<any[]>([]);
   const [commodities, setCommodities] = useState<any[]>([]);
   const [ports, setPorts] = useState<any[]>([]);
+  const [portCustomsLoading, setPortCustomsLoading] = useState(false);
   const [mdmLocations, setMdmLocations] = useState<any[]>([]);
   const emptyForm = {
     driverId: '',
@@ -167,7 +168,7 @@ export function DispatchTab({
   }, [apiEnabled, company?.id, show]);
 
   const applyPort = async (portId: string) => {
-    if (!portId || !company?.id) {
+    if (!portId) {
       setF((x) => ({
         ...x,
         portOfEntryId: '',
@@ -179,34 +180,74 @@ export function DispatchTab({
         customsPaps: false,
         customsPars: false,
       }));
+      setPortCustomsLoading(false);
       return;
     }
-    try {
-      const customs = await companiesApi.portCustoms(company.id, portId);
-      setF((x) => ({
-        ...x,
-        portOfEntryId: portId,
-        portOfEntryCode: customs.portOfEntryCode || '',
-        portOfEntryName: customs.portOfEntryName || '',
-        customsAce: Boolean(customs.customsAce),
-        customsAci: Boolean(customs.customsAci),
-        customsPaps: Boolean(customs.customsPaps),
-        customsPars: Boolean(customs.customsPars),
-        customsProgram: customs.defaultProgram || '',
-      }));
-    } catch {
-      const p = ports.find((x: any) => x.id === portId);
-      setF((x) => ({
+
+    // 1. Immediately apply from in-memory ports list (instant 0ms feedback)
+    const p = ports.find((x: any) => x.id === portId);
+    const immediateAce = Boolean(p?.ace);
+    const immediateAci = Boolean(p?.aci);
+    const immediateProgram = immediateAce ? 'ACE' : immediateAci ? 'ACI' : '';
+    const pCountry = p
+      ? (normalizeTripCountry(p.country) || (p.ace ? 'US' : p.aci ? 'CA' : ''))
+      : '';
+    const reqOrigin = pCountry ? oppositeCountry(pCountry as TripCountry) : '';
+    const reqDest = pCountry;
+
+    setF((x) => {
+      const clearOrigin =
+        Boolean(pCountry && x.originCountry && x.originCountry !== reqOrigin);
+      const clearDest =
+        Boolean(pCountry && x.destinationCountry && x.destinationCountry !== reqDest);
+      return {
         ...x,
         portOfEntryId: portId,
         portOfEntryCode: p?.code || '',
         portOfEntryName: p?.name || '',
-        customsAce: Boolean(p?.ace),
-        customsAci: Boolean(p?.aci),
+        customsAce: immediateAce,
+        customsAci: immediateAci,
         customsPaps: Boolean(p?.paps),
         customsPars: Boolean(p?.pars),
-        customsProgram: p?.ace ? 'ACE' : p?.aci ? 'ACI' : '',
-      }));
+        customsProgram: immediateProgram,
+        ...(clearOrigin
+          ? { origin: '', originLocationId: '', originCountry: '' as TripCountry | '' }
+          : {}),
+        ...(clearDest
+          ? { destination: '', destinationLocationId: '', destinationCountry: '' as TripCountry | '' }
+          : {}),
+      };
+    });
+    setFieldErr((e) => {
+      const next = { ...e };
+      delete next.portOfEntryId;
+      delete next.customsProgram;
+      return next;
+    });
+
+    // 2. Query backend to verify / resolve authoritative customs with loader
+    if (apiEnabled && company?.id) {
+      setPortCustomsLoading(true);
+      try {
+        const customs = await companiesApi.portCustoms(company.id, portId);
+        setF((x) => {
+          if (x.portOfEntryId !== portId) return x;
+          return {
+            ...x,
+            portOfEntryCode: customs.portOfEntryCode || x.portOfEntryCode,
+            portOfEntryName: customs.portOfEntryName || x.portOfEntryName,
+            customsAce: Boolean(customs.customsAce),
+            customsAci: Boolean(customs.customsAci),
+            customsPaps: Boolean(customs.customsPaps),
+            customsPars: Boolean(customs.customsPars),
+            customsProgram: x.customsProgram || customs.defaultProgram || '',
+          };
+        });
+      } catch {
+        /* Keep in-memory port values on network error */
+      } finally {
+        setPortCustomsLoading(false);
+      }
     }
   };
   const upd = (k: string, v: string) => {
@@ -280,6 +321,35 @@ export function DispatchTab({
     };
   };
 
+  const clearPortIfNeeded = (
+    prev: typeof f,
+    originCountry: TripCountry | '',
+    destinationCountry: TripCountry | '',
+  ) => {
+    if (!prev.crossBorder || !prev.portOfEntryId) return {};
+    const p = ports.find((x: any) => x.id === prev.portOfEntryId);
+    const pCountry = p
+      ? (normalizeTripCountry(p.country) || (p.ace ? 'US' : p.aci ? 'CA' : ''))
+      : '';
+    if (!pCountry) return {};
+    const targetCountry =
+      destinationCountry ||
+      (originCountry ? oppositeCountry(originCountry as TripCountry) : '');
+    if (targetCountry && pCountry !== targetCountry) {
+      return {
+        portOfEntryId: '',
+        portOfEntryCode: '',
+        portOfEntryName: '',
+        customsProgram: '',
+        customsAce: false,
+        customsAci: false,
+        customsPaps: false,
+        customsPars: false,
+      };
+    }
+    return {};
+  };
+
   const formatAddressLabel = (addr: GeoapifyAddress) =>
     addr.formatted ||
     addr.address_line1 ||
@@ -287,14 +357,47 @@ export function DispatchTab({
       .filter(Boolean)
       .join(', ');
 
-  const originAllowed = useMemo(
-    () => allowedCountriesForOrigin(f.crossBorder, f.destinationCountry),
-    [f.crossBorder, f.destinationCountry],
+  const selectedPort = useMemo(
+    () => ports.find((p: any) => p.id === f.portOfEntryId),
+    [ports, f.portOfEntryId],
   );
-  const destinationAllowed = useMemo(
-    () => allowedCountriesForDestination(f.crossBorder, f.originCountry),
-    [f.crossBorder, f.originCountry],
-  );
+  const portCountry: TripCountry | '' = useMemo(() => {
+    if (!selectedPort) return '';
+    return (
+      normalizeTripCountry(selectedPort.country) ||
+      (selectedPort.ace ? 'US' : selectedPort.aci ? 'CA' : '')
+    );
+  }, [selectedPort]);
+
+  const originAllowed = useMemo(() => {
+    if (f.crossBorder && portCountry) {
+      return [oppositeCountry(portCountry)];
+    }
+    return allowedCountriesForOrigin(f.crossBorder, f.destinationCountry);
+  }, [f.crossBorder, portCountry, f.destinationCountry]);
+
+  const destinationAllowed = useMemo(() => {
+    if (f.crossBorder && portCountry) {
+      return [portCountry];
+    }
+    return allowedCountriesForDestination(f.crossBorder, f.originCountry);
+  }, [f.crossBorder, portCountry, f.originCountry]);
+
+  const availablePorts = useMemo(() => {
+    if (!f.crossBorder) return ports;
+    const targetCountry =
+      f.destinationCountry ||
+      (f.originCountry ? oppositeCountry(f.originCountry) : '');
+    if (targetCountry) {
+      return ports.filter((p: any) => {
+        const pc =
+          normalizeTripCountry(p.country) ||
+          (p.ace ? 'US' : p.aci ? 'CA' : '');
+        return pc === targetCountry;
+      });
+    }
+    return ports;
+  }, [ports, f.crossBorder, f.destinationCountry, f.originCountry]);
 
   const masterLocationsFor = (allowed: TripCountry[]) =>
     mdmLocations.filter((loc: any) => {
@@ -1138,7 +1241,7 @@ export function DispatchTab({
                   onChange={(e: any) => void applyPort(e.target.value)}
                 >
                   <option value="">— Select POE —</option>
-                  {ports.map((p: any) => (
+                  {availablePorts.map((p: any) => (
                     <option key={p.id} value={p.id}>
                       {p.code} · {p.name} ({p.country})
                     </option>
@@ -1156,6 +1259,7 @@ export function DispatchTab({
                 style={{
                   display: 'flex',
                   gap: 6,
+                  alignItems: 'center',
                   flexWrap: 'wrap',
                   marginBottom: 8,
                   fontSize: 12,
@@ -1165,7 +1269,24 @@ export function DispatchTab({
                 {f.customsAci && <Pill>ACI</Pill>}
                 {f.customsPaps && <Pill>PAPS</Pill>}
                 {f.customsPars && <Pill>PARS</Pill>}
-                {!f.portOfEntryId && (
+                {portCustomsLoading && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 11,
+                      color: G.muted,
+                    }}
+                  >
+                    <span
+                      className="ts-btn-spinner"
+                      style={{ width: 11, height: 11 }}
+                    />
+                    Verifying customs…
+                  </span>
+                )}
+                {!f.portOfEntryId && !portCustomsLoading && (
                   <span style={{ color: G.muted }}>
                     Select a port to populate customs options
                   </span>
@@ -1212,6 +1333,11 @@ export function DispatchTab({
                       { ...x, originCountry },
                       originCountry,
                     ),
+                    ...clearPortIfNeeded(
+                      { ...x, originCountry },
+                      originCountry,
+                      x.destinationCountry,
+                    ),
                   };
                 });
                 setFieldErr((e) => {
@@ -1253,6 +1379,11 @@ export function DispatchTab({
                       { ...x, destinationCountry },
                       destinationCountry,
                     ),
+                    ...clearPortIfNeeded(
+                      { ...x, destinationCountry },
+                      x.originCountry,
+                      destinationCountry,
+                    ),
                   };
                 });
                 setFieldErr((e) => {
@@ -1271,11 +1402,15 @@ export function DispatchTab({
               ))}
             </Sel>
           </G2>
-          {f.crossBorder && f.originCountry && (
+          {f.crossBorder && (portCountry || f.originCountry) && (
             <div style={{ fontSize: 11, color: G.muted, marginBottom: 10 }}>
-              Cross-border: destination must be in{' '}
+              Cross-border route:{' '}
               <strong style={{ color: G.text }}>
-                {countryLabel(oppositeCountry(f.originCountry))}
+                {portCountry
+                  ? `${countryLabel(oppositeCountry(portCountry))} → ${countryLabel(portCountry)} (via ${selectedPort?.name || selectedPort?.code || 'Port of entry'})`
+                  : f.originCountry
+                    ? `${countryLabel(f.originCountry)} → ${countryLabel(oppositeCountry(f.originCountry as TripCountry))}`
+                    : ''}
               </strong>
             </div>
           )}
@@ -1350,6 +1485,11 @@ export function DispatchTab({
                     { ...x, originCountry },
                     originCountry,
                   ),
+                  ...clearPortIfNeeded(
+                    { ...x, originCountry },
+                    originCountry,
+                    x.destinationCountry,
+                  ),
                 }));
                 setFieldErr((e) => {
                   const next = { ...e };
@@ -1360,11 +1500,13 @@ export function DispatchTab({
               }}
               placeholder="Search city, facility, or address…"
               hint={
-                f.crossBorder && f.destinationCountry
-                  ? `Showing ${countryLabel(f.destinationCountry === 'US' ? 'CA' : 'US')} origins only`
-                  : f.destinationCountry && !f.crossBorder
-                    ? `Showing ${countryLabel(f.destinationCountry)} only`
-                    : 'Pick a suggestion so country is detected'
+                f.crossBorder && portCountry
+                  ? `Showing ${countryLabel(oppositeCountry(portCountry))} origins only (${portCountry === 'US' ? 'US' : 'CA'} port selected)`
+                  : f.crossBorder && f.destinationCountry
+                    ? `Showing ${countryLabel(oppositeCountry(f.destinationCountry as TripCountry))} origins only`
+                    : f.destinationCountry && !f.crossBorder
+                      ? `Showing ${countryLabel(f.destinationCountry)} only`
+                      : 'Pick a suggestion so country is detected'
               }
               error={fieldErr.origin}
             />
@@ -1394,6 +1536,11 @@ export function DispatchTab({
                     { ...x, destinationCountry },
                     destinationCountry,
                   ),
+                  ...clearPortIfNeeded(
+                    { ...x, destinationCountry },
+                    x.originCountry,
+                    destinationCountry,
+                  ),
                 }));
                 setFieldErr((e) => {
                   const next = { ...e };
@@ -1404,13 +1551,15 @@ export function DispatchTab({
               }}
               placeholder="Search city, facility, or address…"
               hint={
-                f.crossBorder && f.originCountry
-                  ? `Showing ${countryLabel(oppositeCountry(f.originCountry))} only`
-                  : f.originCountry && !f.crossBorder
-                    ? `Showing ${countryLabel(f.originCountry)} only`
-                    : f.crossBorder
-                      ? 'Select origin first, or pick destination to set direction'
-                      : 'Pick a suggestion so country is detected'
+                f.crossBorder && portCountry
+                  ? `Showing ${countryLabel(portCountry)} destinations only (${portCountry === 'US' ? 'US' : 'CA'} port selected)`
+                  : f.crossBorder && f.originCountry
+                    ? `Showing ${countryLabel(oppositeCountry(f.originCountry as TripCountry))} only`
+                    : f.originCountry && !f.crossBorder
+                      ? `Showing ${countryLabel(f.originCountry)} only`
+                      : f.crossBorder
+                        ? 'Select origin first, or pick destination to set direction'
+                        : 'Pick a suggestion so country is detected'
               }
               error={fieldErr.destination}
             />
