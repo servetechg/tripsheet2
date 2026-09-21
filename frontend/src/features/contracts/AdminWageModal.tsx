@@ -1,12 +1,42 @@
 import { useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Inp, Sel, Icons } from '@/components/ui';
-import { blank } from '@/lib/format';
+import { blank, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 import { PAY_TYPES } from '@/lib/docTypes';
 
-export function AdminWageModal({ driver, company, existingContract, onSave, onClose }: any) {
+import type { AdminWageModalProps } from '@/features/contracts/types';
+import type { ContractForm } from '@/types/app';
+
+type WageFormState = Pick<
+  ContractForm,
+  | 'payType'
+  | 'payRate'
+  | 'payUnit'
+  | 'teamRate'
+  | 'detentionRate'
+  | 'waitRate'
+  | 'fuelSurcharge'
+  | 'vacationPct'
+  | 'trialDays'
+  | 'noticeDays'
+  | 'benefits'
+  | 'deductions'
+  | 'notes'
+  | 'startDate'
+  | 'signedByAdmin'
+  | 'signedByDriver'
+>;
+
+export function AdminWageModal({
+  driver,
+  company,
+  existingContract,
+  onSave,
+  onClose,
+}: AdminWageModalProps) {
   const today = new Date().toLocaleDateString("en-CA");
-  const [initialF] = useState(() => ({
+  const [initialF] = useState((): WageFormState => ({
     payType:       existingContract?.payType       || "per_mile",
     payRate:       existingContract?.payRate       || "",
     payUnit:       existingContract?.payUnit       || "CAD",
@@ -26,9 +56,10 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
   }));
   const [f, setF] = useState(initialF);
   const isDirty = existingContract
-    ? Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])
+    ? Object.keys(initialF).some((k) => (f)[k] !== (initialF)[k])
     : !blank(f.payRate);
-  const upd = (k,v) => setF(x=>({...x,[k]:v}));
+  const upd = <K extends keyof WageFormState>(k: K, v: WageFormState[K]) =>
+    setF((x) => ({ ...x, [k]: v }));
   const pt = PAY_TYPES.find(p=>p.id===f.payType)||PAY_TYPES[0];
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
@@ -50,8 +81,8 @@ export function AdminWageModal({ driver, company, existingContract, onSave, onCl
         updatedAt:   today,
         signedByAdmin: true,
       }));
-    } catch (e: any) {
-      setErr(e?.message || 'Failed to save wage terms.');
+    } catch (e: unknown) {
+      setErr(getApiErrorMessage(e, 'Failed to save wage terms.'));
     } finally {
       setSaving(false);
     }

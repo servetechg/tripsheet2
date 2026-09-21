@@ -2,7 +2,13 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2 } from '@/components/ui';
 
-export function CarrierProfileForm({ carrier, onSave, onClose }: any) {
+import type { CarrierProfileFormProps } from '@/features/manifests/types';
+
+export function CarrierProfileForm({
+  carrier,
+  onSave,
+  onClose,
+}: CarrierProfileFormProps) {
   const [f, setF] = useState({ cbsaCarrierCode: carrier.cbsaCarrierCode||"", scacCode: carrier.scacCode||"", dotNumber: carrier.dotNumber||"", csnNumber: carrier.csnNumber||"", fastLane: carrier.fastLane||false });
   const upd = (k,v) => setF(x=>({...x,[k]:v}));
   return (
@@ -24,7 +30,7 @@ export function CarrierProfileForm({ carrier, onSave, onClose }: any) {
         <strong style={{ color:G.success }}>Note:</strong> Real EDI submission requires registration with CBSA (ACI) and CBP (ACE). This module simulates the full workflow. To get live, contact CBSA TCCU or a certified software provider.
       </div>
       <div style={{ display:"flex", gap:10 }}>
-        <Btn onClick={()=>{ onSave(f); onClose(); }}>SAVE PROFILE</Btn>
+        <Btn onClick={()=>{ onSave({ ...carrier, ...f }); onClose(); }}>SAVE PROFILE</Btn>
         <Btn variant="outline" onClick={onClose}>CANCEL</Btn>
       </div>
     </div>

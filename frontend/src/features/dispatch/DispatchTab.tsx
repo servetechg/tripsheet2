@@ -48,6 +48,10 @@ import {
   validateRouteCountries,
   type TripCountry,
 } from '@/lib/dispatchLocations';
+import type { DispatchTabProps, DispatchLoadFormState } from '@/features/dispatch/types';
+import type { MdmRecord, PortOfEntryDto } from '@/types/dtos';
+import { getApiErrorMessage } from '@/lib/format';
+import type { Load, LoadStatus } from '@tripsheet/shared';
 
 type FormErrors = Partial<
   Record<
@@ -86,13 +90,13 @@ export function DispatchTab({
   driverDocs = [],
   apiEnabled,
   refreshAll,
-}: any) {
+}: DispatchTabProps) {
   const { can } = useCan();
   const confirm = useConfirm();
   const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [show, setShow] = useState(false);
-  const [editLoad, setEditLoad] = useState<any>(null);
-  const [initialF, setInitialF] = useState<any>(null);
+  const [editLoad, setEditLoad] = useState<Load | null>(null);
+  const [initialF, setInitialF] = useState<DispatchLoadFormState | null>(null);
   const [docErr, setDocErr] = useState('');
   const [fieldErr, setFieldErr] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -104,12 +108,12 @@ export function DispatchTab({
   const [busy, setBusy] = useState(false);
   const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [brokers, setBrokers] = useState<any[]>([]);
-  const [carriers, setCarriers] = useState<any[]>([]);
-  const [commodities, setCommodities] = useState<any[]>([]);
-  const [ports, setPorts] = useState<any[]>([]);
+  const [brokers, setBrokers] = useState<MdmRecord[]>([]);
+  const [carriers, setCarriers] = useState<MdmRecord[]>([]);
+  const [commodities, setCommodities] = useState<MdmRecord[]>([]);
+  const [ports, setPorts] = useState<PortOfEntryDto[]>([]);
   const [portCustomsLoading, setPortCustomsLoading] = useState(false);
-  const [mdmLocations, setMdmLocations] = useState<any[]>([]);
+  const [mdmLocations, setMdmLocations] = useState<MdmRecord[]>([]);
   const emptyForm = {
     driverId: '',
     truckId: '',
@@ -191,7 +195,7 @@ export function DispatchTab({
     }
 
     // 1. Immediately apply from in-memory ports list (instant 0ms feedback)
-    const p = ports.find((x: any) => x.id === portId);
+    const p = ports.find((x) => x.id === portId);
     const immediateAce = Boolean(p?.ace);
     const immediateAci = Boolean(p?.aci);
     const immediateProgram = immediateAce ? 'ACE' : immediateAci ? 'ACI' : '';
@@ -268,7 +272,7 @@ export function DispatchTab({
 
   const countryFromMaster = (locationId: string): TripCountry | '' => {
     if (!locationId) return '';
-    const loc = mdmLocations.find((x: any) => x.id === locationId);
+    const loc = mdmLocations.find((x) => x.id === locationId);
     return normalizeTripCountry(loc?.country) || '';
   };
 
@@ -333,7 +337,7 @@ export function DispatchTab({
     destinationCountry: TripCountry | '',
   ) => {
     if (!prev.crossBorder || !prev.portOfEntryId) return {};
-    const p = ports.find((x: any) => x.id === prev.portOfEntryId);
+    const p = ports.find((x) => x.id === prev.portOfEntryId);
     const pCountry = p
       ? (normalizeTripCountry(p.country) || (p.ace ? 'US' : p.aci ? 'CA' : ''))
       : '';
@@ -364,7 +368,7 @@ export function DispatchTab({
       .join(', ');
 
   const selectedPort = useMemo(
-    () => ports.find((p: any) => p.id === f.portOfEntryId),
+    () => ports.find((p) => p.id === f.portOfEntryId),
     [ports, f.portOfEntryId],
   );
   const portCountry: TripCountry | '' = useMemo(() => {
@@ -412,7 +416,7 @@ export function DispatchTab({
       f.destinationCountry ||
       (f.originCountry ? oppositeCountry(f.originCountry) : '');
     if (targetCountry) {
-      return ports.filter((p: any) => {
+      return ports.filter((p) => {
         const pc =
           normalizeTripCountry(p.country) ||
           (p.ace ? 'US' : p.aci ? 'CA' : '');
@@ -423,12 +427,12 @@ export function DispatchTab({
   }, [ports, f.crossBorder, f.destinationCountry, f.originCountry]);
 
   const masterLocationsFor = (allowed: TripCountry[]) =>
-    mdmLocations.filter((loc: any) => {
+    mdmLocations.filter((loc) => {
       const c = normalizeTripCountry(loc.country) || 'CA';
       return allowed.includes(c);
     });
 
-  const formatMasterOption = (loc: any) => {
+  const formatMasterOption = (loc) => {
     const c = normalizeTripCountry(loc.country) || 'CA';
     const place = [loc.name || loc.city, loc.city, loc.region]
       .filter(Boolean)
@@ -468,17 +472,17 @@ export function DispatchTab({
 
   useEffect(() => {
     if (!apiEnabled || !f.driverId) return;
-    const driver = drivers.find((d: any) => d.id === f.driverId);
+    const driver = drivers.find((d) => d.id === f.driverId);
     const recordId = driver ? driverRecordIdOf(driver) : f.driverId;
     let cancelled = false;
     (async () => {
       try {
         const rows = await driversApi.equipmentAssignments(recordId);
         if (cancelled) return;
-        const truck = (rows as any[]).find(
+        const truck = (rows).find(
           (r) => r.assetType === 'truck' && r.role === 'primary' && !r.unassignedAt,
         );
-        const trailer = (rows as any[]).find(
+        const trailer = (rows).find(
           (r) => r.assetType === 'trailer' && r.role === 'primary' && !r.unassignedAt,
         );
         setF((prev) => ({
@@ -506,7 +510,7 @@ export function DispatchTab({
     setFieldErr({});
     setTouched({});
   };
-  const openEdit = (l: any) => {
+  const openEdit = (l) => {
     const stops = Array.isArray(l.stops) ? l.stops : [];
     const init = {
       driverId: l.driverId || '',
@@ -548,7 +552,7 @@ export function DispatchTab({
       detentionRate: l.detentionRate != null ? String(l.detentionRate) : '',
       miles: l.miles != null ? String(l.miles) : '',
       intermediateStops: stops.map(
-        (s: any) =>
+        (s) =>
           (typeof s === 'string' ? s : s?.location || '') as string,
       ),
     };
@@ -563,7 +567,7 @@ export function DispatchTab({
   const assertDispatchReady = async (driverId: string) => {
     if (apiEnabled) {
       try {
-        const driver = drivers.find((d: any) => d.id === driverId);
+        const driver = drivers.find((d) => d.id === driverId);
         const recordId = driver?.driverRecordId || driverId;
         const res = await driversApi.dispatchReady(recordId);
         if (!res.ready) return res.missing;
@@ -576,27 +580,27 @@ export function DispatchTab({
 
   const checkDriverDocs = (driverId: string) => {
     const driver =
-      drivers.find((d: any) => d.id === driverId) ||
-      users.find((u: any) => u.id === driverId);
+      drivers.find((d) => d.id === driverId) ||
+      users.find((u) => u.id === driverId);
     const dd = (driverDocs || []).filter(
-      (d: any) =>
+      (d) =>
         (driver
           ? matchesDriverRef(d.driverId, driver)
           : d.driverId === driverId) && d.status !== 'expired',
     );
     return DISPATCH_REQUIRED.filter(
-      (id) => !dd.find((d: any) => d.type === id),
+      (id) => !dd.find((d) => d.type === id),
     );
   };
 
-  const isDriverAvailableForDispatch = (d: any) => {
+  const isDriverAvailableForDispatch = (d) => {
     const missing = checkDriverDocs(d.id);
     const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
     const avail = d.availabilityStatus || 'available';
     const driverActive = lifecycleAllowsDispatch(lifecycle);
     const availOk = availabilityAllowsDispatch(avail);
     const onLoad = loads.some(
-      (l: any) =>
+      (l) =>
         l.driverId === d.id &&
         ['assigned', 'in_transit'].includes(l.status) &&
         (!editLoad || l.id !== editLoad.id),
@@ -606,7 +610,7 @@ export function DispatchTab({
 
   const uniqueDrivers = useMemo(() => {
     const seen = new Set<string>();
-    return (drivers || []).filter((d: any) => {
+    return (drivers || []).filter((d) => {
       const key = String(d.id || d.driverRecordId || '');
       if (!key || seen.has(key)) return false;
       seen.add(key);
@@ -616,7 +620,7 @@ export function DispatchTab({
 
   const visibleDrivers = useMemo(() => {
     if (showAllDrivers) return uniqueDrivers;
-    return uniqueDrivers.filter((d: any) => {
+    return uniqueDrivers.filter((d) => {
       if (editLoad && f.driverId === d.id) return true;
       return isDriverAvailableForDispatch(d);
     });
@@ -820,17 +824,21 @@ export function DispatchTab({
   };
 
   const payloadFromForm = () => {
-    const truck = trucks.find((t: any) => t.id === f.truckId);
-    const trailer = trailers.find((t: any) => t.id === f.trailerId);
-    const broker = brokers.find((b: any) => b.id === f.brokerId);
-    const carrier = carriers.find((c: any) => c.id === f.carrierId);
-    const commodity = commodities.find((c: any) => c.id === f.commodityId);
+    const truck = trucks.find((t) => t.id === f.truckId);
+    const trailer = trailers.find((t) => t.id === f.trailerId);
+    const broker = brokers.find((b) => b.id === f.brokerId);
+    const carrier = carriers.find((c) => c.id === f.carrierId);
+    const commodity = commodities.find((c) => c.id === f.commodityId);
     const stops = f.intermediateStops
       .filter((s) => !blank(s))
-      .map((location, i) => ({ seq: i + 1, location }));
+      .map((location, i) => ({
+        seq: i + 1,
+        location,
+        stopType: 'stop' as const,
+      }));
     const selectedDriver =
-      drivers.find((d: any) => d.id === f.driverId) ||
-      users.find((u: any) => u.id === f.driverId);
+      drivers.find((d) => d.id === f.driverId) ||
+      users.find((u) => u.id === f.driverId);
     return {
       driverId: selectedDriver
         ? driverRecordIdOf(selectedDriver)
@@ -875,7 +883,7 @@ export function DispatchTab({
     };
   };
 
-  const loadMargin = (l: any) => {
+  const loadMargin = (l) => {
     const rev =
       Number(l.customerRate || 0) +
       Number(l.fuelSurcharge || 0) +
@@ -934,8 +942,8 @@ export function DispatchTab({
             lastUpdate: 'just now',
           });
           const driver =
-            drivers.find((d: any) => d.id === body.driverId) ||
-            users.find((u: any) => u.id === body.driverId);
+            drivers.find((d) => d.id === body.driverId) ||
+            users.find((u) => u.id === body.driverId);
           if (smsEnabled && driver?.phone) {
             try {
               await notificationsApi.sendSms({
@@ -951,34 +959,36 @@ export function DispatchTab({
         }
         await refreshAll?.();
       } else if (editLoad) {
-        setLoads((p: any[]) =>
-          p.map((l) => (l.id === editLoad.id ? { ...l, ...body } : l)),
+        setLoads((p) =>
+          p.map((l) =>
+            l.id === editLoad.id ? ({ ...l, ...body } as Load) : l,
+          ),
         );
       } else {
-        setLoads((p: any[]) => [
+        setLoads((p) => [
           ...p,
           {
             id: 'L' + uid().slice(0, 4).toUpperCase(),
             companyId: company.id,
             ...body,
-            status: 'assigned',
+            status: 'assigned' as const,
             lat: 51.05 + Math.random() * 5,
             lng: -114 + Math.random() * 10,
             speed: 0,
             heading: 'E',
             lastUpdate: 'just now',
-          },
+          } as Load,
         ]);
       }
       resetForm();
-    } catch (e: any) {
-      notify(e?.message || 'Failed to save load', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to save load'), 'error');
     } finally {
       setBusy(false);
     }
   };
 
-  const setStatus = async (id: string, s: string) => {
+  const setStatus = async (id: string, s: LoadStatus) => {
     setStatusUpdatingId(id);
     try {
       if (apiEnabled) {
@@ -994,22 +1004,22 @@ export function DispatchTab({
         }
         await refreshAll?.();
       } else {
-        setLoads((p: any[]) =>
+        setLoads((p) =>
           p.map((l) =>
             l.id === id
-              ? {
+              ? ({
                   ...l,
                   status: s,
                   ...(s === 'delivered'
                     ? { actualDelivery: new Date().toISOString() }
                     : {}),
-                }
+                } as Load)
               : l,
           ),
         );
       }
-    } catch (e: any) {
-      notify(e?.message || 'Status update failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Status update failed'), 'error');
     } finally {
       setStatusUpdatingId(null);
     }
@@ -1029,11 +1039,11 @@ export function DispatchTab({
         await loadsApi.remove(id);
         await refreshAll?.();
       } else {
-        setLoads((p: any[]) => p.filter((l) => l.id !== id));
+        setLoads((p) => p.filter((l) => l.id !== id));
       }
       notify('Load deleted.');
-    } catch (e: any) {
-      notify(e?.message || 'Delete failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Delete failed'), 'error');
     } finally {
       setDeletingId(null);
     }
@@ -1042,28 +1052,28 @@ export function DispatchTab({
   const stats = [
     {
       label: 'In Transit',
-      value: loads.filter((l: any) => l.status === 'in_transit').length,
+      value: loads.filter((l) => l.status === 'in_transit').length,
       color: G.warning,
       subtitle: 'Currently moving',
       icon: Icons.running({ size: 20, color: G.warning }),
     },
     {
       label: 'Assigned',
-      value: loads.filter((l: any) => l.status === 'assigned').length,
+      value: loads.filter((l) => l.status === 'assigned').length,
       color: G.info,
       subtitle: 'Ready to start',
       icon: Icons.assigned({ size: 20, color: G.info }),
     },
     {
       label: 'Delivered',
-      value: loads.filter((l: any) => l.status === 'delivered').length,
+      value: loads.filter((l) => l.status === 'delivered').length,
       color: G.success,
       subtitle: 'Completed loads',
       icon: Icons.completed({ size: 20, color: G.success }),
     },
     {
       label: 'Cancelled',
-      value: loads.filter((l: any) => l.status === 'cancelled').length,
+      value: loads.filter((l) => l.status === 'cancelled').length,
       color: G.danger,
       subtitle: 'Stopped loads',
       icon: Icons.cancelled({ size: 20, color: G.danger }),
@@ -1161,7 +1171,7 @@ export function DispatchTab({
               </div>
               <Sel
                 value={f.driverId}
-                onChange={(e: any) => upd('driverId', e.target.value)}
+                onChange={(e) => upd('driverId', e.target.value)}
                 onBlur={() => markTouched('driverId')}
                 error={showErr('driverId')}
                 style={{ marginBottom: 0 }}
@@ -1172,14 +1182,14 @@ export function DispatchTab({
                     — No available drivers (check "Show all" to view all) —
                   </option>
                 )}
-                {visibleDrivers.map((d: any) => {
+                {visibleDrivers.map((d) => {
                   const missing = checkDriverDocs(d.id);
                   const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
                   const avail = d.availabilityStatus || 'available';
                   const driverActive = lifecycleAllowsDispatch(lifecycle);
                   const availOk = availabilityAllowsDispatch(avail);
                   const onLoad = loads.find(
-                    (l: any) =>
+                    (l) =>
                       l.driverId === d.id &&
                       ['assigned', 'in_transit'].includes(l.status) &&
                       (!editLoad || l.id !== editLoad.id),
@@ -1206,7 +1216,7 @@ export function DispatchTab({
               <FieldInp
                 label="Trip No."
                 value={f.tripNo}
-                onChange={(e: any) =>
+                onChange={(e) =>
                   upd(
                     'tripNo',
                     e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
@@ -1223,7 +1233,7 @@ export function DispatchTab({
           </G2>
 
           {(() => {
-            const selectedDriver = drivers.find((d: any) => d.id === f.driverId);
+            const selectedDriver = drivers.find((d) => d.id === f.driverId);
             if (!selectedDriver) return null;
             const missing = checkDriverDocs(selectedDriver.id);
             const lifecycle = selectedDriver.lifecycleStatus || (selectedDriver.active === false ? 'suspended' : 'active');
@@ -1232,7 +1242,7 @@ export function DispatchTab({
             const availOk = availabilityAllowsDispatch(avail);
             const canDispatch = missing.length === 0 && driverActive && availOk;
             const onLoad = loads.find(
-              (l: any) =>
+              (l) =>
                 l.driverId === selectedDriver.id &&
                 ['assigned', 'in_transit'].includes(l.status) &&
                 (!editLoad || l.id !== editLoad.id),
@@ -1299,10 +1309,10 @@ export function DispatchTab({
             <Sel
               label="Broker"
               value={f.brokerId}
-              onChange={(e: any) => upd('brokerId', e.target.value)}
+              onChange={(e) => upd('brokerId', e.target.value)}
             >
               <option value="">— Optional —</option>
-              {brokers.map((b: any) => (
+              {brokers.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                   {b.mc ? ` · MC ${b.mc}` : ''}
@@ -1312,10 +1322,10 @@ export function DispatchTab({
             <Sel
               label="Subcontract carrier"
               value={f.carrierId}
-              onChange={(e: any) => upd('carrierId', e.target.value)}
+              onChange={(e) => upd('carrierId', e.target.value)}
             >
               <option value="">— Own fleet / none —</option>
-              {carriers.map((c: any) => (
+              {carriers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                   {c.mc ? ` · MC ${c.mc}` : ''}
@@ -1330,10 +1340,10 @@ export function DispatchTab({
           <Sel
             label="Commodity"
             value={f.commodityId}
-            onChange={(e: any) => upd('commodityId', e.target.value)}
+            onChange={(e) => upd('commodityId', e.target.value)}
           >
             <option value="">— Optional —</option>
-            {commodities.map((c: any) => (
+            {commodities.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
                 {c.hazmat ? ' · HAZMAT' : ''}
@@ -1344,7 +1354,7 @@ export function DispatchTab({
             <Sel
               label="Cross-border"
               value={f.crossBorder ? 'yes' : 'no'}
-              onChange={(e: any) => {
+              onChange={(e) => {
                 const on = e.target.value === 'yes';
                 setF((x) => {
                   const next = {
@@ -1391,12 +1401,12 @@ export function DispatchTab({
                 <Sel
                   label="Port of entry *"
                   value={f.portOfEntryId}
-                  onChange={(e: any) => void applyPort(e.target.value)}
+                  onChange={(e) => void applyPort(e.target.value)}
                   onBlur={() => markTouched('portOfEntryId')}
                   error={showErr('portOfEntryId')}
                 >
                   <option value="">— Select POE —</option>
-                  {availablePorts.map((p: any) => (
+                  {availablePorts.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.code} · {p.name} ({p.country})
                     </option>
@@ -1448,7 +1458,7 @@ export function DispatchTab({
                 <Sel
                   label="Customs program *"
                   value={f.customsProgram}
-                  onChange={(e: any) => upd('customsProgram', e.target.value)}
+                  onChange={(e) => upd('customsProgram', e.target.value)}
                   onBlur={() => markTouched('customsProgram')}
                   error={showErr('customsProgram')}
                 >
@@ -1463,9 +1473,9 @@ export function DispatchTab({
             <Sel
               label="Origin from master"
               value={f.originLocationId}
-              onChange={(e: any) => {
+              onChange={(e) => {
                 const id = e.target.value;
-                const loc = mdmLocations.find((x: any) => x.id === id);
+                const loc = mdmLocations.find((x) => x.id === id);
                 const originCountry = loc
                   ? normalizeTripCountry(loc.country) || 'CA'
                   : ('' as TripCountry | '');
@@ -1500,7 +1510,7 @@ export function DispatchTab({
               }}
             >
               <option value="">— Or type below —</option>
-              {masterLocationsFor(originAllowed).map((loc: any) => (
+              {masterLocationsFor(originAllowed).map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {formatMasterOption(loc)}
                 </option>
@@ -1509,9 +1519,9 @@ export function DispatchTab({
             <Sel
               label="Destination from master"
               value={f.destinationLocationId}
-              onChange={(e: any) => {
+              onChange={(e) => {
                 const id = e.target.value;
-                const loc = mdmLocations.find((x: any) => x.id === id);
+                const loc = mdmLocations.find((x) => x.id === id);
                 const destinationCountry = loc
                   ? normalizeTripCountry(loc.country) || 'CA'
                   : ('' as TripCountry | '');
@@ -1546,7 +1556,7 @@ export function DispatchTab({
               }}
             >
               <option value="">— Or type below —</option>
-              {masterLocationsFor(destinationAllowed).map((loc: any) => (
+              {masterLocationsFor(destinationAllowed).map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {formatMasterOption(loc)}
                 </option>
@@ -1570,14 +1580,14 @@ export function DispatchTab({
               <Sel
                 label="Truck *"
                 value={f.truckId}
-                onChange={(e: any) => upd('truckId', e.target.value)}
+                onChange={(e) => upd('truckId', e.target.value)}
                 onBlur={() => markTouched('truckId')}
                 error={showErr('truckId')}
               >
                 <option value="">— Select truck —</option>
                 {trucks
-                  .filter((t: any) => canAssignAsset(t.status))
-                  .map((t: any) => (
+                  .filter((t) => canAssignAsset(t.status))
+                  .map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.unitNo ? `#${t.unitNo}` : 'Unnumbered truck'} · {t.year} {t.make} {t.model}
                     </option>
@@ -1587,12 +1597,12 @@ export function DispatchTab({
             <Sel
               label="Trailer"
               value={f.trailerId}
-              onChange={(e: any) => upd('trailerId', e.target.value)}
+              onChange={(e) => upd('trailerId', e.target.value)}
             >
               <option value="">— Select trailer —</option>
               {trailers
-                .filter((t: any) => canAssignAsset(t.status))
-                .map((t: any) => (
+                .filter((t) => canAssignAsset(t.status))
+                .map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.unitNo ? `#${t.unitNo}` : 'Unnumbered trailer'} · {t.make} {t.model}
                   </option>
@@ -1713,7 +1723,7 @@ export function DispatchTab({
               type="datetime-local"
               value={f.pickupTime}
               min={minPickupTime}
-              onChange={(e: any) => upd('pickupTime', e.target.value)}
+              onChange={(e) => upd('pickupTime', e.target.value)}
               onBlur={() => markTouched('pickupTime')}
               error={showErr('pickupTime')}
             />
@@ -1722,7 +1732,7 @@ export function DispatchTab({
               type="datetime-local"
               value={f.eta}
               min={minEta}
-              onChange={(e: any) => upd('eta', e.target.value)}
+              onChange={(e) => upd('eta', e.target.value)}
               onBlur={() => markTouched('eta')}
               error={showErr('eta')}
               hint="Must be on or after pickup"
@@ -1734,7 +1744,7 @@ export function DispatchTab({
               label="Customer rate ($)"
               inputMode="decimal"
               value={f.customerRate}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('customerRate', sanitizeDecimal(e.target.value, 2))
               }
               onBlur={() => markTouched('customerRate')}
@@ -1745,7 +1755,7 @@ export function DispatchTab({
               label="Carrier cost ($)"
               inputMode="decimal"
               value={f.carrierCost}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('carrierCost', sanitizeDecimal(e.target.value, 2))
               }
               onBlur={() => markTouched('carrierCost')}
@@ -1758,7 +1768,7 @@ export function DispatchTab({
               label="Fuel surcharge ($)"
               inputMode="decimal"
               value={f.fuelSurcharge}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('fuelSurcharge', sanitizeDecimal(e.target.value, 2))
               }
               onBlur={() => markTouched('fuelSurcharge')}
@@ -1769,7 +1779,7 @@ export function DispatchTab({
               label="Accessorials ($)"
               inputMode="decimal"
               value={f.accessorials}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('accessorials', sanitizeDecimal(e.target.value, 2))
               }
               onBlur={() => markTouched('accessorials')}
@@ -1782,7 +1792,7 @@ export function DispatchTab({
               label="Detention hours"
               inputMode="decimal"
               value={f.detentionHours}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('detentionHours', sanitizeDecimal(e.target.value, 1))
               }
               onBlur={() => markTouched('detentionHours')}
@@ -1793,7 +1803,7 @@ export function DispatchTab({
               label="Detention rate ($/hr)"
               inputMode="decimal"
               value={f.detentionRate}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 upd('detentionRate', sanitizeDecimal(e.target.value, 2))
               }
               onBlur={() => markTouched('detentionRate')}
@@ -1805,7 +1815,7 @@ export function DispatchTab({
             label="Miles"
             inputMode="numeric"
             value={f.miles}
-            onChange={(e: any) =>
+            onChange={(e) =>
               upd('miles', sanitizeInteger(e.target.value).slice(0, 6))
             }
             onBlur={() => markTouched('miles')}
@@ -1904,7 +1914,7 @@ export function DispatchTab({
           <FieldInp
             label="Notes"
             value={f.notes}
-            onChange={(e: any) => upd('notes', e.target.value.slice(0, 500))}
+            onChange={(e) => upd('notes', e.target.value.slice(0, 500))}
             onBlur={() => markTouched('notes')}
             placeholder="Any special instructions…"
             maxLength={500}
@@ -1923,7 +1933,7 @@ export function DispatchTab({
                   !(
                     initialF &&
                     Object.keys(initialF).some(
-                      (k) => (f as any)[k] !== (initialF as any)[k],
+                      (k) => (f)[k] !== (initialF)[k],
                     )
                   ))
               }
@@ -1949,8 +1959,8 @@ export function DispatchTab({
           </div>
         </Card>
       ) : (
-        loads.map((l: any) => {
-          const driver = users.find((u: any) => u.id === l.driverId);
+        loads.map((l) => {
+          const driver = users.find((u) => u.id === l.driverId);
           const sc = statusColor[l.status] || G.muted;
           const { rev, cost, margin } = loadMargin(l);
           const stops = Array.isArray(l.stops) ? l.stops : [];
@@ -2056,7 +2066,7 @@ export function DispatchTab({
                   <Btn
                     variant="outline"
                     size="sm"
-                    onClick={onTrack}
+                    onClick={() => onTrack()}
                     style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
                   >
                     {Icons.track({ size: 16, color: G.muted })}
@@ -2253,7 +2263,7 @@ export function DispatchTab({
                     lineHeight: 1.4,
                   }}
                 >
-                  Stops: {stops.map((s: any) => s.location || s).join(' → ')}
+                  Stops: {stops.map((s) => s.location || s).join(' → ')}
                 </div>
               )}
             </Card>

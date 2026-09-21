@@ -5,6 +5,7 @@ import {
   useState,
   type ChangeEvent,
   type CSSProperties,
+  type FocusEventHandler,
 } from 'react';
 import { DayPicker } from 'react-day-picker';
 import { startOfDay } from 'date-fns';
@@ -30,7 +31,7 @@ export interface DatePickerInputProps {
   mode: DatePickerMode;
   value?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
-  onBlur?: (e?: any) => void;
+  onBlur?: FocusEventHandler<HTMLInputElement>;
   placeholder?: string;
   disabled?: boolean;
   min?: string;
@@ -147,7 +148,6 @@ export function DatePickerInput({
 
   const closePopover = () => {
     setOpen(false);
-    onBlur?.();
   };
 
   const handleDaySelect = (day: Date | undefined) => {
@@ -195,7 +195,7 @@ export function DatePickerInput({
     };
   }, [open]);
 
-  const disabledMatchers: any[] = [];
+  const disabledMatchers: import("react-day-picker").Matcher[] = [];
   if (minDate && mode !== 'time') {
     disabledMatchers.push({ before: startOfDay(minDate) });
   }

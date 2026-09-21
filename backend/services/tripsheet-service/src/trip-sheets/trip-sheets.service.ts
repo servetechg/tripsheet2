@@ -79,7 +79,7 @@ export class TripSheetsService {
       if (!header || typeof header !== 'object') {
         throw new BadRequestException('Trip sheet header must be an object');
       }
-      const h = header as Record<string, any>;
+      const h = header as Record<string, unknown>;
       if (!h.truckNo || !String(h.truckNo).trim()) {
         throw new BadRequestException('Truck Unit No. is required');
       }
@@ -99,7 +99,7 @@ export class TripSheetsService {
         throw new BadRequestException('At least one trip leg is required');
       }
       for (let i = 0; i < trips.length; i++) {
-        const leg = trips[i] as Record<string, any>;
+        const leg = trips[i] as Record<string, unknown>;
         if (!leg || typeof leg !== 'object') {
           throw new BadRequestException(`Trip leg #${i + 1} is invalid`);
         }
@@ -141,7 +141,7 @@ export class TripSheetsService {
         throw new BadRequestException('Expenses must be an array');
       }
       for (let i = 0; i < expenses.length; i++) {
-        const exp = expenses[i] as Record<string, any>;
+        const exp = expenses[i] as Record<string, unknown>;
         if (!exp || typeof exp !== 'object') {
           throw new BadRequestException(`Expense #${i + 1} is invalid`);
         }

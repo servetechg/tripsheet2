@@ -1,7 +1,8 @@
 import { G, RADIUS, FONT_UI } from '@/lib/theme';
 import { Icons } from '@/components/ui/Icons';
+import type { ThemeToggleProps } from '@/types/workspace';
 
-export function ThemeToggle({ mode, onToggle }: any) {
+export function ThemeToggle({ mode, onToggle }: ThemeToggleProps) {
   const isLight = mode === 'light';
   return (
     <button

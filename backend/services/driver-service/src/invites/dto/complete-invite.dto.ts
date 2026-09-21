@@ -188,6 +188,18 @@ class InviteProfileDto {
   @IsOptional()
   @IsString()
   sin?: string;
+
+  @IsOptional()
+  @IsString()
+  driverType?: string;
+
+  @IsOptional()
+  @IsString()
+  employeeNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  hireDate?: string;
 }
 
 export class CompleteInviteDto {

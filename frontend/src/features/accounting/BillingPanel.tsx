@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, Skeleton } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
-import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 import {
   invoicesApi,
   billsApi,
@@ -35,17 +36,27 @@ export function BillingPanel({
   loads = [],
   adminUser,
   apiEnabled,
-}: any) {
+}: import('@/types/tabs').BillingPanelProps) {
   const [section, setSection] = useState<'invoices' | 'bills' | 'payments' | 'coa'>(
     'invoices',
   );
   const [loading, setLoading] = useState(Boolean(apiEnabled));
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [bills, setBills] = useState<any[]>([]);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [brokers, setBrokers] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<
+    import('@/types/dtos').InvoiceDto[]
+  >([]);
+  const [bills, setBills] = useState<import('@/types/dtos').BillDto[]>([]);
+  const [payments, setPayments] = useState<
+    import('@/types/dtos').PaymentDto[]
+  >([]);
+  const [accounts, setAccounts] = useState<
+    import('@/types/dtos').AccountDto[]
+  >([]);
+  const [customers, setCustomers] = useState<
+    import('@/types/dtos').MdmRecord[]
+  >([]);
+  const [brokers, setBrokers] = useState<import('@/types/dtos').MdmRecord[]>(
+    [],
+  );
   const [inv, setInv] = useState({
     customerName: '',
     customerId: '',
@@ -94,8 +105,8 @@ export function BillingPanel({
       setAccounts(a);
       setCustomers(Array.isArray(c) ? c : []);
       setBrokers(Array.isArray(br) ? br : []);
-    } catch (e: any) {
-      notify(e?.message || 'Billing load failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Billing load failed'), 'error');
     } finally {
       setLoading(false);
     }
@@ -116,7 +127,7 @@ export function BillingPanel({
       notify('Customer, dates, and amount required', 'error');
       return;
     }
-    const load = loads.find((l: any) => l.id === inv.loadId);
+    const load = loads.find((l) => l.id === inv.loadId);
     try {
       await invoicesApi.create({
         companyId: company.id,
@@ -142,8 +153,8 @@ export function BillingPanel({
       });
       notify('Invoice created');
       await loadAll();
-    } catch (e: any) {
-      notify(e?.message || 'Invoice failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Invoice failed'), 'error');
     }
   };
 
@@ -168,8 +179,8 @@ export function BillingPanel({
       });
       notify('Bill created');
       await loadAll();
-    } catch (e: any) {
-      notify(e?.message || 'Bill failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Bill failed'), 'error');
     }
   };
 
@@ -191,8 +202,8 @@ export function BillingPanel({
       });
       notify('Payment recorded');
       await loadAll();
-    } catch (e: any) {
-      notify(e?.message || 'Payment failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Payment failed'), 'error');
     }
   };
 
@@ -217,9 +228,9 @@ export function BillingPanel({
           <Sel
             label="Customer (master)"
             value={inv.customerId}
-            onChange={(e: any) => {
+            onChange={(e) => {
               const id = e.target.value;
-              const c = customers.find((x: any) => x.id === id);
+              const c = customers.find((x) => x.id === id);
               setInv({
                 ...inv,
                 customerId: id,
@@ -228,7 +239,7 @@ export function BillingPanel({
             }}
           >
             <option value="">— Or type name below —</option>
-            {customers.map((c: any) => (
+            {customers.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -237,9 +248,9 @@ export function BillingPanel({
           <Sel
             label="Broker (master)"
             value={inv.brokerId}
-            onChange={(e: any) => {
+            onChange={(e) => {
               const id = e.target.value;
-              const b = brokers.find((x: any) => x.id === id);
+              const b = brokers.find((x) => x.id === id);
               setInv({
                 ...inv,
                 brokerId: id,
@@ -248,7 +259,7 @@ export function BillingPanel({
             }}
           >
             <option value="">— Optional —</option>
-            {brokers.map((b: any) => (
+            {brokers.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
@@ -257,15 +268,15 @@ export function BillingPanel({
           <Inp
             label="Customer name"
             value={inv.customerName}
-            onChange={(e: any) => setInv({ ...inv, customerName: e.target.value })}
+            onChange={(e) => setInv({ ...inv, customerName: e.target.value })}
           />
           <Sel
             label="Load (optional)"
             value={inv.loadId}
-            onChange={(e: any) => setInv({ ...inv, loadId: e.target.value })}
+            onChange={(e) => setInv({ ...inv, loadId: e.target.value })}
           >
             <option value="">—</option>
-            {loads.map((l: any) => (
+            {loads.map((l) => (
               <option key={l.id} value={l.id}>
                 {formatLoadLabel(l)}
               </option>
@@ -274,19 +285,19 @@ export function BillingPanel({
           <Inp
             label="Issue date"
             value={inv.issueDate}
-            onChange={(e: any) => setInv({ ...inv, issueDate: e.target.value })}
+            onChange={(e) => setInv({ ...inv, issueDate: e.target.value })}
             placeholder="YYYY-MM-DD"
           />
           <Inp
             label="Due date"
             value={inv.dueDate}
-            onChange={(e: any) => setInv({ ...inv, dueDate: e.target.value })}
+            onChange={(e) => setInv({ ...inv, dueDate: e.target.value })}
             placeholder="YYYY-MM-DD"
           />
           <Inp
             label="Amount"
             value={inv.amount}
-            onChange={(e: any) => setInv({ ...inv, amount: e.target.value })}
+            onChange={(e) => setInv({ ...inv, amount: e.target.value })}
           />
           <Btn onClick={() => void createInvoice()}>Create invoice</Btn>
           {loading ? (
@@ -303,8 +314,8 @@ export function BillingPanel({
           ) : null}
           {!loading && invoices.map((i) => (
             <div key={i.id} style={{ padding: '8px 0', fontSize: 13, borderTop: `1px solid ${G.border}` }}>
-              {i.customerName} · ${i.total.toFixed(2)} · <Pill>{humanizeEnum(i.status)}</Pill> ·
-              paid ${i.amountPaid.toFixed(2)} · due {i.dueDate}
+              {i.customerName} · ${Number(i.total ?? 0).toFixed(2)} · <Pill>{humanizeEnum(i.status)}</Pill> ·
+              paid ${Number(i.amountPaid ?? 0).toFixed(2)} · due {i.dueDate}
             </div>
           ))}
         </Card>
@@ -315,22 +326,22 @@ export function BillingPanel({
           <Inp
             label="Vendor"
             value={bill.vendorName}
-            onChange={(e: any) => setBill({ ...bill, vendorName: e.target.value })}
+            onChange={(e) => setBill({ ...bill, vendorName: e.target.value })}
           />
           <Inp
             label="Issue"
             value={bill.issueDate}
-            onChange={(e: any) => setBill({ ...bill, issueDate: e.target.value })}
+            onChange={(e) => setBill({ ...bill, issueDate: e.target.value })}
           />
           <Inp
             label="Due"
             value={bill.dueDate}
-            onChange={(e: any) => setBill({ ...bill, dueDate: e.target.value })}
+            onChange={(e) => setBill({ ...bill, dueDate: e.target.value })}
           />
           <Inp
             label="Amount"
             value={bill.amount}
-            onChange={(e: any) => setBill({ ...bill, amount: e.target.value })}
+            onChange={(e) => setBill({ ...bill, amount: e.target.value })}
           />
           <Btn onClick={() => void createBill()}>Create bill</Btn>
           {loading ? (
@@ -347,7 +358,7 @@ export function BillingPanel({
           ) : null}
           {!loading && bills.map((b) => (
             <div key={b.id} style={{ padding: '8px 0', fontSize: 13 }}>
-              {b.vendorName} · ${b.total.toFixed(2)} · {humanizeEnum(b.status)}
+              {b.vendorName} · ${Number(b.total ?? 0).toFixed(2)} · {humanizeEnum(b.status)}
             </div>
           ))}
         </Card>
@@ -358,7 +369,7 @@ export function BillingPanel({
           <Sel
             label="Direction"
             value={pay.direction}
-            onChange={(e: any) => setPay({ ...pay, direction: e.target.value })}
+            onChange={(e) => setPay({ ...pay, direction: e.target.value })}
           >
             <option value="customer">Customer payment</option>
             <option value="vendor">Vendor payment</option>
@@ -366,13 +377,13 @@ export function BillingPanel({
           <Inp
             label="Party"
             value={pay.partyName}
-            onChange={(e: any) => setPay({ ...pay, partyName: e.target.value })}
+            onChange={(e) => setPay({ ...pay, partyName: e.target.value })}
           />
           {pay.direction === 'customer' && (
             <Sel
               label="Invoice"
               value={pay.invoiceId}
-              onChange={(e: any) => setPay({ ...pay, invoiceId: e.target.value })}
+              onChange={(e) => setPay({ ...pay, invoiceId: e.target.value })}
             >
               <option value="">—</option>
               {invoices.map((i) => (
@@ -386,7 +397,7 @@ export function BillingPanel({
             <Sel
               label="Bill"
               value={pay.billId}
-              onChange={(e: any) => setPay({ ...pay, billId: e.target.value })}
+              onChange={(e) => setPay({ ...pay, billId: e.target.value })}
             >
               <option value="">—</option>
               {bills.map((b) => (
@@ -399,12 +410,12 @@ export function BillingPanel({
           <Inp
             label="Amount"
             value={pay.amount}
-            onChange={(e: any) => setPay({ ...pay, amount: e.target.value })}
+            onChange={(e) => setPay({ ...pay, amount: e.target.value })}
           />
           <Inp
             label="Paid at"
             value={pay.paidAt}
-            onChange={(e: any) => setPay({ ...pay, paidAt: e.target.value })}
+            onChange={(e) => setPay({ ...pay, paidAt: e.target.value })}
             placeholder="YYYY-MM-DD"
           />
           <Btn onClick={() => void createPayment()}>Record payment</Btn>
@@ -483,8 +494,8 @@ export function BillingPanel({
                   await accountsApi.seedDefaults(company.id);
                   notify('Default chart of accounts seeded');
                   await loadAll();
-                } catch (e: any) {
-                  notify(e?.message || 'Seed failed', 'error');
+                } catch (e: unknown) {
+                  notify(getApiErrorMessage(e, 'Seed failed'), 'error');
                 }
               }}
             >

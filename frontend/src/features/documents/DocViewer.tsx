@@ -6,7 +6,15 @@ function docSrc(doc: { fileUrl?: string; fileData?: string }) {
   return doc.fileUrl || doc.fileData || '';
 }
 
-export function DocViewer({ doc, onClose }: any) {
+import type { DriverDocument } from '@tripsheet/shared';
+
+export function DocViewer({
+  doc,
+  onClose,
+}: {
+  doc: DriverDocument & { fileUrl?: string; fileData?: string };
+  onClose: () => void;
+}) {
   const src = docSrc(doc);
   const isImage = doc.fileType?.startsWith('image/');
   const isPDF = doc.fileType === 'application/pdf';

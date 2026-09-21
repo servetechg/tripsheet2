@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   Navigate,
@@ -157,7 +158,7 @@ function StaffOnboarding({
                 email: email.trim(),
                 password,
               }).catch((e: { message?: string }) => {
-                setErr(e?.message || 'Could not complete invite');
+                setErr(getApiErrorMessage(e, 'Could not complete invite'));
                 setBusy(false);
               });
             }}
@@ -304,8 +305,8 @@ function InviteRoute() {
   const inviteToken = search.get('invite');
   const [inviteState, setInviteState] = useState<{
     loading: boolean;
-    invite: any | null;
-    company: any | null;
+    invite: import("@/types/dtos").InviteDetailDto | null;
+    company: import("@/types/dtos").PlatformCompany | { id: string; name: string } | null;
     error: boolean;
   }>({ loading: true, invite: null, company: null, error: false });
 
@@ -428,7 +429,7 @@ function InviteRoute() {
       <DriverOnboarding
         invite={invite}
         company={company}
-        onComplete={async (profile: any, docs: any, contract: any) => {
+        onComplete={async (profile, docs, contract) => {
           // Auth user is created inside driver-service via internal auth API
           // (invite flow has no JWT — do not call authApi.createUser here).
           await invitesApi.complete(inviteToken, {
@@ -446,7 +447,7 @@ function InviteRoute() {
               fastCard: profile.fastCard,
               notes: profile.notes,
             },
-            docs: (docs || []).map((d: any) => ({
+            docs: (docs || []).map((d) => ({
               type: d.type,
               fileName: d.fileName,
               fileSize:
@@ -634,6 +635,7 @@ function CompanyWorkspace() {
         users={data.users}
         setUsers={data.setUsers}
         sheets={data.sheets}
+        setSheets={data.setSheets}
         loads={data.loads}
         setLoads={data.setLoads}
         assets={data.assets}
@@ -771,6 +773,7 @@ function DriverWorkspace() {
       sheets={data.sheets}
       setSheets={data.setSheets}
       loads={data.loads}
+      setLoads={data.setLoads}
       driverDocs={data.driverDocs}
       setDriverDocs={data.setDriverDocs}
       onLogout={() => {

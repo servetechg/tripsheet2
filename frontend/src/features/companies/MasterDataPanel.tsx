@@ -4,7 +4,8 @@ import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons, AddressAut
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 
 type Kind =
   | 'import'
@@ -72,7 +73,18 @@ const EMPTY_FORM: Record<string, string> = {
   notes: '',
 };
 
-function rowTitle(kind: Kind, r: any): string {
+type MdmRow = import('@/types/dtos').MdmRecord & Record<string, unknown>;
+
+function asMdmRow(value: unknown): MdmRow | undefined {
+  if (!value || typeof value !== 'object' || !('id' in value)) return undefined;
+  return value as MdmRow;
+}
+
+function mdmStr(value: unknown): string {
+  return value == null ? '' : String(value);
+}
+
+function rowTitle(kind: Kind, r: MdmRow): string {
   if (kind === 'ports') return r.name || '(unnamed port)';
   if (kind === 'locations') {
     const parts = [r.name, r.city, r.region].filter(Boolean);
@@ -81,7 +93,7 @@ function rowTitle(kind: Kind, r: any): string {
   return r.name || r.code || '(unnamed)';
 }
 
-function rowMeta(kind: Kind, r: any): string {
+function rowMeta(kind: Kind, r: MdmRow): string {
   const bits: string[] = [];
   if (kind === 'brokers' || kind === 'carriers') {
     if (r.mc) bits.push(`MC ${r.mc}`);
@@ -91,15 +103,16 @@ function rowMeta(kind: Kind, r: any): string {
     if (r.nmfc) bits.push(`NMFC ${r.nmfc}`);
     if (r.hazmat) bits.push('HAZMAT');
   }
-  if (kind === 'warehouses' && r.hours) bits.push(r.hours);
-  if (kind === 'fuel' && r.brand) bits.push(r.brand);
+  if (kind === 'warehouses' && r.hours) bits.push(mdmStr(r.hours));
+  if (kind === 'fuel' && r.brand) bits.push(mdmStr(r.brand));
   if (kind === 'costcenters' || kind === 'payroll' || kind === 'refs') {
     if (r.code) bits.push(r.code);
   }
   if (kind === 'refs' && r.kind) bits.push(humanizeEnum(r.kind));
   if (r.phone) bits.push(r.phone);
   if (r.email) bits.push(r.email);
-  if (kind === 'ports' && r.borderCrossingName) bits.push(r.borderCrossingName);
+  if (kind === 'ports' && r.borderCrossingName)
+    bits.push(mdmStr(r.borderCrossingName));
   if (kind === 'ports' && r.country) bits.push(r.country);
   if (kind === 'ports' && r.code) bits.push(`Port code ${r.code}`);
   return bits.join(' · ');
@@ -125,8 +138,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const confirm = useConfirm();
   const loadSeq = useRef(0);
   const [kind, setKind] = useState<Kind>('brokers');
-  const [rows, setRows] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
+  const [rows, setRows] = useState<MdmRow[]>([]);
+  const [locations, setLocations] = useState<MdmRow[]>([]);
   const [fetching, setFetching] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dupHint, setDupHint] = useState('');
@@ -137,7 +150,14 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
   const [csvText, setCsvText] = useState('');
   const [csvFileName, setCsvFileName] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [ioReport, setIoReport] = useState<any>(null);
+  const [ioReport, setIoReport] = useState<{
+    dryRun?: boolean;
+    wouldCreate?: number;
+    created?: number;
+    skipped?: number;
+    errorCount?: number;
+    errors?: Array<{ row?: number; message: string; field?: string }>;
+  } | null>(null);
   const [form, setForm] = useState<Record<string, string>>({ ...EMPTY_FORM });
   const [recordFilter, setRecordFilter] = useState<
     'all' | 'active' | 'inactive' | 'blocked'
@@ -153,7 +173,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
     setInitialForm(null);
   };
 
-  const startEdit = (r: any) => {
+  const startEdit = (r: MdmRow) => {
     setEditingId(r.id);
     setDupHint('');
     setDups([]);
@@ -165,22 +185,22 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       phone: r.phone || '',
       email: r.email || '',
       city: r.city || '',
-      line1: r.line1 || '',
+      line1: mdmStr(r.line1),
       region: r.region || '',
-      postal: r.postal || '',
+      postal: mdmStr(r.postal),
       country: r.country || 'CA',
       status: r.status || 'active',
       insuranceExpiry: r.insuranceExpiry
         ? String(r.insuranceExpiry).slice(0, 10)
         : '',
-      safetyRating: r.safetyRating || '',
-      nmfc: r.nmfc || '',
+      safetyRating: mdmStr(r.safetyRating),
+      nmfc: mdmStr(r.nmfc),
       hazmat: r.hazmat ? 'true' : 'false',
       locationId: r.locationId || '',
-      hours: r.hours || '',
+      hours: mdmStr(r.hours),
       docks: r.docks != null ? String(r.docks) : '',
       code: r.code || '',
-      brand: r.brand || '',
+      brand: mdmStr(r.brand),
       kind: r.kind || 'expense_category',
       notes: r.notes || '',
     };
@@ -197,7 +217,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
     }
     try {
       setFetching(true);
-      let list: any[] = [];
+      let list: MdmRow[] = [];
       if (kind === 'locations') list = await companiesApi.locations(companyId);
       else if (kind === 'brokers') list = await companiesApi.brokers(companyId);
       else if (kind === 'customers')
@@ -230,9 +250,9 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
         if (seq !== loadSeq.current) return;
         setLocations(Array.isArray(locs) ? locs : []);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (seq !== loadSeq.current) return;
-      notify(e?.message || 'Failed to load master data', 'error');
+      notify(getApiErrorMessage(e, 'Failed to load master data'), 'error');
       setRows([]);
     } finally {
       if (seq === loadSeq.current) setFetching(false);
@@ -257,8 +277,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       const res = await companiesApi.exportMdm(companyId, entity);
       downloadCsv(res.filename || `mdm-${entity}.csv`, res.csv || '');
       notify(`Exported ${entity}`, 'success');
-    } catch (e: any) {
-      notify(e?.message || 'Export failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Export failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -288,8 +308,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
           res.errorCount ? 'error' : 'success',
         );
       }
-    } catch (e: any) {
-      notify(e?.message || 'Import failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Import failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -404,8 +424,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       notify('Updated');
       resetForm();
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Update failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Update failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -453,9 +473,9 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       setBusy(true);
       setDupHint('');
       setDups([]);
-      let res: any;
+      let res: MdmRow | undefined;
       if (kind === 'locations') {
-        res = await companiesApi.createLocation(companyId, {
+        res = asMdmRow(await companiesApi.createLocation(companyId, {
           name: form.name || form.city || 'Location',
           line1: form.line1,
           city: form.city,
@@ -463,31 +483,31 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
           postal: form.postal,
           country: form.country || 'CA',
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'brokers') {
-        res = await companiesApi.createBroker(companyId, {
+        res = asMdmRow(await companiesApi.createBroker(companyId, {
           name: form.name,
           mc: form.mc,
           phone: form.phone,
           email: form.email,
           status: form.status,
-        });
+        }));
       } else if (kind === 'customers') {
-        res = await companiesApi.createCustomer(companyId, {
+        res = asMdmRow(await companiesApi.createCustomer(companyId, {
           name: form.name,
           phone: form.phone,
           email: form.email,
           status: form.status,
-        });
+        }));
       } else if (kind === 'consignees') {
-        res = await companiesApi.createConsignee(companyId, {
+        res = asMdmRow(await companiesApi.createConsignee(companyId, {
           name: form.name,
           phone: form.phone,
           email: form.email,
           status: form.status,
-        });
+        }));
       } else if (kind === 'carriers') {
-        res = await companiesApi.createCarrier(companyId, {
+        res = asMdmRow(await companiesApi.createCarrier(companyId, {
           name: form.name,
           mc: form.mc,
           phone: form.phone,
@@ -495,62 +515,62 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
           insuranceExpiry: form.insuranceExpiry,
           safetyRating: form.safetyRating,
           status: form.status,
-        });
+        }));
       } else if (kind === 'commodities') {
-        res = await companiesApi.createCommodity(companyId, {
+        res = asMdmRow(await companiesApi.createCommodity(companyId, {
           name: form.name,
           nmfc: form.nmfc,
           hazmat: form.hazmat === 'true',
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'vendors') {
-        res = await companiesApi.createMaintenanceVendor(companyId, {
+        res = asMdmRow(await companiesApi.createMaintenanceVendor(companyId, {
           name: form.name,
           phone: form.phone,
           email: form.email,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'fuel') {
-        res = await companiesApi.createFuelStation(companyId, {
+        res = asMdmRow(await companiesApi.createFuelStation(companyId, {
           name: form.name,
           brand: form.brand,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'insurance') {
-        res = await companiesApi.createInsuranceProvider(companyId, {
+        res = asMdmRow(await companiesApi.createInsuranceProvider(companyId, {
           name: form.name,
           phone: form.phone,
           email: form.email,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'costcenters') {
-        res = await companiesApi.createCostCenter(companyId, {
+        res = asMdmRow(await companiesApi.createCostCenter(companyId, {
           name: form.name,
           code: form.code,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'payroll') {
-        res = await companiesApi.createPayrollCategory(companyId, {
+        res = asMdmRow(await companiesApi.createPayrollCategory(companyId, {
           name: form.name,
           code: form.code,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else if (kind === 'refs') {
-        res = await companiesApi.createReferenceData(companyId, {
+        res = asMdmRow(await companiesApi.createReferenceData(companyId, {
           name: form.name,
           code: form.code,
           kind: form.kind || 'expense_category',
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       } else {
-        res = await companiesApi.createWarehouse(companyId, {
+        res = asMdmRow(await companiesApi.createWarehouse(companyId, {
           name: form.name,
           locationId: form.locationId || null,
           hours: form.hours,
           docks: form.docks,
           phone: form.phone,
           status: form.status === 'inactive' ? 'inactive' : 'active',
-        });
+        }));
       }
       const suggestions = (res?.duplicateSuggestions || []) as DupSuggestion[];
       setLastCreatedId(res?.id || '');
@@ -583,8 +603,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       notify('Saved');
       resetForm();
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Save failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Save failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -622,8 +642,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
         await companiesApi.patchPortOfEntry(companyId, id, { status });
       }
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Update failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Update failed'), 'error');
     }
   };
 
@@ -650,8 +670,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
       setDupHint('');
       setLastCreatedId('');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Merge failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Merge failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -736,8 +756,8 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             <Sel
               label="Entity"
               value={ioEntity}
-              onChange={(e: any) => {
-                setIoEntity(e.target.value);
+              onChange={(e) => {
+                setIoEntity(e.target.value as IoKind);
                 setIoReport(null);
               }}
             >
@@ -902,7 +922,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               {ioReport.errorCount} errors.
               {Array.isArray(ioReport.errors) && ioReport.errors.length > 0 && (
                 <ul style={{ marginTop: 8 }}>
-                  {ioReport.errors.slice(0, 25).map((err: any, i: number) => (
+                  {ioReport.errors.slice(0, 25).map((err, i: number) => (
                     <li key={i}>
                       Row {err.row} · {err.field}: {err.message}
                     </li>
@@ -978,7 +998,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                 <Sel
                   label="Hazmat"
                   value={form.hazmat}
-                  onChange={(e: any) =>
+                  onChange={(e) =>
                     setForm({ ...form, hazmat: e.target.value })
                   }
                 >
@@ -992,12 +1012,12 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                 <Sel
                   label="Location"
                   value={form.locationId}
-                  onChange={(e: any) =>
+                  onChange={(e) =>
                     setForm({ ...form, locationId: e.target.value })
                   }
                 >
                   <option value="">— Optional —</option>
-                  {locations.map((loc: any) => (
+                  {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.name || loc.city}
                     </option>
@@ -1060,7 +1080,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                 <Sel
                   label="Country"
                   value={form.country || 'CA'}
-                  onChange={(e: any) => setForm({ ...form, country: e.target.value })}
+                  onChange={(e) => setForm({ ...form, country: e.target.value })}
                 >
                   <option value="CA">Canada</option>
                   <option value="US">United States</option>
@@ -1124,7 +1144,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             <Sel
               label="Status"
               value={form.status}
-              onChange={(e: any) => setForm({ ...form, status: e.target.value })}
+              onChange={(e) => setForm({ ...form, status: e.target.value })}
             >
               {statusOpts.map((s) => (
                 <option key={s} value={s}>
@@ -1214,7 +1234,11 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
             <Sel
               label="Show"
               value={recordFilter}
-              onChange={(e: any) => setRecordFilter(e.target.value)}
+              onChange={(e) =>
+                setRecordFilter(
+                  e.target.value as 'all' | 'active' | 'inactive' | 'blocked',
+                )
+              }
               style={{ marginBottom: 0, minWidth: 160 }}
             >
               <option value="all">All records</option>
@@ -1271,11 +1295,11 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                   ) : null}
                   {kind === 'ports' && (
                     <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                      {r.ace && <Pill>ACE</Pill>}
-                      {r.aci && <Pill>ACI</Pill>}
-                      {r.paps && <Pill>PAPS</Pill>}
-                      {r.pars && <Pill>PARS</Pill>}
-                      {r.fastLane && <Pill>FAST</Pill>}
+                      {Boolean(r.ace) && <Pill>ACE</Pill>}
+                      {Boolean(r.aci) && <Pill>ACI</Pill>}
+                      {Boolean(r.paps) && <Pill>PAPS</Pill>}
+                      {Boolean(r.pars) && <Pill>PARS</Pill>}
+                      {Boolean(r.fastLane) && <Pill>FAST</Pill>}
                     </div>
                   )}
                   <div style={{ marginTop: 6 }}>
@@ -1322,7 +1346,7 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
                   <Sel
                     label=""
                     value={r.status}
-                    onChange={(e: any) => void setStatus(r.id, e.target.value)}
+                    onChange={(e) => void setStatus(r.id, e.target.value)}
                   >
                     {statusOpts.map((s) => (
                       <option key={s} value={s}>

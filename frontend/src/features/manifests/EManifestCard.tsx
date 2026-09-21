@@ -9,8 +9,25 @@ const btnIconStyle = {
   gap: 6,
 };
 
-export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, error, onDismissError, onSubmit, onAccept, onReject, onCancel, onDelete, onEdit, onLeadSheet }: any) {
-  const [countdown, setCountdown] = useState<any>(null);
+import type { EManifestCardProps } from '@/features/manifests/types';
+
+export function EManifestCard({
+  manifest: m,
+  drivers,
+  trucks,
+  trailers,
+  pending,
+  error,
+  onDismissError,
+  onSubmit,
+  onAccept,
+  onReject,
+  onCancel,
+  onDelete,
+  onEdit,
+  onLeadSheet,
+}: EManifestCardProps) {
+  const [countdown, setCountdown] = useState<string | null>(null);
   const driver  = drivers.find(d=>d.id===m.driverId);
   const truck   = trucks.find(t=>t.id===m.truckId);
   const trailer = trailers.find(t=>t.id===m.trailerId);
@@ -21,8 +38,8 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
   useEffect(()=>{
     if (m.status!=="accepted"||!m.acceptedAt) return;
     const tick = ()=>{
-      const elapsed = (Date.now()-new Date(m.acceptedAt).getTime())/1000;
-      const waitSecs = (m.fastLane?30:60)*60;
+      const elapsed = (Date.now()-new Date(String(m.acceptedAt)).getTime())/1000;
+      const waitSecs = (m.fastLane ? 30 : 60) * 60;
       const remaining = Math.max(0, waitSecs-elapsed);
       if (remaining===0) { setCountdown(null); return; }
       const mins = Math.floor(remaining/60);
@@ -54,15 +71,15 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
                 </span>
               )}
             </div>
-            <div style={{ fontSize:12, color:G.text }}>Driver: {driver?.name||m.driverName||"—"} · Truck: {truck?.unitNo||m.truckNo||"—"} · Trailer: {trailer?.unitNo||m.trailerNo||"—"}</div>
-            <div style={{ fontSize:11, color:G.muted, marginTop:2 }}>Port: {m.portName||m.portCode} · ETA: {m.eta||"—"} {m.etaTime||""}</div>
+            <div style={{ fontSize:12, color:G.text }}>Driver: {driver?.name||String(m.driverName ?? '—')} · Truck: {truck?.unitNo||String(m.truckNo ?? '—')} · Trailer: {trailer?.unitNo||String(m.trailerNo ?? '—')}</div>
+            <div style={{ fontSize:11, color:G.muted, marginTop:2 }}>Port: {String(m.portName ?? m.portCode ?? '—')} · ETA: {String(m.eta ?? '—')} {String(m.etaTime ?? '')}</div>
             <div style={{ fontSize:12, color:G.text, marginTop:4 }}>
-              {(m.shipments || []).map((s: any) => s.commodityDesc).filter(Boolean).join(' · ') || 'Commodity not specified'}
+              {(m.shipments || []).map((s) => String(s.commodityDesc ?? '')).filter(Boolean).join(' · ') || 'Commodity not specified'}
             </div>
             <div style={{ fontSize:11, color:G.muted }}>
-              Shipments: {m.shipments?.length||0} · CRN: <span style={{ fontFamily:FONT_MONO }}>{m.crn||"—"}</span> · Created: {m.createdAt}
+              Shipments: {m.shipments?.length||0} · CRN: <span style={{ fontFamily:FONT_MONO }}>{String(m.crn ?? '—')}</span> · Created: {String(m.createdAt ?? '')}
             </div>
-            {m.status==="rejected"&&m.rejectionReason&&<div style={{ fontSize:11, color:G.danger, marginTop:4 }}>✗ Rejected: {m.rejectionReason}</div>}
+            {m.status==="rejected"&&m.rejectionReason&&<div style={{ fontSize:11, color:G.danger, marginTop:4 }}>✗ Rejected: {String(m.rejectionReason)}</div>}
           </div>
           <div style={{ display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8, flexWrap:"wrap", flex:"0 1 auto" }}>
             {m.status==="draft"     && <Btn disabled={!!pending} onClick={()=>onSubmit()} style={{ padding:"7px 14px", fontSize:11, background:G.info, borderColor:G.info, opacity:pending?0.6:1, ...btnIconStyle }}>{pending==="Submission"?<>{Icons.pending({ size: 16, color: '#fff' })} SUBMITTING…</>:<>SUBMIT</>}</Btn>}
@@ -84,26 +101,26 @@ export function EManifestCard({ manifest:m, drivers, trucks, trailers, pending, 
             {Icons.alert({ size: 16, color: G.danger })}
             {error}
           </span>
-          <button onClick={e=>{e.stopPropagation();onDismissError();}} style={{ background:"none", border:"none", color:G.danger, cursor:"pointer", fontSize:14, lineHeight:1, padding:0 }}>✕</button>
+          <button onClick={e=>{e.stopPropagation();onDismissError?.();}} style={{ background:"none", border:"none", color:G.danger, cursor:"pointer", fontSize:14, lineHeight:1, padding:0 }}>✕</button>
         </div>
       )}
 
       <div style={{ padding:"14px 16px", borderTop:`1px solid ${G.border}` }}>
           <div style={{ fontSize:10, letterSpacing:2, color:G.muted, marginBottom:10 }}>SHIPMENTS</div>
           {(m.shipments||[]).map((s,i)=>(
-            <div key={s.id} style={{ background:G.card2, border:`1px solid ${G.border2}`, borderRadius:8, padding:"10px 14px", marginBottom:8 }}>
+            <div key={String(s.id ?? i)} style={{ background:G.card2, border:`1px solid ${G.border2}`, borderRadius:8, padding:"10px 14px", marginBottom:8 }}>
               <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:6 }}>
                 <div>
-                  <span style={{ fontSize:12, fontWeight:700, color:G.text }}>{s.commodityDesc||"Commodity not specified"}</span>
-                  <span style={{ fontSize:11, color:isACI?G.info:G.purple, marginLeft:10 }}>#{i+1} {s.type}</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:G.text }}>{String(s.commodityDesc ?? 'Commodity not specified')}</span>
+                  <span style={{ fontSize:11, color:isACI?G.info:G.purple, marginLeft:10 }}>#{i+1} {String(s.type ?? '')}</span>
                 </div>
-                <span style={{ fontSize:10, color:G.muted, fontFamily:FONT_MONO }}>CCN/PAPS: {s.ccn||"—"}</span>
+                <span style={{ fontSize:10, color:G.muted, fontFamily:FONT_MONO }}>CCN/PAPS: {String(s.ccn ?? '—')}</span>
               </div>
               <div style={{ fontSize:11, color:G.muted, marginTop:4 }}>
-                {s.shipperName||"?"} ({s.shipperCountry}) → {s.consigneeName||"?"} ({s.consigneeCountry})
+                {String(s.shipperName ?? '?')} ({String(s.shipperCountry ?? '')}) → {String(s.consigneeName ?? '?')} ({String(s.consigneeCountry ?? '')})
               </div>
               <div style={{ fontSize:11, color:G.muted }}>
-                {s.pieces||"—"} pcs · {s.weight||"—"} {s.weightUnit} · Origin: {s.countryOfOrigin}
+                {String(s.pieces ?? '—')} pcs · {String(s.weight ?? '—')} {String(s.weightUnit ?? '')} · Origin: {String(s.countryOfOrigin ?? '')}
               </div>
             </div>
           ))}

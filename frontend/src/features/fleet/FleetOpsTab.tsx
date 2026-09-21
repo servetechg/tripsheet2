@@ -2,8 +2,15 @@ import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2 } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
-import { blank, humanizeEnum } from '@/lib/format';
+import { blank, humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 import { maintenanceApi, dvirApi, auditApi, companiesApi } from '@/lib/api';
+import type { FleetOpsTabProps } from '@/types/tabs';
+import type {
+  DvirRecordDto,
+  MaintenanceRecordDto,
+  MdmRecord,
+} from '@/types/dtos';
 
 export function FleetOpsTab({
   company,
@@ -11,11 +18,11 @@ export function FleetOpsTab({
   drivers,
   adminUser,
   apiEnabled,
-}: any) {
+}: FleetOpsTabProps) {
   const [tab, setTab] = useState<'maintenance' | 'dvir' | 'expiry'>('maintenance');
-  const [rows, setRows] = useState<any[]>([]);
-  const [dvirs, setDvirs] = useState<any[]>([]);
-  const [vendors, setVendors] = useState<any[]>([]);
+  const [rows, setRows] = useState<MaintenanceRecordDto[]>([]);
+  const [dvirs, setDvirs] = useState<DvirRecordDto[]>([]);
+  const [vendors, setVendors] = useState<MdmRecord[]>([]);
   const [f, setF] = useState({
     assetId: '',
     type: 'pm',
@@ -86,8 +93,8 @@ export function FleetOpsTab({
       });
       notify('Maintenance record saved');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Save failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Save failed'), 'error');
     }
   };
 
@@ -100,23 +107,23 @@ export function FleetOpsTab({
       await dvirApi.create({
         companyId: company.id,
         ...d,
-        unitNo: assets.find((a: any) => a.id === d.assetId)?.unitNo,
-        driverName: drivers.find((dr: any) => dr.id === d.driverId)?.name,
+        unitNo: assets.find((a) => a.id === d.assetId)?.unitNo,
+        driverName: drivers.find((dr) => dr.id === d.driverId)?.name,
         defects: [],
       });
       notify('DVIR saved');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'DVIR failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'DVIR failed'), 'error');
     }
   };
 
   const today = new Date().toISOString().slice(0, 10);
-  const expiring = assets.filter((a: any) => {
+  const expiring = assets.filter((a) => {
     const dates = [a.insuranceExpiry, a.plateExpiry, a.permitExpiry].filter(
       Boolean,
     );
-    return dates.some((dt: string) => dt <= today);
+    return dates.some((dt) => dt != null && dt <= today);
   });
 
   return (
@@ -142,10 +149,10 @@ export function FleetOpsTab({
               <Sel
                 label="Asset"
                 value={f.assetId}
-                onChange={(e: any) => setF({ ...f, assetId: e.target.value })}
+                onChange={(e) => setF({ ...f, assetId: e.target.value })}
               >
                 <option value="">— select —</option>
-                {assets.map((a: any) => (
+                {assets.map((a) => (
                   <option key={a.id} value={a.id}>
                     {humanizeEnum(a.type)} #{a.unitNo}
                   </option>
@@ -154,7 +161,7 @@ export function FleetOpsTab({
               <Sel
                 label="Type"
                 value={f.type}
-                onChange={(e: any) => setF({ ...f, type: e.target.value })}
+                onChange={(e) => setF({ ...f, type: e.target.value })}
               >
                 <option value="pm">Preventive (PM)</option>
                 <option value="repair">Repair</option>
@@ -162,38 +169,38 @@ export function FleetOpsTab({
               <Inp
                 label="Title"
                 value={f.title}
-                onChange={(e: any) => setF({ ...f, title: e.target.value })}
+                onChange={(e) => setF({ ...f, title: e.target.value })}
                 placeholder="e.g. Oil change"
               />
               <Inp
                 label="Cost"
                 value={f.cost}
-                onChange={(e: any) => setF({ ...f, cost: e.target.value })}
+                onChange={(e) => setF({ ...f, cost: e.target.value })}
                 placeholder="e.g. 250.00"
               />
               <Inp
                 label="Performed"
                 value={f.performedAt}
-                onChange={(e: any) => setF({ ...f, performedAt: e.target.value })}
+                onChange={(e) => setF({ ...f, performedAt: e.target.value })}
                 placeholder="YYYY-MM-DD"
               />
               <Inp
                 label="Next due"
                 value={f.nextDueAt}
-                onChange={(e: any) => setF({ ...f, nextDueAt: e.target.value })}
+                onChange={(e) => setF({ ...f, nextDueAt: e.target.value })}
                 placeholder="YYYY-MM-DD"
               />
               <Sel
                 label="Vendor"
                 value={f.vendorId}
-                onChange={(e: any) => {
+                onChange={(e) => {
                   const id = e.target.value;
-                  const v = vendors.find((x: any) => x.id === id);
+                  const v = vendors.find((x) => x.id === id);
                   setF({ ...f, vendorId: id, vendor: v?.name || '' });
                 }}
               >
                 <option value="">— Optional —</option>
-                {vendors.map((v: any) => (
+                {vendors.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
                   </option>
@@ -247,10 +254,10 @@ export function FleetOpsTab({
               <Sel
                 label="Asset"
                 value={d.assetId}
-                onChange={(e: any) => setD({ ...d, assetId: e.target.value })}
+                onChange={(e) => setD({ ...d, assetId: e.target.value })}
               >
                 <option value="">— select —</option>
-                {assets.map((a: any) => (
+                {assets.map((a) => (
                   <option key={a.id} value={a.id}>
                     {humanizeEnum(a.type)} #{a.unitNo}
                   </option>
@@ -259,10 +266,10 @@ export function FleetOpsTab({
               <Sel
                 label="Driver"
                 value={d.driverId}
-                onChange={(e: any) => setD({ ...d, driverId: e.target.value })}
+                onChange={(e) => setD({ ...d, driverId: e.target.value })}
               >
                 <option value="">— optional —</option>
-                {drivers.map((dr: any) => (
+                {drivers.map((dr) => (
                   <option key={dr.id} value={dr.id}>
                     {dr.name}
                   </option>
@@ -271,13 +278,13 @@ export function FleetOpsTab({
               <Inp
                 label="Inspected at"
                 value={d.inspectedAt}
-                onChange={(e: any) => setD({ ...d, inspectedAt: e.target.value })}
+                onChange={(e) => setD({ ...d, inspectedAt: e.target.value })}
                 placeholder="YYYY-MM-DD"
               />
               <Sel
                 label="Status"
                 value={d.status}
-                onChange={(e: any) => setD({ ...d, status: e.target.value })}
+                onChange={(e) => setD({ ...d, status: e.target.value })}
               >
                 <option value="satisfactory">Satisfactory</option>
                 <option value="defects">Defects</option>
@@ -287,7 +294,7 @@ export function FleetOpsTab({
                 <Inp
                   label="Remarks"
                   value={d.remarks}
-                  onChange={(e: any) => setD({ ...d, remarks: e.target.value })}
+                  onChange={(e) => setD({ ...d, remarks: e.target.value })}
                   placeholder="Optional inspection remarks or defects"
                 />
               </div>
@@ -319,7 +326,7 @@ export function FleetOpsTab({
               No expired asset dates (set expiry fields on Assets).
             </div>
           )}
-          {expiring.map((a: any) => (
+          {expiring.map((a) => (
             <div key={a.id} style={{ padding: '8px 0', fontSize: 13 }}>
               #{a.unitNo} ({humanizeEnum(a.type)}) — insurance {a.insuranceExpiry || '—'} ·
               plate {a.plateExpiry || '—'} · permit {a.permitExpiry || '—'}

@@ -340,9 +340,9 @@ export class InvitesService {
             lifecycleStatus: 'pending_review',
             active: false,
             employmentStatus: 'active',
-            driverType: emptyToNull((dto.profile as any).driverType) ?? 'company',
-            employeeNumber: emptyToNull((dto.profile as any).employeeNumber),
-            hireDate: emptyToNull((dto.profile as any).hireDate),
+            driverType: emptyToNull(dto.profile.driverType) ?? 'company',
+            employeeNumber: emptyToNull(dto.profile.employeeNumber),
+            hireDate: emptyToNull(dto.profile.hireDate),
           },
         });
 

@@ -58,7 +58,11 @@ describe('SmsService', () => {
         return values[key];
       }),
     };
-    service = new SmsService(prisma as any, redis as any, config as any);
+    service = new SmsService(
+      prisma as unknown as ConstructorParameters<typeof SmsService>[0],
+      redis as unknown as ConstructorParameters<typeof SmsService>[1],
+      config as unknown as ConstructorParameters<typeof SmsService>[2],
+    );
   });
 
   describe('send', () => {
@@ -76,7 +80,11 @@ describe('SmsService', () => {
     });
 
     it('throws BadRequestException when rate limit is exceeded', async () => {
-      service = new SmsService(prisma as any, redis as any, twilioConfig() as any);
+      service = new SmsService(
+        prisma as unknown as ConstructorParameters<typeof SmsService>[0],
+        redis as unknown as ConstructorParameters<typeof SmsService>[1],
+        twilioConfig() as unknown as ConstructorParameters<typeof SmsService>[2],
+      );
       redis.incr.mockResolvedValue(21);
 
       await expect(
@@ -92,7 +100,11 @@ describe('SmsService', () => {
     });
 
     it('uses global scope when companyId is omitted', async () => {
-      service = new SmsService(prisma as any, redis as any, twilioConfig() as any);
+      service = new SmsService(
+        prisma as unknown as ConstructorParameters<typeof SmsService>[0],
+        redis as unknown as ConstructorParameters<typeof SmsService>[1],
+        twilioConfig() as unknown as ConstructorParameters<typeof SmsService>[2],
+      );
       redis.incr.mockResolvedValue(21);
 
       await expect(

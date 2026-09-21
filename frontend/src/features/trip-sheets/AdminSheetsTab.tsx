@@ -2,29 +2,43 @@ import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import { Btn, Card, StatCard, StatsGrid, Icons } from '@/components/ui';
 import { isCompactIdentifier } from '@/lib/format';
 
-export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
-  const sorted = [...sheets].sort((a: any, b: any) =>
+import type { Expense, TripLeg, TripSheet } from '@tripsheet/shared';
+import type { AdminSheetsTabProps } from '@/features/trip-sheets/types';
+
+export function AdminSheetsTab({
+  sheets,
+  users,
+  company,
+  onViewPdf,
+}: AdminSheetsTabProps) {
+  const sorted = [...sheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
 
   const cadTotal = sheets.reduce(
-    (sum: number, s: any) =>
+    (sum: number, s: TripSheet) =>
       sum +
       (s.expenses || [])
-        .filter((e: any) => e.currency === 'CAD')
-        .reduce((a: number, e: any) => a + (parseFloat(e.amount) || 0), 0),
+        .filter((e) => e.currency === 'CAD')
+        .reduce(
+          (a: number, e: Expense) => a + (parseFloat(String(e.amount)) || 0),
+          0,
+        ),
     0,
   );
   const usdTotal = sheets.reduce(
-    (sum: number, s: any) =>
+    (sum: number, s: TripSheet) =>
       sum +
       (s.expenses || [])
-        .filter((e: any) => e.currency === 'USD')
-        .reduce((a: number, e: any) => a + (parseFloat(e.amount) || 0), 0),
+        .filter((e) => e.currency === 'USD')
+        .reduce(
+          (a: number, e: Expense) => a + (parseFloat(String(e.amount)) || 0),
+          0,
+        ),
     0,
   );
   const legCount = sheets.reduce(
-    (sum: number, s: any) => sum + (s.trips?.length || 0),
+    (sum: number, s: TripSheet) => sum + (s.trips?.length || 0),
     0,
   );
 
@@ -69,16 +83,24 @@ export function AdminSheetsTab({ sheets, users, company, onViewPdf }: any) {
           </div>
         </Card>
       ) : (
-        sorted.map((s: any) => {
-          const d = users.find((u: any) => u.id === s.driverId);
+        sorted.map((s) => {
+          const d = users.find((u) => u.id === s.driverId);
           const cad = (s.expenses || [])
-            .filter((e: any) => e.currency === 'CAD')
-            .reduce((a: number, e: any) => a + (parseFloat(e.amount) || 0), 0);
+            .filter((e) => e.currency === 'CAD')
+            .reduce(
+              (a: number, e: Expense) =>
+                a + (parseFloat(String(e.amount)) || 0),
+              0,
+            );
           const usd = (s.expenses || [])
-            .filter((e: any) => e.currency === 'USD')
-            .reduce((a: number, e: any) => a + (parseFloat(e.amount) || 0), 0);
+            .filter((e) => e.currency === 'USD')
+            .reduce(
+              (a: number, e: Expense) =>
+                a + (parseFloat(String(e.amount)) || 0),
+              0,
+            );
           const tripNumbers = (s.trips || [])
-            .map((trip: any) => trip.tripNo)
+            .map((trip: TripLeg) => trip.tripNo)
             .filter(Boolean);
           const compactTripNumbers = tripNumbers.filter((tripNo: string) =>
             isCompactIdentifier(tripNo),

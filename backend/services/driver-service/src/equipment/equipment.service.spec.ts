@@ -29,7 +29,10 @@ describe('EquipmentService.assign', () => {
       },
     };
     const config = { get: jest.fn(() => '') };
-    service = new EquipmentService(prisma as any, config as any);
+    service = new EquipmentService(
+      prisma as unknown as ConstructorParameters<typeof EquipmentService>[0],
+      config as unknown as ConstructorParameters<typeof EquipmentService>[1],
+    );
   });
 
   it('closes prior primary assignment before creating new primary', async () => {

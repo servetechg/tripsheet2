@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { G, FONT_MONO, RADIUS } from '@/lib/theme';
 import { Btn, Card, Pill, Icons, RouteFromTo } from '@/components/ui';
 import { formatDisplayDateTime } from '@/lib/formFields';
+import type { Load } from '@tripsheet/shared';
 
 const STATUS_COLOR: Record<string, string> = {
   assigned: G.info,
@@ -28,7 +29,7 @@ function loadMargin(l: {
 }
 
 export type DriverLoadCardProps = {
-  load: any;
+  load: Load;
   /** Active assignment vs completed history row */
   mode?: 'active' | 'history';
   loadStatusBusy?: boolean;
@@ -303,7 +304,7 @@ export function DriverLoadCard({
             lineHeight: 1.4,
           }}
         >
-          Stops: {stops.map((s: any) => s.location || s).join(' → ')}
+          Stops: {stops.map((s) => s.location || s).join(' → ')}
         </div>
       )}
     </Card>

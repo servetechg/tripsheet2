@@ -15,15 +15,10 @@ import { BrandLogo } from '@/components/brand/BrandLogo';
 import { matchesDriverRef } from '@/lib/driverIds';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 
-type DashboardTabProps = {
-  company: { id: string; shortName?: string; name?: string };
-  loads: any[];
-  sheets: any[];
-  drivers: any[];
-  trucks: any[];
-  users: any[];
-  onNavigate?: (tab: string) => void;
-};
+import type {
+  DashboardChartTooltipProps,
+  DashboardTabProps,
+} from '@/types/tabs';
 
 const PAGE_SIZE = 6;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
@@ -51,7 +46,7 @@ function CustomBarTooltip({
   payload,
   label,
   seriesNames,
-}: any) {
+}: DashboardChartTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   return (
     <div
@@ -72,7 +67,7 @@ function CustomBarTooltip({
       <div style={{ color: G.muted, marginBottom: 4, fontWeight: 600, fontSize: 11 }}>
         {label}
       </div>
-      {payload.map((entry: any, i: number) => {
+      {payload.map((entry, i: number) => {
         const name = seriesNames?.[i] || entry.name;
         const val = Number(entry.value || 0);
         return (
@@ -119,7 +114,7 @@ function BarChart({
 }) {
   const data = useMemo(() => {
     return labels.map((label, idx) => {
-      const item: Record<string, any> = { label };
+      const item: Record<string, string | number> = { label };
       series.forEach((s, sIdx) => {
         item[`s_${sIdx}`] = s[idx] ?? 0;
       });
@@ -173,7 +168,11 @@ function BarChart({
   );
 }
 
-function DonutTooltip({ active, payload, coordinate }: any) {
+function DonutTooltip({
+  active,
+  payload,
+  coordinate,
+}: DashboardChartTooltipProps) {
   if (!active || !payload || !payload.length) return null;
   const item = payload[0];
   if (!item || item.name === 'No data') return null;
@@ -368,7 +367,7 @@ export function DashboardTab({
     let expensesCad = 0;
     let expensesUsd = 0;
     sheets.forEach((s) => {
-      (s.expenses || []).forEach((e: any) => {
+      (s.expenses || []).forEach((e) => {
         const amt = parseFloat(e.amount) || 0;
         if (e.currency === 'USD') expensesUsd += amt;
         else expensesCad += amt;
@@ -438,7 +437,10 @@ export function DashboardTab({
           (l.truckId === t.id || l.truckNo === t.unitNo) &&
           ['assigned', 'in_transit'].includes(l.status),
       );
-      const inactive = t.status !== 'active';
+      const inactive =
+        t.status === 'retired' ||
+        t.status === 'maintenance' ||
+        t.status === 'out_of_service';
       return {
         id: t.id,
         label: `#${t.unitNo || '—'}`,

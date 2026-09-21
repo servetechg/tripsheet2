@@ -27,7 +27,16 @@ import { DepartmentsPanel } from './DepartmentsPanel';
 import { NotificationRulesPanel } from './NotificationRulesPanel';
 import { EmailDeliveryPanel } from './EmailDeliveryPanel';
 import { UsersPanel } from './UsersPanel';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
+import type { SecurityPolicyDto } from '@/types/dtos';
+
+function patchSecurity(
+  prev: SecurityPolicyDto | null,
+  patch: Partial<SecurityPolicyDto>,
+): SecurityPolicyDto | null {
+  return prev ? { ...prev, ...patch } : prev;
+}
 
 function SecurityEventsList({ companyId }: { companyId: string }) {
   const [rows, setRows] = useState<
@@ -132,25 +141,35 @@ export function CompanySettingsTab({
   apiEnabled,
   refreshAll,
   initialSub,
-}: {
-  company: any;
-  adminUser?: any;
-  apiEnabled?: boolean;
-  refreshAll?: (scope?: string) => Promise<void> | void;
-  initialSub?: Sub;
-}) {
+}: import('@/types/tabs').CompanySettingsTabProps & { initialSub?: Sub }) {
   const { can } = useCan();
   const confirm = useConfirm();
   const [sub, setSub] = useState<Sub>(initialSub || 'profile');
-  const [ent, setEnt] = useState<any>(null);
-  const [settings, setSettings] = useState<any>(null);
-  const [branding, setBranding] = useState<any>(null);
-  const [branches, setBranches] = useState<any[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [docs, setDocs] = useState<any[]>([]);
-  const [keys, setKeys] = useState<any[]>([]);
-  const [security, setSecurity] = useState<any>(null);
-  const [rules, setRules] = useState<any[]>([]);
+  const [ent, setEnt] = useState<
+    import('@/types/dtos').CompanyEntitlementsDto | null
+  >(null);
+  const [settings, setSettings] = useState<
+    import('@/types/dtos').CompanySettingsDto | null
+  >(null);
+  const [branding, setBranding] = useState<
+    import('@/types/dtos').CompanyBrandingDto | null
+  >(null);
+  const [branches, setBranches] = useState<
+    import('@/types/dtos').BranchDto[]
+  >([]);
+  const [departments, setDepartments] = useState<
+    import('@/types/dtos').DepartmentDto[]
+  >([]);
+  const [docs, setDocs] = useState<
+    import('@/types/dtos').CompanyDocumentDto[]
+  >([]);
+  const [keys, setKeys] = useState<import('@/types/dtos').ApiKeyDto[]>([]);
+  const [security, setSecurity] = useState<
+    import('@/types/dtos').SecurityPolicyDto | null
+  >(null);
+  const [rules, setRules] = useState<
+    import('@/types/dtos').NotificationRuleDto[]
+  >([]);
   const [profile, setProfile] = useState({
     name: company.name || '',
     shortName: company.shortName || '',
@@ -161,10 +180,14 @@ export function CompanySettingsTab({
   const [newBranchBusy, setNewBranchBusy] = useState(false);
   const [profileBusy, setProfileBusy] = useState(false);
   const [settingsBusy, setSettingsBusy] = useState(false);
-  const [editingBranch, setEditingBranch] = useState<any>(null);
+  const [editingBranch, setEditingBranch] = useState<
+    import('@/types/dtos').BranchDto | null
+  >(null);
   const [branchForm, setBranchForm] = useState({ name: '', address: '' });
   const [branchBusy, setBranchBusy] = useState(false);
-  const [editingDoc, setEditingDoc] = useState<any>(null);
+  const [editingDoc, setEditingDoc] = useState<
+    import('@/types/dtos').CompanyDocumentDto | null
+  >(null);
   const [docForm, setDocForm] = useState({ name: '', type: '' });
   const [docBusy, setDocBusy] = useState(false);
   const [newDoc, setNewDoc] = useState<{
@@ -176,8 +199,10 @@ export function CompanySettingsTab({
   const [newKeyName, setNewKeyName] = useState('Integration key');
   const [revealedKey, setRevealedKey] = useState('');
   const [copiedKey, setCopiedKey] = useState(false);
-  const [staff, setStaff] = useState<any[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [staff, setStaff] = useState<import('@/types/session').AppUser[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<
+    import('@/types/dtos').InviteDetailDto[]
+  >([]);
   const [customRoles, setCustomRoles] = useState<CustomRoleDto[]>([]);
 
   const cid = company.id;
@@ -188,7 +213,7 @@ export function CompanySettingsTab({
       .then((rows) =>
         setPendingInvites(
           (rows || []).filter(
-            (i: any) => i.status === 'pending' || i.status === 'expired',
+            (i) => i.status === 'pending' || i.status === 'expired',
           ),
         ),
       )
@@ -217,8 +242,8 @@ export function CompanySettingsTab({
       setKeys(k || []);
       setSecurity(sec);
       setRules(r || []);
-    } catch (err: any) {
-      notify(err?.message || 'Failed to load company config', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Failed to load company config'), 'error');
     }
   };
 
@@ -353,8 +378,8 @@ export function CompanySettingsTab({
                 await companiesApi.update(cid, profile);
                 notify('Profile saved');
                 await refreshAll?.('all');
-              } catch (err: any) {
-                notify(err?.message || 'Save failed', 'error');
+              } catch (err: unknown) {
+                notify(getApiErrorMessage(err, 'Save failed'), 'error');
               } finally {
                 setProfileBusy(false);
               }
@@ -374,30 +399,45 @@ export function CompanySettingsTab({
               label="Currency"
               value={settings.general?.currency || ''}
               onChange={(e) =>
-                setSettings((s: any) => ({
-                  ...s,
-                  general: { ...s.general, currency: e.target.value },
-                }))
+                setSettings((s) =>
+                  s
+                    ? {
+                        ...s,
+                        general: { ...s.general, currency: e.target.value },
+                      }
+                    : s,
+                )
               }
             />
             <Inp
               label="Time zone"
               value={settings.general?.timeZone || ''}
               onChange={(e) =>
-                setSettings((s: any) => ({
-                  ...s,
-                  general: { ...s.general, timeZone: e.target.value },
-                }))
+                setSettings((s) =>
+                  s
+                    ? {
+                        ...s,
+                        general: { ...s.general, timeZone: e.target.value },
+                      }
+                    : s,
+                )
               }
             />
             <Inp
               label="Distance unit"
               value={settings.general?.distanceUnit || ''}
               onChange={(e) =>
-                setSettings((s: any) => ({
-                  ...s,
-                  general: { ...s.general, distanceUnit: e.target.value },
-                }))
+                setSettings((s) =>
+                  s
+                    ? {
+                        ...s,
+                        general: {
+                          ...s.general,
+                          distanceUnit: e.target.value,
+                        },
+                      }
+                    : s,
+                )
               }
             />
           </G2>
@@ -408,13 +448,17 @@ export function CompanySettingsTab({
                 type="checkbox"
                 checked={Boolean(settings.dispatch?.autoDispatchNumber)}
                 onChange={(e) =>
-                  setSettings((s: any) => ({
-                    ...s,
-                    dispatch: {
-                      ...s.dispatch,
-                      autoDispatchNumber: e.target.checked,
-                    },
-                  }))
+                  setSettings((s) =>
+                    s
+                      ? {
+                          ...s,
+                          dispatch: {
+                            ...s.dispatch,
+                            autoDispatchNumber: e.target.checked,
+                          },
+                        }
+                      : s,
+                  )
                 }
               />{' '}
               Auto dispatch numbers
@@ -424,13 +468,17 @@ export function CompanySettingsTab({
                 type="checkbox"
                 checked={Boolean(settings.dispatch?.driverAcceptanceRequired)}
                 onChange={(e) =>
-                  setSettings((s: any) => ({
-                    ...s,
-                    dispatch: {
-                      ...s.dispatch,
-                      driverAcceptanceRequired: e.target.checked,
-                    },
-                  }))
+                  setSettings((s) =>
+                    s
+                      ? {
+                          ...s,
+                          dispatch: {
+                            ...s.dispatch,
+                            driverAcceptanceRequired: e.target.checked,
+                          },
+                        }
+                      : s,
+                  )
                 }
               />{' '}
               Driver acceptance required
@@ -452,8 +500,8 @@ export function CompanySettingsTab({
                   compliance: settings.compliance,
                 });
                 notify('Settings saved');
-              } catch (err: any) {
-                notify(err?.message || 'Save failed', 'error');
+              } catch (err: unknown) {
+                notify(getApiErrorMessage(err, 'Save failed'), 'error');
               } finally {
                 setSettingsBusy(false);
               }
@@ -497,8 +545,8 @@ export function CompanySettingsTab({
                     setNewBranch({ name: '', address: '' });
                     notify('Branch added successfully');
                     await reload();
-                  } catch (err: any) {
-                    notify(err?.message || 'Failed to add branch', 'error');
+                  } catch (err: unknown) {
+                    notify(getApiErrorMessage(err, 'Failed to add branch'), 'error');
                   } finally {
                     setNewBranchBusy(false);
                   }
@@ -559,8 +607,8 @@ export function CompanySettingsTab({
                               notify('Branch deactivated');
                               return reload();
                             })
-                            .catch((err: any) =>
-                              notify(err?.message || 'Failed to deactivate branch', 'error'),
+                            .catch((err) =>
+                              notify(getApiErrorMessage(err, 'Failed to deactivate branch'), 'error'),
                             );
                         }}
                       >
@@ -623,8 +671,8 @@ export function CompanySettingsTab({
                         setEditingBranch(null);
                         return reload();
                       })
-                      .catch((err: any) =>
-                        notify(err?.message || 'Update failed', 'error'),
+                      .catch((err) =>
+                        notify(getApiErrorMessage(err, 'Update failed'), 'error'),
                       )
                       .finally(() => setBranchBusy(false));
                   }}
@@ -645,7 +693,12 @@ export function CompanySettingsTab({
       {sub === 'departments' && (
         <DepartmentsPanel
           companyId={cid}
-          departments={departments}
+          departments={departments.map((d) => ({
+            id: d.id,
+            name: d.name,
+            code: d.code ?? '',
+            companyId: d.companyId,
+          }))}
           canManage={can('company.edit')}
           onReload={reload}
         />
@@ -700,44 +753,45 @@ export function CompanySettingsTab({
               label="Accent color"
               value={branding.accentColor || ''}
               onChange={(e) =>
-                setBranding((b: any) => ({ ...b, accentColor: e.target.value }))
+                setBranding((b) =>
+                  b ? { ...b, accentColor: e.target.value } : b,
+                )
               }
             />
             <Inp
               label="Primary color"
               value={branding.primaryColor || ''}
               onChange={(e) =>
-                setBranding((b: any) => ({ ...b, primaryColor: e.target.value }))
+                setBranding((b) =>
+                  b ? { ...b, primaryColor: e.target.value } : b,
+                )
               }
             />
             <Inp
               label="Secondary color"
               value={branding.secondaryColor || ''}
               onChange={(e) =>
-                setBranding((b: any) => ({
-                  ...b,
-                  secondaryColor: e.target.value,
-                }))
+                setBranding((b) =>
+                  b ? { ...b, secondaryColor: e.target.value } : b,
+                )
               }
             />
             <Inp
               label="Invoice header"
               value={branding.invoiceHeader || ''}
               onChange={(e) =>
-                setBranding((b: any) => ({
-                  ...b,
-                  invoiceHeader: e.target.value,
-                }))
+                setBranding((b) =>
+                  b ? { ...b, invoiceHeader: e.target.value } : b,
+                )
               }
             />
             <Inp
               label="Invoice footer"
               value={branding.invoiceFooter || ''}
               onChange={(e) =>
-                setBranding((b: any) => ({
-                  ...b,
-                  invoiceFooter: e.target.value,
-                }))
+                setBranding((b) =>
+                  b ? { ...b, invoiceFooter: e.target.value } : b,
+                )
               }
             />
           </G2>
@@ -758,8 +812,8 @@ export function CompanySettingsTab({
                   notify('Branding saved');
                   return reload();
                 })
-                .catch((err: any) =>
-                  notify(err?.message || 'Save failed', 'error'),
+                .catch((err) =>
+                  notify(getApiErrorMessage(err, 'Save failed'), 'error'),
                 );
             }}
           >
@@ -809,7 +863,7 @@ export function CompanySettingsTab({
                   notify('Document uploaded');
                   return reload();
                 })
-                .catch((err: any) => notify(err?.message || 'Failed', 'error'));
+                .catch((err) => notify(getApiErrorMessage(err, 'Failed'), 'error'));
             }}
           >
             Upload Document
@@ -820,7 +874,7 @@ export function CompanySettingsTab({
               {docs.map((d) => (
                 <VaultFileRow
                   key={d.id}
-                  name={d.name}
+                  name={d.name ?? d.fileName}
                   type={d.type}
                   fileName={d.fileName}
                   fileUrl={d.fileUrl}
@@ -837,8 +891,8 @@ export function CompanySettingsTab({
                         notify('Document removed');
                         return reload();
                       })
-                      .catch((err: any) =>
-                        notify(err?.message || 'Delete failed', 'error'),
+                      .catch((err) =>
+                        notify(getApiErrorMessage(err, 'Delete failed'), 'error'),
                       );
                   }}
                 />
@@ -897,8 +951,8 @@ export function CompanySettingsTab({
                         setEditingDoc(null);
                         return reload();
                       })
-                      .catch((err: any) =>
-                        notify(err?.message || 'Update failed', 'error'),
+                      .catch((err) =>
+                        notify(getApiErrorMessage(err, 'Update failed'), 'error'),
                       )
                       .finally(() => setDocBusy(false));
                   }}
@@ -946,14 +1000,15 @@ export function CompanySettingsTab({
               onClick={() => {
                 void companiesApi
                   .createApiKey(cid, { name: newKeyName, scopes: ['read'] })
-                  .then((res: any) => {
-                    setRevealedKey(res.apiKey || '');
+                  .then((res) => {
+                    const key = res as import('@/types/dtos').ApiKeyCreatedDto;
+                    setRevealedKey(key.apiKey || key.key || '');
                     setCopiedKey(false);
                     notify('API key created — copy it now');
                     return reload();
                   })
-                  .catch((err: any) =>
-                    notify(err?.message || 'Failed', 'error'),
+                  .catch((err) =>
+                    notify(getApiErrorMessage(err, 'Failed'), 'error'),
                   );
               }}
             >
@@ -1038,7 +1093,7 @@ export function CompanySettingsTab({
               }}
             >
               <div>
-                {k.name} · <code>{k.keyPrefix}…</code>{' '}
+                {k.name} · <code>{k.keyPrefix ?? k.prefix}…</code>{' '}
                 <Pill color={k.active ? G.success : G.muted} small>
                   {k.active ? 'Active' : 'Revoked'}
                 </Pill>
@@ -1054,8 +1109,8 @@ export function CompanySettingsTab({
                         notify('API key revoked');
                         return reload();
                       })
-                      .catch((err: any) =>
-                        notify(err?.message || 'Failed to revoke key', 'error'),
+                      .catch((err) =>
+                        notify(getApiErrorMessage(err, 'Failed to revoke key'), 'error'),
                       );
                   }}
                 >
@@ -1086,70 +1141,77 @@ export function CompanySettingsTab({
               label="Min password length"
               value={String(security.passwordMinLength ?? 8)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  passwordMinLength: Number(e.target.value) || 8,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    passwordMinLength: Number(e.target.value) || 8,
+                  }),
+                )
               }
             />
             <Inp
               label="Password history (0 = off)"
               value={String(security.passwordHistoryCount ?? 10)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  passwordHistoryCount: Number(e.target.value) || 0,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    passwordHistoryCount: Number(e.target.value) || 0,
+                  }),
+                )
               }
             />
             <Inp
               label="Session days"
               value={String(security.sessionDays ?? 7)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  sessionDays: Number(e.target.value) || 7,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    sessionDays: Number(e.target.value) || 7,
+                  }),
+                )
               }
             />
             <Inp
               label="Idle timeout (minutes, 0 = off)"
               value={String(security.idleTimeoutMinutes ?? 0)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  idleTimeoutMinutes: Number(e.target.value) || 0,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    idleTimeoutMinutes: Number(e.target.value) || 0,
+                  }),
+                )
               }
             />
             <Inp
               label="Invite link TTL (days)"
               value={String(security.inviteTtlDays ?? 7)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  inviteTtlDays: Number(e.target.value) || 7,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    inviteTtlDays: Number(e.target.value) || 7,
+                  }),
+                )
               }
             />
             <Inp
               label="Lockout after failures"
               value={String(security.lockoutThreshold ?? 5)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  lockoutThreshold: Number(e.target.value) || 5,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    lockoutThreshold: Number(e.target.value) || 5,
+                  }),
+                )
               }
             />
             <Inp
               label="Lockout minutes"
               value={String(security.lockoutMinutes ?? 15)}
               onChange={(e) =>
-                setSecurity((s: any) => ({
-                  ...s,
-                  lockoutMinutes: Number(e.target.value) || 15,
-                }))
+                setSecurity((s) =>
+                  patchSecurity(s, {
+                    lockoutMinutes: Number(e.target.value) || 15,
+                  }),
+                )
               }
             />
             <label style={{ fontSize: 12, color: G.muted, paddingTop: 22 }}>
@@ -1157,10 +1219,11 @@ export function CompanySettingsTab({
                 type="checkbox"
                 checked={Boolean(security.passwordComplexity)}
                 onChange={(e) =>
-                  setSecurity((s: any) => ({
-                    ...s,
-                    passwordComplexity: e.target.checked,
-                  }))
+                  setSecurity((s) =>
+                    patchSecurity(s, {
+                      passwordComplexity: e.target.checked,
+                    }),
+                  )
                 }
               />{' '}
               Require complexity (12+ / upper / lower / number / special / no
@@ -1171,10 +1234,9 @@ export function CompanySettingsTab({
                 type="checkbox"
                 checked={Boolean(security.requireMfa)}
                 onChange={(e) =>
-                  setSecurity((s: any) => ({
-                    ...s,
-                    requireMfa: e.target.checked,
-                  }))
+                  setSecurity((s) =>
+                    patchSecurity(s, { requireMfa: e.target.checked }),
+                  )
                 }
               />{' '}
               Require MFA (authenticator at login)
@@ -1185,8 +1247,8 @@ export function CompanySettingsTab({
               void companiesApi
                 .patchSecurityPolicy(cid, security)
                 .then(() => notify('Security policy saved'))
-                .catch((err: any) =>
-                  notify(err?.message || 'Save failed', 'error'),
+                .catch((err) =>
+                  notify(getApiErrorMessage(err, 'Save failed'), 'error'),
                 );
             }}
           >
@@ -1211,7 +1273,14 @@ export function CompanySettingsTab({
       {sub === 'notifications' && (
         <NotificationRulesPanel
           cid={cid}
-          rules={rules}
+          rules={rules.map((r) => ({
+            id: r.id,
+            companyId: r.companyId,
+            eventType: r.event,
+            channel: r.channel,
+            target: r.template ?? '',
+            enabled: r.active,
+          }))}
           onReload={reload}
         />
       )}
@@ -1259,7 +1328,7 @@ export function CompanySettingsTab({
                       fontWeight: 750,
                     }}
                   >
-                    {ent.planName || humanizeEnum(ent.planCode)}
+                    {ent.planName || humanizeEnum(String(ent.planCode ?? ''))}
                   </div>
                   <div style={{ color: G.muted, fontSize: 13, marginTop: 5 }}>
                     Your company&apos;s plan and included capabilities
@@ -1296,7 +1365,9 @@ export function CompanySettingsTab({
                     DRIVER CAPACITY
                   </div>
                   <div style={{ color: G.text, fontSize: 18, fontWeight: 700 }}>
-                    {ent.maxDrivers < 0 ? 'Unlimited' : ent.maxDrivers}
+                    {(ent.maxDrivers ?? 0) < 0
+                      ? 'Unlimited'
+                      : String(ent.maxDrivers ?? '—')}
                   </div>
                 </div>
                 <div

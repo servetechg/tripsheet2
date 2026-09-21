@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useEffect, useMemo, useState } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Divider, SectionTitle, G2, Chk } from '@/components/ui';
@@ -44,8 +45,8 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
       setRoles(list || []);
       setCatalog((perms || []).filter((p) => p.code !== 'company.delete'));
       setTemplates((sys || []).filter((r) => r.code !== 'company_owner'));
-    } catch (err: any) {
-      notify(err?.message || 'Failed to load roles', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Failed to load roles'), 'error');
     }
   };
 
@@ -168,8 +169,8 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
         notify('Role updated — assigned users pick up grants on next login');
         await load();
       }
-    } catch (err: any) {
-      notify(err?.message || 'Save failed', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Save failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -191,8 +192,8 @@ export function CustomRolesPanel({ companyId }: { companyId: string }) {
       notify('Custom role deleted');
       setSelectedId('new');
       await load();
-    } catch (err: any) {
-      notify(err?.message || 'Delete failed', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Delete failed'), 'error');
     } finally {
       setBusy(false);
     }

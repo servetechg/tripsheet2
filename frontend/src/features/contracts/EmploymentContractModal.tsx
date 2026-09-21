@@ -5,9 +5,38 @@ import { blank } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { DRIVER_DOC_TYPES, PAY_TYPES, DISPATCH_REQUIRED_DOCS, DOC_STATUS_COLOR } from '@/lib/docTypes';
 
-export function EmploymentContractModal({ driver, company, existingContract, onSave, onClose }: any) {
+import type { EmploymentContractModalProps } from '@/features/contracts/types';
+import type { ContractForm } from '@/types/app';
+
+type ContractFormState = Pick<
+  ContractForm,
+  | 'startDate'
+  | 'payType'
+  | 'payRate'
+  | 'payUnit'
+  | 'teamRate'
+  | 'detentionRate'
+  | 'waitRate'
+  | 'fuelSurcharge'
+  | 'vacationPct'
+  | 'trialDays'
+  | 'noticeDays'
+  | 'benefits'
+  | 'deductions'
+  | 'notes'
+  | 'signedByAdmin'
+  | 'signedByDriver'
+>;
+
+export function EmploymentContractModal({
+  driver,
+  company,
+  existingContract,
+  onSave,
+  onClose,
+}: EmploymentContractModalProps) {
   const today = new Date().toLocaleDateString("en-CA");
-  const [initialF] = useState(() => ({
+  const [initialF] = useState((): ContractFormState => ({
     startDate:     existingContract?.startDate     || today,
     payType:       existingContract?.payType       || "per_mile",
     payRate:       existingContract?.payRate       || "",
@@ -27,9 +56,12 @@ export function EmploymentContractModal({ driver, company, existingContract, onS
   }));
   const [f, setF] = useState(initialF);
   const isDirty = existingContract
-    ? Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])
+    ? Object.keys(initialF).some((k) => (f)[k] !== (initialF)[k])
     : !blank(f.payRate);
-  const upd = (k,v) => setF(x=>({...x,[k]:v}));
+  const upd = <K extends keyof ContractFormState>(
+    k: K,
+    v: ContractFormState[K],
+  ) => setF((x) => ({ ...x, [k]: v }));
   const pt = PAY_TYPES.find(p=>p.id===f.payType) || PAY_TYPES[0];
 
   const save = () => {

@@ -5,6 +5,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { formatDisplayDateTime } from '@/lib/formFields';
 import { loadsApi } from '@/lib/api';
 import { MapView } from './MapView';
+import type { TrackTabProps } from '@/types/tabs';
 
 export function TrackTab({
   company,
@@ -14,8 +15,8 @@ export function TrackTab({
   statusColor,
   apiEnabled,
   refreshAll,
-}: any) {
-  const [sel, setSel] = useState<any>(null);
+}: TrackTabProps) {
+  const [sel, setSel] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const loadsRef = useRef(loads);
   loadsRef.current = loads;
@@ -24,14 +25,14 @@ export function TrackTab({
     let cancelled = false;
 
     const localSim = () => {
-      setLoads((p: any[]) =>
+      setLoads((p) =>
         p.map((l) =>
           l.status !== 'in_transit'
             ? l
             : {
                 ...l,
-                lat: l.lat + (Math.random() - 0.3) * 0.08,
-                lng: l.lng + (Math.random() + 0.1) * 0.12,
+                lat: (l.lat ?? 0) + (Math.random() - 0.3) * 0.08,
+                lng: (l.lng ?? 0) + (Math.random() + 0.1) * 0.12,
                 speed: Math.floor(88 + Math.random() * 20),
                 lastUpdate: 'just now',
               },
@@ -47,11 +48,11 @@ export function TrackTab({
       }
 
       const inTransit = loadsRef.current.filter(
-        (l: any) => l.status === 'in_transit',
+        (l) => l.status === 'in_transit',
       );
       try {
         await Promise.all(
-          inTransit.map((l: any) =>
+          inTransit.map((l) =>
             loadsApi.simulateTrack(l.id).catch(() => null),
           ),
         );
@@ -60,8 +61,8 @@ export function TrackTab({
         if (company?.id) {
           const active = await loadsApi.active(company.id);
           if (cancelled) return;
-          setLoads((prev: any[]) => {
-            const byId = new Map(active.map((a: any) => [a.id, a]));
+          setLoads((prev) => {
+            const byId = new Map(active.map((a) => [a.id, a]));
             return prev.map((l) => byId.get(l.id) || l);
           });
         } else {
@@ -83,28 +84,28 @@ export function TrackTab({
   }, [apiEnabled, company?.id, setLoads, refreshAll]);
 
   const w = useMediaQuery();
-  const viewing = sel ? loads.find((l: any) => l.id === sel) || null : null;
+  const viewing = sel ? loads.find((l) => l.id === sel) || null : null;
 
   return (
     <div>
       <StatsGrid>
         <StatCard
           label="In Transit"
-          value={loads.filter((l: any) => l.status === 'in_transit').length}
+          value={loads.filter((l) => l.status === 'in_transit').length}
           subtitle="Live on route"
           accent={G.warning}
           icon={Icons.track({ size: 20, color: G.warning })}
         />
         <StatCard
           label="Assigned"
-          value={loads.filter((l: any) => l.status === 'assigned').length}
+          value={loads.filter((l) => l.status === 'assigned').length}
           subtitle="Waiting to depart"
           accent={G.info}
           icon={Icons.assigned({ size: 20, color: G.info })}
         />
         <StatCard
           label="Delivered"
-          value={loads.filter((l: any) => l.status === 'delivered').length}
+          value={loads.filter((l) => l.status === 'delivered').length}
           subtitle="Completed trips"
           accent={G.success}
           icon={Icons.completed({ size: 20, color: G.success })}
@@ -134,7 +135,7 @@ export function TrackTab({
             </Card>
           )}
           {loads.length > 0 &&
-            loads.filter((l: any) => l.status === 'in_transit').length === 0 && (
+            loads.filter((l) => l.status === 'in_transit').length === 0 && (
               <div
                 style={{
                   background: `${G.gold}11`,
@@ -150,8 +151,8 @@ export function TrackTab({
                 track it live.
               </div>
             )}
-          {loads.map((l: any) => {
-            const driver = users.find((u: any) => u.id === l.driverId);
+          {loads.map((l) => {
+            const driver = users.find((u) => u.id === l.driverId);
             const isSel = sel === l.id;
             return (
               <div

@@ -4,8 +4,7 @@ import { Btn, Card, Pill, SectionTitle } from '@/components/ui';
 import { tenantsApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { TenantIssueAlert } from '@/components/feedback/TenantIssueAlert';
-import { humanizeEnum } from '@/lib/format';
-
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
 type OpsSummary = {
   generatedAt: string;
   totals: {
@@ -68,9 +67,9 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
     setLoading(true);
     try {
       const s = await tenantsApi.opsSummary();
-      setData(s);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to load tenant ops', 'error');
+      setData(s as unknown as OpsSummary);
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to load tenant ops'), 'error');
     } finally {
       setLoading(false);
     }
@@ -86,8 +85,8 @@ export function TenantOpsDashboard({ apiEnabled }: { apiEnabled: boolean }) {
       const r = await tenantsApi.schemaMigrateAll();
       notify(`Schema migrate: ${r.ok}/${r.migrated} ok`);
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Schema migrate failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Schema migrate failed'), 'error');
     } finally {
       setMigrating(false);
     }

@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useState, useEffect, useMemo, useId } from 'react';
 import { G, FONT_MONO, labelBase } from '@/lib/theme';
 import { Btn, Card, Pill, SectionTitle, Skeleton, Sel, Icons } from '@/components/ui';
@@ -28,6 +29,17 @@ import {
   pickCurrentDriverLoad,
 } from '@/lib/driverIds';
 import { DriverLoadCard } from '@/features/drivers/DriverLoadCard';
+import type { DriverDashboardProps } from '@/features/drivers/types';
+import type { DriverDocument, Load, Settlement, TripSheet } from '@tripsheet/shared';
+import type { DocTypeMeta, FileUploadData } from '@/types/app';
+import type { EmploymentContractDto } from '@/types/dtos';
+import {
+  asDriverContract,
+  type DriverContractView,
+} from '@/features/drivers/types';
+import type { LoadWithTimestamps } from '@/types/app';
+import type { DriverQualificationRow } from '@/types/session';
+import type { MouseEvent } from 'react';
 
 export function DriverDashboard({
   user,
@@ -44,57 +56,74 @@ export function DriverDashboard({
   refreshAll,
   activeTab,
   onTabChange,
-}: any) {
+}: DriverDashboardProps) {
   const tab = activeTab || 'sheets';
   const setTab = onTabChange || (() => {});
   const [formOpen, setForm] = useState(false);
-  const [editSheet, setEditSheet] = useState<any>(null);
-  const [previewS, setPreview] = useState<any>(null);
+  const [editSheet, setEditSheet] = useState<TripSheet | null>(null);
+  const [previewS, setPreview] = useState<TripSheet | null>(null);
   const sn = company.shortName;
   const recordId = driverRecordIdOf(user);
   const mySheets = sheets.filter(
-    (s: any) =>
+    (s) =>
       s.companyId === company.id && matchesDriverRef(s.driverId, user),
   );
   const sortedSheets = [...mySheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
-  const myLoad: any = pickCurrentDriverLoad(loads, user);
+  const myLoad = pickCurrentDriverLoad(loads, user);
   const myDocs = (driverDocs || []).filter(
-    (d: any) =>
+    (d) =>
       matchesDriverRef(d.driverId, user) && d.type !== '__contract__',
   );
   const localContract = (driverDocs || []).find(
-    (d: any) =>
+    (d) =>
       matchesDriverRef(d.driverId, user) && d.type === '__contract__',
   );
-  const [apiContract, setApiContract] = useState<any>(null);
-  const [qualifications, setQualifications] = useState<any[]>([]);
-  const [settlements, setSettlements] = useState<any[]>([]);
+  const [apiContract, setApiContract] = useState<EmploymentContractDto | null>(
+    null,
+  );
+  const [qualifications, setQualifications] = useState<DriverQualificationRow[]>(
+    [],
+  );
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [availabilityStatus, setAvailabilityStatus] = useState(
     user.availabilityStatus || 'available',
   );
   const [availBusy, setAvailBusy] = useState(false);
   const [loadStatusBusy, setLoadStatusBusy] = useState(false);
   const { can } = useCan();
-  const myContract = apiEnabled ? apiContract || localContract : localContract;
+  const myContract: DriverContractView | null = apiEnabled
+    ? asDriverContract(apiContract) ?? asDriverContract(localContract)
+    : asDriverContract(localContract);
   const recentDelivered = useMemo(
     () =>
       [...loads]
         .filter(
-          (l: any) =>
+          (l) =>
             matchesDriverRef(l.driverId, user) && l.status === 'delivered',
         )
-        .sort((a: any, b: any) => {
-          const ta = a.actualDelivery || a.updatedAt || a.createdAt || '';
-          const tb = b.actualDelivery || b.updatedAt || b.createdAt || '';
+        .sort((a, b) => {
+          const meta = (l: Load) => l as LoadWithTimestamps;
+          const ta =
+            a.actualDelivery ||
+            meta(a).updatedAt ||
+            meta(a).createdAt ||
+            a.lastUpdate ||
+            '';
+          const tb =
+            b.actualDelivery ||
+            meta(b).updatedAt ||
+            meta(b).createdAt ||
+            b.lastUpdate ||
+            '';
           return tb >= ta ? 1 : -1;
         })
         .slice(0, 8),
     [loads, user],
   );
-  const [uploadModal, setUploadModal] = useState<any>(null);
-  const [viewDoc, setViewDoc] = useState<any>(null);
+  const [uploadModal, setUploadModal] = useState<DocTypeMeta | null>(null);
+  const [viewDoc, setViewDoc] = useState<DriverDocument | null>(null);
   const tabLoading = useFakeLoad(tab, 350);
   const availabilitySelectId = useId();
 
@@ -105,8 +134,8 @@ export function DriverDashboard({
       await loadsApi.setStatus(loadId, status);
       notify(status === 'in_transit' ? 'Trip started' : 'Trip marked delivered');
       await refreshAll?.();
-    } catch (e: any) {
-      notify(e?.message || 'Could not update trip status', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Could not update trip status'), 'error');
     } finally {
       setLoadStatusBusy(false);
     }
@@ -176,7 +205,7 @@ export function DriverDashboard({
     const alerts: Array<{ level: 'danger' | 'warning'; text: string }> = [];
 
     for (const dt of DRIVER_DOC_TYPES) {
-      const doc = myDocs.find((d: any) => d.type === dt.id);
+      const doc = myDocs.find((d) => d.type === dt.id);
       if (dt.required && !doc) {
         alerts.push({ level: 'danger', text: `Missing required: ${dt.label}` });
         continue;
@@ -215,8 +244,8 @@ export function DriverDashboard({
       await driversApi.update(recordId, { availabilityStatus });
       await refreshAll?.();
       notify('Availability updated');
-    } catch (e: any) {
-      notify(e?.message || 'Failed to update availability', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to update availability'), 'error');
     } finally {
       setAvailBusy(false);
     }
@@ -227,12 +256,12 @@ export function DriverDashboard({
     (s) => s.status === 'draft' || s.status === 'approved',
   ).length;
 
-  const saveDoc = async (typeId: string, fileData: any) => {
-    const nd = {
+  const saveDoc = async (typeId: string, fileData: FileUploadData) => {
+    const nd: DriverDocument = {
       id: uid(),
       driverId: recordId,
       companyId: company.id,
-      type: typeId,
+      type: typeId as DriverDocument['type'],
       fileName: fileData.name,
       fileSize: fileData.size,
       fileType: fileData.fileType,
@@ -259,7 +288,7 @@ export function DriverDashboard({
         });
         await refreshAll?.();
       } else {
-        setDriverDocs((p: any[]) => {
+        setDriverDocs((p) => {
           const ex = p.findIndex(
             (d) => matchesDriverRef(d.driverId, user) && d.type === typeId,
           );
@@ -271,15 +300,15 @@ export function DriverDashboard({
           return [...p, nd];
         });
       }
-    } catch (e: any) {
-      notify(e?.message || 'Document upload failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Document upload failed'), 'error');
     }
   };
 
-  const saveSheet = async (s: any) => {
+  const saveSheet = async (s) => {
     try {
       if (apiEnabled) {
-        const exists = sheets.find((x: any) => x.id === s.id);
+        const exists = sheets.find((x) => x.id === s.id);
         if (exists) {
           await tripSheetsApi.update(s.id, {
             header: s.header,
@@ -299,7 +328,7 @@ export function DriverDashboard({
         }
         await refreshAll?.();
       } else {
-        setSheets((p: any[]) => {
+        setSheets((p) => {
           const ex = p.find((x) => x.id === s.id);
           return ex ? p.map((x) => (x.id === s.id ? s : x)) : [...p, s];
         });
@@ -307,12 +336,12 @@ export function DriverDashboard({
       setForm(false);
       setEditSheet(null);
       notify(
-        s.id && sheets.find((x: any) => x.id === s.id)
+        s.id && sheets.find((x) => x.id === s.id)
           ? 'Trip sheet updated.'
           : 'Trip sheet saved.',
       );
-    } catch (e: any) {
-      notify(e?.message || 'Failed to save trip sheet', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to save trip sheet'), 'error');
       throw e;
     }
   };
@@ -338,7 +367,7 @@ export function DriverDashboard({
           });
         }
       } else {
-        setDriverDocs((p: any[]) =>
+        setDriverDocs((p) =>
           p.map((d) =>
             matchesDriverRef(d.driverId, user) && d.type === '__contract__'
               ? {
@@ -350,8 +379,8 @@ export function DriverDashboard({
           ),
         );
       }
-    } catch (e: any) {
-      notify(e?.message || 'Sign failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Sign failed'), 'error');
     }
   };
 
@@ -359,12 +388,12 @@ export function DriverDashboard({
     setEditSheet(null);
     setForm(true);
   };
-  const openEdit = (s: any, e: any) => {
+  const openEdit = (s: TripSheet, e: MouseEvent) => {
     e.stopPropagation();
     setEditSheet(s);
     setForm(true);
   };
-  const openPDF = (s: any, e: any) => {
+  const openPDF = (s: TripSheet, e: MouseEvent) => {
     e.stopPropagation();
     setPreview(s);
   };
@@ -634,7 +663,7 @@ export function DriverDashboard({
                   <Btn onClick={openNew}>CREATE TRIP SHEET</Btn>
                 </Card>
               ) : (
-                sortedSheets.map((s: any) => (
+                sortedSheets.map((s) => (
                   <div
                     key={s.id}
                     style={{
@@ -756,7 +785,7 @@ export function DriverDashboard({
                 driver profile.
               </div>
               {DRIVER_DOC_TYPES.map((dt) => {
-                const doc = myDocs.find((d: any) => d.type === dt.id);
+                const doc = myDocs.find((d) => d.type === dt.id);
                 return (
                   <div
                     key={dt.id}
@@ -885,7 +914,7 @@ export function DriverDashboard({
               {uploadModal && (
                 <DocUploadModal
                   docType={uploadModal}
-                  onUpload={(id: string, fd: any) => {
+                  onUpload={(id: string, fd: FileUploadData) => {
                     void saveDoc(id, fd);
                     setUploadModal(null);
                   }}
@@ -1201,7 +1230,7 @@ export function DriverDashboard({
                       gap: 10,
                     }}
                   >
-                    {recentDelivered.map((l: any) => (
+                    {recentDelivered.map((l) => (
                       <DriverLoadCard key={l.id} load={l} mode="history" />
                     ))}
                   </div>

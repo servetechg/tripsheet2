@@ -5,7 +5,8 @@ import { notify } from '@/components/feedback/Toast';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { auditApi, notificationsApi } from '@/lib/api';
 import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 
 const COMPLIANCE_TYPES = new Set([
   'bol',
@@ -23,7 +24,7 @@ interface AuditItem {
   action: string;
   entityType?: string;
   entityId?: string;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
   createdAt?: string;
 }
 
@@ -91,7 +92,7 @@ export function ComplianceTab({
   adminUser,
   apiEnabled,
   onGoDrivers,
-}: any) {
+}: import('@/types/tabs').ComplianceTabProps) {
   const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [audit, setAudit] = useState<AuditItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -100,7 +101,7 @@ export function ComplianceTab({
   const [auditFilter, setAuditFilter] = useState<'all' | 'auth' | 'security' | 'reminder'>('all');
 
   const complianceDocs = useMemo(
-    () => (driverDocs || []).filter((d: any) => COMPLIANCE_TYPES.has(d.type)),
+    () => (driverDocs || []).filter((d) => COMPLIANCE_TYPES.has(d.type)),
     [driverDocs],
   );
 
@@ -110,13 +111,13 @@ export function ComplianceTab({
     soon.setDate(soon.getDate() + 30);
     const cutoff = soon.toISOString().slice(0, 10);
 
-    const aAlerts = (assets || []).filter((a: any) =>
+    const aAlerts = (assets || []).filter((a) =>
       [a.insuranceExpiry, a.plateExpiry, a.permitExpiry].some(
-        (dt: string) => dt && dt <= cutoff,
+        (dt) => dt != null && dt !== '' && dt <= cutoff,
       ),
     );
     const dAlerts = (driverDocs || []).filter(
-      (d: any) => d.expiryDate && d.expiryDate <= cutoff,
+      (d) => d.expiryDate && d.expiryDate <= cutoff,
     );
     return {
       assetAlerts: aAlerts,
@@ -131,8 +132,8 @@ export function ComplianceTab({
     try {
       const rows = await auditApi.list(company.id, 100);
       setAudit(rows || []);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to load audit log', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to load audit log'), 'error');
     } finally {
       setRefreshing(false);
     }
@@ -182,8 +183,8 @@ export function ComplianceTab({
       });
       notify('Expiry reminder SMS sent', 'success');
       await loadAudit();
-    } catch (e: any) {
-      notify(e?.message || 'Reminder failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Reminder failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -429,9 +430,9 @@ export function ComplianceTab({
               gap: 12,
             }}
           >
-            {complianceDocs.map((d: any) => {
+            {complianceDocs.map((d) => {
               const driver = drivers?.find(
-                (x: any) =>
+                (x) =>
                   x.id === d.driverId || x.driverRecordId === d.driverId,
               );
               return (
@@ -529,11 +530,16 @@ export function ComplianceTab({
                     }}
                   >
                     <span style={{ color: G.muted }}>
-                      {d.createdAt
-                        ? new Date(d.createdAt).toLocaleDateString()
+                      {d.uploadedAt
+                        ? new Date(d.uploadedAt).toLocaleDateString()
                         : 'Uploaded'}
                     </span>
-                    <Pill color={d.status === 'verified' ? G.success : G.gold} small>
+                    <Pill
+                      color={
+                        String(d.status) === 'verified' ? G.success : G.gold
+                      }
+                      small
+                    >
                       {humanizeEnum(d.status || 'uploaded')}
                     </Pill>
                   </div>

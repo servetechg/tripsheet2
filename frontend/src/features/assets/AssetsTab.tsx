@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { G, FONT_MONO } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
-import { blank, humanizeEnum, isCompactIdentifier } from '@/lib/format';
+import { blank, humanizeEnum, isCompactIdentifier, getApiErrorMessage } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
@@ -12,6 +12,13 @@ import {
   canAssignAsset,
   normalizeAssetStatus,
 } from '@/lib/assetStatus';
+import type { Asset } from '@tripsheet/shared';
+import type { AssetsTabProps } from '@/types/tabs';
+
+type FleetAsset = Asset & {
+  insuranceProviderId?: string;
+  insuranceProviderName?: string;
+};
 
 const emptyAsset = {
   type: 'truck',
@@ -36,16 +43,18 @@ export function AssetsTab({
   loads,
   apiEnabled,
   refreshAll,
-}: any) {
+}: AssetsTabProps) {
   const [assetTab, setAssetTab] = useState<'trucks' | 'trailers' | 'equipment'>(
     'trucks',
   );
   const [show, setShow] = useState(false);
-  const [editAsset, setEditAsset] = useState<any>(null);
+  const [editAsset, setEditAsset] = useState<Asset | null>(null);
   const [f, setF] = useState(emptyAsset);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [insurers, setInsurers] = useState<any[]>([]);
+  const [insurers, setInsurers] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   useEffect(() => {
     if (!apiEnabled || !company?.id) return;
@@ -56,13 +65,13 @@ export function AssetsTab({
   }, [apiEnabled, company?.id]);
 
   const myTrucks = assets.filter(
-    (a: any) => a.companyId === company.id && a.type === 'truck',
+    (a) => a.companyId === company.id && a.type === 'truck',
   );
   const myTrailers = assets.filter(
-    (a: any) => a.companyId === company.id && a.type === 'trailer',
+    (a) => a.companyId === company.id && a.type === 'trailer',
   );
   const myEquipment = assets.filter(
-    (a: any) => a.companyId === company.id && a.type === 'equipment',
+    (a) => a.companyId === company.id && a.type === 'equipment',
   );
   const list =
     assetTab === 'trucks'
@@ -70,7 +79,7 @@ export function AssetsTab({
       : assetTab === 'trailers'
         ? myTrailers
         : myEquipment;
-  const activeCount = list.filter((a: any) => canAssignAsset(a.status)).length;
+  const activeCount = list.filter((a) => canAssignAsset(a.status)).length;
   const typeLabel =
     assetTab === 'trucks'
       ? 'TRUCK'
@@ -78,7 +87,7 @@ export function AssetsTab({
         ? 'TRAILER'
         : 'EQUIPMENT';
 
-  const openEdit = (a: any) => {
+  const openEdit = (a) => {
     setEditAsset(a);
     setF({
       type: a.type || 'truck',
@@ -112,7 +121,7 @@ export function AssetsTab({
     } else if (
       !editAsset &&
       assets.some(
-        (a: any) =>
+        (a) =>
           a.companyId === company?.id &&
           a.unitNo?.trim().toLowerCase() === f.unitNo.trim().toLowerCase(),
       )
@@ -146,14 +155,18 @@ export function AssetsTab({
         : assetTab === 'trailers'
           ? 'trailer'
           : 'equipment';
-    const body = {
+    const body: Partial<Asset> & {
+      type: string;
+      unitNo: string;
+      companyId: string;
+    } = {
       ...f,
       type,
       unitNo: f.unitNo.trim(),
       companyId: company.id,
     };
     if (!editAsset) {
-      (body as any).status = 'available';
+      body.status = 'available';
     }
     try {
       setBusy(true);
@@ -165,15 +178,18 @@ export function AssetsTab({
         }
         await refreshAll?.();
       } else if (editAsset) {
-        setAssets((p: any[]) =>
+        setAssets((p) =>
           p.map((a) => (a.id === editAsset.id ? { ...a, ...body } : a)),
         );
       } else {
-        setAssets((p: any[]) => [...p, { ...body, id: uid(), status: 'available' }]);
+        setAssets((p) => [
+          ...p,
+          { ...body, id: uid(), status: 'available' } as FleetAsset,
+        ]);
       }
       resetAssetForm();
-    } catch (e: any) {
-      setErr(e?.message || 'Failed to save asset');
+    } catch (e: unknown) {
+      setErr(getApiErrorMessage(e, 'Failed to save asset'));
     } finally {
       setBusy(false);
     }
@@ -185,22 +201,22 @@ export function AssetsTab({
         await assetsApi.toggleActive(id);
         await refreshAll?.();
       } else {
-        setAssets((p: any[]) =>
+        setAssets((p) =>
           p.map((a) =>
             a.id === id
-              ? {
+              ? ({
                   ...a,
                   status:
                     normalizeAssetStatus(a.status) === 'available'
                       ? 'retired'
                       : 'available',
-                }
+                } as FleetAsset)
               : a,
           ),
         );
       }
-    } catch (e: any) {
-      notify(e?.message || 'Toggle failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Toggle failed'), 'error');
     }
   };
 
@@ -210,12 +226,14 @@ export function AssetsTab({
         await assetsApi.setStatus(id, status);
         await refreshAll?.();
       } else {
-        setAssets((p: any[]) =>
-          p.map((a) => (a.id === id ? { ...a, status } : a)),
+        setAssets((p) =>
+          p.map((a) =>
+            a.id === id ? ({ ...a, status } as FleetAsset) : a,
+          ),
         );
       }
-    } catch (e: any) {
-      notify(e?.message || 'Status update failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Status update failed'), 'error');
     }
   };
 
@@ -225,10 +243,10 @@ export function AssetsTab({
         await assetsApi.remove(id);
         await refreshAll?.();
       } else {
-        setAssets((p: any[]) => p.filter((a) => a.id !== id));
+        setAssets((p) => p.filter((a) => a.id !== id));
       }
-    } catch (e: any) {
-      notify(e?.message || 'Remove failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Remove failed'), 'error');
     }
   };
 
@@ -324,7 +342,7 @@ export function AssetsTab({
             <Inp
               label="Unit No. *"
               value={f.unitNo}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, unitNo: e.target.value }))
               }
               onBlur={() => markTouched('unitNo')}
@@ -334,7 +352,7 @@ export function AssetsTab({
             <Inp
               label="Year"
               value={f.year}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, year: e.target.value }))
               }
               placeholder="e.g. 2022"
@@ -344,14 +362,14 @@ export function AssetsTab({
             <Inp
               label="Make"
               value={f.make}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, make: e.target.value }))
               }
             />
             <Inp
               label="Model"
               value={f.model}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, model: e.target.value }))
               }
             />
@@ -360,14 +378,14 @@ export function AssetsTab({
             <Inp
               label="VIN"
               value={f.vin}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, vin: e.target.value }))
               }
             />
             <Inp
               label="Plate No."
               value={f.plate}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, plate: e.target.value }))
               }
             />
@@ -376,9 +394,9 @@ export function AssetsTab({
             <Sel
               label="Insurance provider"
               value={f.insuranceProviderId}
-              onChange={(e: any) => {
+              onChange={(e) => {
                 const id = e.target.value;
-                const p = insurers.find((x: any) => x.id === id);
+                const p = insurers.find((x) => x.id === id);
                 setF((x) => ({
                   ...x,
                   insuranceProviderId: id,
@@ -387,7 +405,7 @@ export function AssetsTab({
               }}
             >
               <option value="">— Optional —</option>
-              {insurers.map((p: any) => (
+              {insurers.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
                 </option>
@@ -396,7 +414,7 @@ export function AssetsTab({
             <Inp
               label="Insurance expiry"
               value={f.insuranceExpiry}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, insuranceExpiry: e.target.value }))
               }
               placeholder="YYYY-MM-DD"
@@ -406,7 +424,7 @@ export function AssetsTab({
             <Inp
               label="Plate expiry"
               value={f.plateExpiry}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, plateExpiry: e.target.value }))
               }
               placeholder="YYYY-MM-DD"
@@ -414,7 +432,7 @@ export function AssetsTab({
             <Inp
               label="Permit expiry"
               value={f.permitExpiry}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, permitExpiry: e.target.value }))
               }
               placeholder="YYYY-MM-DD"
@@ -423,7 +441,7 @@ export function AssetsTab({
           <Inp
             label="Notes"
             value={f.notes}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, notes: e.target.value }))
             }
             placeholder="Optional notes"
@@ -461,7 +479,7 @@ export function AssetsTab({
           </div>
         </Card>
       ) : (
-        list.map((a: any) => {
+        list.map((a: FleetAsset) => {
           const compactUnitNo = isCompactIdentifier(a.unitNo);
           const assetName =
             [a.year, a.make, a.model].filter(Boolean).join(' ') ||
@@ -529,7 +547,7 @@ export function AssetsTab({
                     {assetStatusLabel(a.status)}
                   </Pill>
                   {loads.find(
-                    (l: any) =>
+                    (l) =>
                       ['assigned', 'in_transit'].includes(l.status) &&
                       (l.truckId === a.id || l.trailerId === a.id),
                   ) && <Pill color={G.gold}>IN USE</Pill>}

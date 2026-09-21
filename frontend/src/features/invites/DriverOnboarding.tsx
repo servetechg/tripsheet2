@@ -6,6 +6,9 @@ import { DRIVER_DOC_TYPES, PAY_TYPES } from '@/lib/docTypes';
 import { DocUploadModal } from '@/features/documents/DocUploadModal';
 import { uid } from '@/lib/uid';
 import { notify } from '@/components/feedback/Toast';
+import type { DriverOnboardingProps, OnboardingDocument } from '@/features/invites/types';
+import type { ContractForm, DocTypeMeta, FileUploadData } from '@/types/app';
+import { getApiErrorMessage } from '@/lib/format';
 
 type Profile = {
   name: string;
@@ -41,18 +44,18 @@ const emptyProfile = (): Profile => ({
  * Invite onboarding wizard.
  * Steps are inlined (not nested components) so inputs keep focus while typing.
  */
-export function DriverOnboarding({ invite, company, onComplete }: any) {
+export function DriverOnboarding({ invite, company, onComplete }: DriverOnboardingProps) {
   const TOTAL = 4;
   const [step, setStep] = useState(1);
   const [profile, setProfile] = useState<Profile>(emptyProfile);
-  const [docs, setDocs] = useState<any[]>([]);
-  const [contract, setContract] = useState<any>({
+  const [docs, setDocs] = useState<OnboardingDocument[]>([]);
+  const [contract, setContract] = useState<ContractForm>({
     signedByDriver: false,
     signedByAdmin: false,
   });
   const [err, setErr] = useState('');
   const [profileErr, setProfileErr] = useState('');
-  const [uploading, setUploading] = useState<any>(null);
+  const [uploading, setUploading] = useState<DocTypeMeta | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const [profileTouched, setProfileTouched] = useState<Record<string, boolean>>({});
@@ -87,9 +90,9 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
     setProfile((x) => ({ ...x, [k]: v }));
 
   const updContract = (k: string, v: unknown) =>
-    setContract((x: any) => ({ ...x, [k]: v }));
+    setContract((x) => ({ ...x, [k]: v }));
 
-  const saveDoc = (typeId: string, fileData: any) => {
+  const saveDoc = (typeId: string, fileData: FileUploadData) => {
     setDocs((p) => {
       const ex = p.findIndex((d) => d.type === typeId);
       const newDoc = {
@@ -136,13 +139,8 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
       await onComplete(profile, docs, contract);
       notify('Application submitted successfully');
       setStep(5);
-    } catch (e: any) {
-      const raw = e?.message ?? e?.body?.message;
-      const msg = Array.isArray(raw)
-        ? raw.join(', ')
-        : typeof raw === 'string'
-          ? raw
-          : 'Failed to submit application.';
+    } catch (e: unknown) {
+      const msg = getApiErrorMessage(e, 'Failed to submit application.');
       setErr(msg);
       notify(msg, 'error');
     } finally {
