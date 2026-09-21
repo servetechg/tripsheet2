@@ -22,7 +22,10 @@ function assert(cond: unknown, msg: string) {
 
 console.log('Chapter 6.19 acceptance (driver-service)');
 
-const qualSvc = new QualificationsService({} as any, {} as any);
+const qualSvc = new QualificationsService(
+  {} as unknown as ConstructorParameters<typeof QualificationsService>[0],
+  {} as unknown as ConstructorParameters<typeof QualificationsService>[1],
+);
 
 // ─── #1 Lifecycle transitions ───────────────────────────────────────────────
 {

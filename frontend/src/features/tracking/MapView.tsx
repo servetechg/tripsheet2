@@ -2,12 +2,17 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Icons } from '@/components/ui';
 
-export function MapView({ load, users, loads, tick }: any) {
-  const canvasRef = useRef<any>(null);
+import type { Load } from '@tripsheet/shared';
+import type { AppUser } from '@/types/session';
+import type { MapViewProps } from '@/types/tabs';
+
+export function MapView({ load, users, loads, tick }: MapViewProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const driver = users.find(u=>u.id===load.driverId);
   useEffect(()=>{
     const cv=canvasRef.current; if(!cv)return;
     const ctx=cv.getContext("2d");
+    if(!ctx)return;
     const W=cv.width, H=cv.height;
     ctx.fillStyle="#0a0e18"; ctx.fillRect(0,0,W,H);
     ctx.strokeStyle="#141c2e"; ctx.lineWidth=1;
@@ -18,11 +23,11 @@ export function MapView({ load, users, loads, tick }: any) {
     ctx.strokeStyle="#121e30"; ctx.lineWidth=4;
     ctx.beginPath();ctx.moveTo(0,H*.7);ctx.bezierCurveTo(W*.4,H*.65,W*.7,H*.35,W,H*.3);ctx.stroke();
     loads.filter(l=>l.status==="in_transit"&&l.id!==load.id).forEach(l=>{
-      const x=((l.lng+115)/25)*W, y=(1-(l.lat-45)/20)*H;
+      const x=(((l.lng ?? 0)+115)/25)*W, y=(1-((l.lat ?? 0)-45)/20)*H;
       ctx.beginPath();ctx.arc(x,y,5,0,Math.PI*2);ctx.fillStyle=G.goldDim+"88";ctx.fill();
     });
-    const x=Math.max(30,Math.min(W-30,((load.lng+115)/25)*W));
-    const y=Math.max(30,Math.min(H-30,(1-(load.lat-45)/20)*H));
+    const x=Math.max(30,Math.min(W-30,(((load.lng ?? 0)+115)/25)*W));
+    const y=Math.max(30,Math.min(H-30,(1-((load.lat ?? 0)-45)/20)*H));
     ctx.beginPath();ctx.arc(x,y,18+(tick%3)*6,0,Math.PI*2);ctx.strokeStyle=G.success+"44";ctx.lineWidth=2;ctx.stroke();
     ctx.setLineDash([5,4]);ctx.strokeStyle=G.gold+"33";ctx.lineWidth=2;
     ctx.beginPath();ctx.moveTo(40,H-30);ctx.lineTo(x,y);ctx.lineTo(W-40,30);ctx.stroke();

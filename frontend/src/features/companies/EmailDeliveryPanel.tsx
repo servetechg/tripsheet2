@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Inp, Pill, SectionTitle, G2, Divider, Skeleton } from '@/components/ui';
@@ -223,7 +224,7 @@ export function EmailDeliveryPanel({
                 notify('Email settings saved');
               })
               .catch((err: Error) =>
-                notify(err?.message || 'Save failed', 'error'),
+                notify(getApiErrorMessage(err, 'Save failed'), 'error'),
               )
               .finally(() => setSaving(false));
           }}
@@ -254,7 +255,7 @@ export function EmailDeliveryPanel({
                   return load();
                 })
                 .catch((err: Error) =>
-                  notify(err?.message || 'Test send failed', 'error'),
+                  notify(getApiErrorMessage(err, 'Test send failed'), 'error'),
                 )
                 .finally(() => setTesting(false));
             }}

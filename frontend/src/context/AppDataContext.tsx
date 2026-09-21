@@ -9,9 +9,20 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
-import type { Company, Asset, Load, CarrierProfile, TripSheet, Invite } from '@tripsheet/shared';
-import type { Role } from '@tripsheet/shared';
+import type {
+  Asset,
+  CarrierProfile,
+  DriverDocument,
+  Invite,
+  Load,
+  TripSheet,
+} from '@tripsheet/shared';
 import { isCompanyOwnerRole, isDriverRole } from '@tripsheet/shared';
+import type { Manifest } from '@/types/app';
+import type { PlatformCompany } from '@/types/dtos';
+import type { AppUser } from '@/types/session';
+
+export type { AppUser };
 import {
   pingApi,
   checkBackendServices,
@@ -27,47 +38,7 @@ import {
   tripSheetsApi,
   setToken,
   getToken,
-  type AuthUserDto,
 } from '@/lib/api';
-
-export type Manifest = Record<string, unknown> & {
-  id: string;
-  companyId: string;
-  type?: string;
-  status?: string;
-};
-
-export type AppUser = AuthUserDto & {
-  role: Role | string;
-  password?: string;
-  driverRecordId?: string | null;
-  phone?: string;
-  dob?: string;
-  licenseNo?: string;
-  citizenship?: string;
-  address?: string;
-  emergencyName?: string;
-  emergencyPhone?: string;
-  fastCard?: string;
-  notes?: string;
-  sin?: string;
-  active?: boolean;
-  lifecycleStatus?: string;
-  driverType?: string;
-  employeeNumber?: string;
-  employmentStatus?: string;
-  hireDate?: string;
-  probationEndDate?: string;
-  seniorityDate?: string;
-  branchId?: string;
-  managerUserId?: string;
-  dispatcherUserId?: string;
-  preferredName?: string;
-  preferredLanguage?: string;
-  ownerOperatorProfile?: Record<string, unknown>;
-  qualifications?: any[];
-  availabilityStatus?: string;
-};
 
 export type RefreshScope = 'full' | 'driver';
 
@@ -81,8 +52,8 @@ interface AppData {
     scope?: RefreshScope,
   ) => Promise<void>;
 
-  companies: Company[];
-  setCompanies: Dispatch<SetStateAction<Company[]>>;
+  companies: PlatformCompany[];
+  setCompanies: Dispatch<SetStateAction<PlatformCompany[]>>;
   users: AppUser[];
   setUsers: Dispatch<SetStateAction<AppUser[]>>;
   sheets: TripSheet[];
@@ -95,30 +66,21 @@ interface AppData {
   setManifests: Dispatch<SetStateAction<Manifest[]>>;
   carrierProfiles: CarrierProfile[];
   setCarrierProfiles: Dispatch<SetStateAction<CarrierProfile[]>>;
-  driverDocs: any[];
-  setDriverDocs: Dispatch<SetStateAction<any[]>>;
+  driverDocs: DriverDocument[];
+  setDriverDocs: Dispatch<SetStateAction<DriverDocument[]>>;
   invites: Invite[];
   setInvites: Dispatch<SetStateAction<Invite[]>>;
 }
 
 const AppDataContext = createContext<AppData | null>(null);
 
-function asCompany(c: any): Company {
+function asCompany(c: PlatformCompany): PlatformCompany {
   return {
-    id: c.id,
-    name: c.name,
-    shortName: c.shortName,
+    ...c,
     tagline: c.tagline ?? '',
     address: c.address ?? '',
     active: c.active !== false,
-    // Super Admin + entitlements need full platform row (plan, tenant DB, slug)
-    slug: c.slug,
-    status: c.status,
-    planId: c.planId,
-    plan: c.plan,
-    subscription: c.subscription,
-    tenantDatabase: c.tenantDatabase,
-  } as Company;
+  };
 }
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
@@ -127,14 +89,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [servicesDown, setServicesDown] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState<PlatformCompany[]>([]);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [sheets, setSheets] = useState<TripSheet[]>([]);
   const [loads, setLoads] = useState<Load[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [manifests, setManifests] = useState<Manifest[]>([]);
   const [carrierProfiles, setCarrierProfiles] = useState<CarrierProfile[]>([]);
-  const [driverDocs, setDriverDocs] = useState<any[]>([]);
+  const [driverDocs, setDriverDocs] = useState<DriverDocument[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
 
   const refreshAll = useCallback(async (
@@ -164,7 +126,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      let cosList: Company[] = [];
+      let cosList: PlatformCompany[] = [];
       if (hasToken) {
         // Resolve the signed-in tenant first (list can lag or fail for non–super-admin).
         if (companyId && companyId !== 'all') {
@@ -202,16 +164,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           authUsers = allUsers.map((u) => ({
             ...u,
             companyId: u.companyId ?? null,
-            driverRecordId:
-              (u as any).driverRecordId ||
-              (u as any).driverId ||
-              null,
+            driverRecordId: u.driverRecordId ?? u.driverId ?? null,
             active:
               u.status !== 'suspended' &&
               u.status !== 'archived' &&
-              (u as any).active !== false,
+              u.active !== false,
             lifecycleStatus:
-              (u as any).lifecycleStatus ||
+              u.lifecycleStatus ||
               (u.status === 'suspended'
                 ? 'suspended'
                 : u.status === 'archived'
@@ -267,7 +226,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
             .map((u) => [u.id, u] as const),
         );
 
-        const driverUsers: AppUser[] = (drv as any[]).map((d) => {
+        const driverUsers: AppUser[] = drv.map((d) => {
           const authId = d.userId || d.id;
           const authUser = authByUserId.get(authId);
           return {
@@ -339,16 +298,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         });
 
         setDriverDocs(docs);
-        setInvites(inv as Invite[]);
-        setAssets(ast as Asset[]);
-        setLoads(lds as Load[]);
-        setManifests(man as Manifest[]);
+        setInvites(inv);
+        setAssets(ast);
+        setLoads(lds);
+        setManifests(man);
         if (carrier) {
-          setCarrierProfiles([carrier as CarrierProfile]);
+          setCarrierProfiles([carrier]);
         } else {
           setCarrierProfiles([]);
         }
-        setSheets(sh as TripSheet[]);
+        setSheets(sh);
       }
     } catch (e) {
       setApiError(e instanceof Error ? e.message : 'Failed to load API data');

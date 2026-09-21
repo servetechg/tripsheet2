@@ -4,8 +4,10 @@ import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton,
 import { HEADER_HEIGHT } from '@/components/layout/shellLayout';
 import { EM_STATUS, CA_PORTS, US_PORTS } from '@/features/manifests/constants';
 
-export function LeadSheet({ manifest:m, company, carrier, onBack }: any) {
-  const ref = useRef<any>(null);
+import type { LeadSheetProps } from '@/features/manifests/types';
+
+export function LeadSheet({ manifest: m, company, carrier, onBack }: LeadSheetProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
   const isACI = m.type==="ACI";
   const statusInfo = EM_STATUS[m.status]||EM_STATUS.draft;
 
@@ -76,7 +78,7 @@ ${ref.current.innerHTML}
                 <div style={{ fontSize:8, letterSpacing:3, color:"#888", marginBottom:6, textTransform:"uppercase" }}>Conveyance Reference Number (CRN)</div>
                 {/* Visual barcode */}
                 <div style={{ display:"flex", justifyContent:"center", alignItems:"flex-end", gap:1, background:"#fff", padding:"8px 12px", marginBottom:6 }}>
-                  {m.crn.split("").map((c,i)=>{
+                  {(m.crn ?? '').split("").map((c,i)=>{
                     const w=((c.charCodeAt(0)%3)+1)*3;
                     const h=30+((c.charCodeAt(0)%4)*8);
                     return <div key={i} style={{ width:w, height:h, background:"#000", display:"inline-block" }} />;
@@ -99,8 +101,8 @@ ${ref.current.innerHTML}
                   ["Created",       m.createdAt],
                   ["Direction",     isACI?"Entering Canada":"Entering USA"],
                 ].map(([lbl,val])=>(
-                  <div key={lbl} style={{ padding:"9px 14px", borderBottom:"1px solid #ddd", borderRight:"1px solid #ddd" }}>
-                    <div style={{ fontSize:7, letterSpacing:2, color:"#888", textTransform:"uppercase" }}>{lbl}</div>
+                  <div key={String(lbl)} style={{ padding:"9px 14px", borderBottom:"1px solid #ddd", borderRight:"1px solid #ddd" }}>
+                    <div style={{ fontSize:7, letterSpacing:2, color:"#888", textTransform:"uppercase" }}>{String(lbl)}</div>
                     <div style={{ fontSize:11, fontWeight:700, marginTop:2, color:"#000" }}>{String(val)}</div>
                   </div>
                 ))}
@@ -118,15 +120,15 @@ ${ref.current.innerHTML}
                 </thead>
                 <tbody>
                   {(m.shipments||[]).map((s,i)=>(
-                    <tr key={s.id} style={{ background:i%2===1?"#f7f7f7":"#fff" }}>
+                    <tr key={String(s.id ?? i)} style={{ background:i%2===1?"#f7f7f7":"#fff" }}>
                       <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9, textAlign:"center" }}>{i+1}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9, fontWeight:700 }}>{s.type}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9, fontFamily:"monospace" }}>{s.ccn}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.commodityDesc||"—"}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.shipperName||"—"}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.consigneeName||"—"}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.pieces||"—"}</td>
-                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.weight?`${s.weight}${s.weightUnit}`:"—"}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9, fontWeight:700 }}>{String(s.type ?? '')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9, fontFamily:"monospace" }}>{String(s.ccn ?? '')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{String(s.commodityDesc ?? '—')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{String(s.shipperName ?? '—')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{String(s.consigneeName ?? '—')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{String(s.pieces ?? '—')}</td>
+                      <td style={{ padding:"6px 8px", border:"1px solid #ddd", fontSize:9 }}>{s.weight ? `${String(s.weight)}${String(s.weightUnit ?? '')}` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

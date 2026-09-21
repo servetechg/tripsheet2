@@ -3,8 +3,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { withTenantSchemaRetry } from '../prisma/tenant-schema-errors';
+
+type InvoiceLineInput = { amount?: unknown };
+
+function sumLineAmounts(lines: InvoiceLineInput[]): number {
+  return lines.reduce((s, l) => s + Number(l.amount || 0), 0);
+}
 
 @Injectable()
 export class BillingService {
@@ -82,11 +89,8 @@ export class BillingService {
         'companyId, customerName, issueDate, and dueDate are required',
       );
     }
-    const lines = Array.isArray(body.lines) ? body.lines : [];
-    const subtotal = lines.reduce(
-      (s: number, l: any) => s + Number(l.amount || 0),
-      0,
-    );
+    const lines = (Array.isArray(body.lines) ? body.lines : []) as InvoiceLineInput[];
+    const subtotal = sumLineAmounts(lines);
     const tax = Number(body.tax || 0);
     const total = subtotal + tax;
     return this.prisma.invoice.create({
@@ -135,11 +139,8 @@ export class BillingService {
       data.brokerId = body.brokerId ? String(body.brokerId) : null;
     }
     if (body.lines !== undefined) {
-      const lines = Array.isArray(body.lines) ? body.lines : [];
-      const subtotal = lines.reduce(
-        (s: number, l: any) => s + Number(l.amount || 0),
-        0,
-      );
+      const lines = (Array.isArray(body.lines) ? body.lines : []) as InvoiceLineInput[];
+      const subtotal = sumLineAmounts(lines);
       const tax = Number(body.tax ?? 0);
       data.lines = lines as object;
       data.subtotal = subtotal;
@@ -148,7 +149,10 @@ export class BillingService {
     } else if (body.tax !== undefined) {
       data.tax = Number(body.tax);
     }
-    return this.prisma.invoice.update({ where: { id }, data: data as any });
+    return this.prisma.invoice.update({
+      where: { id },
+      data: data as Prisma.InvoiceUpdateInput,
+    });
   }
 
   async removeInvoice(id: string) {
@@ -179,11 +183,9 @@ export class BillingService {
         'companyId, vendorName, issueDate, and dueDate are required',
       );
     }
-    const lines = Array.isArray(body.lines) ? body.lines : [];
-    const total = lines.reduce(
-      (s: number, l: any) => s + Number(l.amount || 0),
-      Number(body.total || 0) || 0,
-    );
+    const lines = (Array.isArray(body.lines) ? body.lines : []) as InvoiceLineInput[];
+    const total =
+      sumLineAmounts(lines) || Number(body.total || 0) || 0;
     return this.prisma.bill.create({
       data: {
         companyId,

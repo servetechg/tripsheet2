@@ -1,4 +1,65 @@
+import type {
+  AccountDto,
+  ApiKeyDto,
+  AuditEntryDto,
+  BillDto,
+  BranchDto,
+  CommentDto,
+  CompanyBrandingDto,
+  CompanyDocumentDto,
+  CompanyEntitlementsDto,
+  CompanyReportSummary,
+  CompanySettingsDto,
+  DepartmentDto,
+  DriverDocument,
+  DriverRecordDto,
+  DvirRecordDto,
+  EmploymentContractDto,
+  EquipmentAssignmentDto,
+  InviteDetailDto,
+  InvoiceDto,
+  Load,
+  MaintenanceRecordDto,
+  Manifest,
+  MdmRecord,
+  MessageDto,
+  NotificationRuleDto,
+  PaymentDto,
+  PlanDto,
+  PlatformCompany,
+  PortCustomsDto,
+  PortOfEntryDto,
+  ReportAnalyticsDto,
+  SafetyEventDto,
+  SecurityPolicyDto,
+  Settlement,
+  TenantOpsSummaryDto,
+  TenantRowDto,
+  TrainingRecordDto,
+  TripSheet,
+  Asset,
+  CarrierProfile,
+  Invite,
+} from '@/types/dtos';
+import type { NotificationRecord } from '@tripsheet/shared';
+import type { DriverQualificationRow } from '@/types/session';
+import type {
+  AuthTokens,
+  AuthUserDto,
+  DeviceSessionDto,
+  LoginResult,
+  SessionDto,
+} from '@/types/auth';
+
 const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+
+export type {
+  AuthTokens,
+  AuthUserDto,
+  DeviceSessionDto,
+  LoginResult,
+  SessionDto,
+};
 
 export class ApiError extends Error {
   status: number;
@@ -46,7 +107,7 @@ async function tryRefreshAccessToken(): Promise<boolean> {
   return refreshInFlight;
 }
 
-export async function api<T = any>(
+export async function api<T = unknown>(
   path: string,
   options: RequestInit & { skipAuthRefresh?: boolean } = {},
 ): Promise<T> {
@@ -153,82 +214,6 @@ export async function checkBackendServices(): Promise<{
     return { ok: false, down: [], services: [] };
   }
 }
-
-export type SessionDto = {
-  id?: string;
-  sessionDays: number;
-  accessTokenMinutes?: number;
-  idleTimeoutMinutes: number;
-  passwordPolicy?: {
-    minLength: number;
-    complexity: boolean;
-    historyCount?: number;
-    hint: string;
-  };
-  mfaRequired: boolean;
-  mfaEnabled?: boolean;
-  /** Company policy: MFA enrollment required at login. */
-  requireMfa: boolean;
-  idleNote?: string;
-};
-
-export type DeviceSessionDto = {
-  id: string;
-  deviceLabel: string;
-  userAgent: string;
-  ip: string;
-  trusted: boolean;
-  current: boolean;
-  active: boolean;
-  createdAt: string;
-  lastSeenAt: string;
-  expiresAt: string;
-  revokedAt: string | null;
-  revokeReason: string;
-};
-
-export type AuthTokens = {
-  accessToken: string;
-  refreshToken?: string;
-  user: AuthUserDto;
-  session?: SessionDto;
-  recoveryCodes?: string[];
-};
-
-export type LoginResult =
-  | AuthTokens
-  | {
-      mfaRequired: true;
-      mfaToken: string;
-      message?: string;
-    }
-  | {
-      mfaEnrollmentRequired: true;
-      mfaToken: string;
-      message?: string;
-    };
-
-export type AuthUserDto = {
-  id: string;
-  email: string;
-  pendingEmail?: string | null;
-  name: string;
-  role: string;
-  companyId: string | null;
-  status?: string;
-  lockedUntil?: string | null;
-  suspendedAt?: string | null;
-  archivedAt?: string | null;
-  tenantKey?: string | null;
-  permissions?: string[];
-  customRoleId?: string | null;
-  customRoleName?: string | null;
-  driverId?: string | null;
-  mfaEnabled?: boolean;
-  session?: SessionDto;
-  createdAt?: string;
-  updatedAt?: string;
-};
 
 export const authApi = {
   login: (email: string, password: string) =>
@@ -496,8 +481,8 @@ export type EmailDeliveryDto = {
 };
 
 export const companiesApi = {
-  list: () => api<any[]>('/companies'),
-  get: (id: string) => api<any>(`/companies/${id}`),
+  list: () => api<PlatformCompany[]>('/companies'),
+  get: (id: string) => api<PlatformCompany>(`/companies/${id}`),
   create: (body: unknown) =>
     api('/companies', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: unknown) =>
@@ -510,16 +495,18 @@ export const companiesApi = {
       body: JSON.stringify({ planCode }),
     }),
   entitlements: (id: string) =>
-    api<any>(`/companies/${encodeURIComponent(id)}/entitlements`),
+    api<CompanyEntitlementsDto>(
+      `/companies/${encodeURIComponent(id)}/entitlements`,
+    ),
   settings: (id: string) =>
-    api<any>(`/companies/${encodeURIComponent(id)}/settings`),
+    api<CompanySettingsDto>(`/companies/${encodeURIComponent(id)}/settings`),
   patchSettings: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/settings`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
   branding: (id: string) =>
-    api<any>(`/companies/${encodeURIComponent(id)}/branding`),
+    api<CompanyBrandingDto>(`/companies/${encodeURIComponent(id)}/branding`),
   patchBranding: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/branding`, {
       method: 'PATCH',
@@ -540,7 +527,7 @@ export const companiesApi = {
       { method: 'POST', body: JSON.stringify({ to }) },
     ),
   branches: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/branches`),
+    api<BranchDto[]>(`/companies/${encodeURIComponent(id)}/branches`),
   saveBranch: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/branches`, {
       method: 'POST',
@@ -552,7 +539,7 @@ export const companiesApi = {
       { method: 'DELETE' },
     ),
   locations: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/locations${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createLocation: (id: string, body: unknown) =>
@@ -566,7 +553,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   brokers: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/brokers${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createBroker: (id: string, body: unknown) =>
@@ -580,7 +567,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   customers: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/customers${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createCustomer: (id: string, body: unknown) =>
@@ -594,7 +581,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   consignees: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/consignees${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createConsignee: (id: string, body: unknown) =>
@@ -608,7 +595,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   carriers: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/carriers${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createCarrier: (id: string, body: unknown) =>
@@ -651,7 +638,7 @@ export const companiesApi = {
       body: JSON.stringify(body),
     }),
   commodities: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/commodities${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createCommodity: (id: string, body: unknown) =>
@@ -665,7 +652,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   warehouses: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/warehouses${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createWarehouse: (id: string, body: unknown) =>
@@ -679,7 +666,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   borderCrossings: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/border-crossings`),
+    api<MdmRecord[]>(`/companies/${encodeURIComponent(id)}/border-crossings`),
   portsOfEntry: (
     id: string,
     opts?: { selectableOnly?: boolean; country?: string },
@@ -688,12 +675,12 @@ export const companiesApi = {
     if (opts?.selectableOnly) q.set('selectableOnly', '1');
     if (opts?.country) q.set('country', opts.country);
     const qs = q.toString();
-    return api<any[]>(
+    return api<PortOfEntryDto[]>(
       `/companies/${encodeURIComponent(id)}/ports-of-entry${qs ? `?${qs}` : ''}`,
     );
   },
   portCustoms: (id: string, portId: string) =>
-    api<any>(
+    api<PortCustomsDto>(
       `/companies/${encodeURIComponent(id)}/ports-of-entry/${encodeURIComponent(portId)}/customs`,
     ),
   patchPortOfEntry: (id: string, portId: string, body: unknown) =>
@@ -702,7 +689,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   maintenanceVendors: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/maintenance-vendors${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createMaintenanceVendor: (id: string, body: unknown) =>
@@ -716,7 +703,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   fuelStations: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/fuel-stations${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createFuelStation: (id: string, body: unknown) =>
@@ -730,7 +717,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   insuranceProviders: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/insurance-providers${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createInsuranceProvider: (id: string, body: unknown) =>
@@ -744,7 +731,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   costCenters: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/cost-centers${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createCostCenter: (id: string, body: unknown) =>
@@ -758,7 +745,7 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   payrollCategories: (id: string, selectableOnly = false) =>
-    api<any[]>(
+    api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/payroll-categories${selectableOnly ? '?selectableOnly=1' : ''}`,
     ),
   createPayrollCategory: (id: string, body: unknown) =>
@@ -779,7 +766,7 @@ export const companiesApi = {
     if (opts?.selectableOnly) q.set('selectableOnly', '1');
     if (opts?.kind) q.set('kind', opts.kind);
     const qs = q.toString();
-    return api<any[]>(
+    return api<MdmRecord[]>(
       `/companies/${encodeURIComponent(id)}/reference-data${qs ? `?${qs}` : ''}`,
     );
   },
@@ -794,14 +781,16 @@ export const companiesApi = {
       { method: 'PATCH', body: JSON.stringify(body) },
     ),
   departments: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/departments`),
+    api<DepartmentDto[]>(`/companies/${encodeURIComponent(id)}/departments`),
   saveDepartment: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/departments`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
   documents: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/documents`),
+    api<CompanyDocumentDto[]>(
+      `/companies/${encodeURIComponent(id)}/documents`,
+    ),
   createDocument: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/documents`, {
       method: 'POST',
@@ -818,7 +807,7 @@ export const companiesApi = {
       { method: 'DELETE' },
     ),
   apiKeys: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/api-keys`),
+    api<ApiKeyDto[]>(`/companies/${encodeURIComponent(id)}/api-keys`),
   createApiKey: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/api-keys`, {
       method: 'POST',
@@ -830,14 +819,18 @@ export const companiesApi = {
       { method: 'POST' },
     ),
   securityPolicy: (id: string) =>
-    api<any>(`/companies/${encodeURIComponent(id)}/security-policy`),
+    api<SecurityPolicyDto>(
+      `/companies/${encodeURIComponent(id)}/security-policy`,
+    ),
   patchSecurityPolicy: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/security-policy`, {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
   notificationRules: (id: string) =>
-    api<any[]>(`/companies/${encodeURIComponent(id)}/notification-rules`),
+    api<NotificationRuleDto[]>(
+      `/companies/${encodeURIComponent(id)}/notification-rules`,
+    ),
   saveNotificationRule: (id: string, body: unknown) =>
     api(`/companies/${encodeURIComponent(id)}/notification-rules`, {
       method: 'POST',
@@ -885,14 +878,14 @@ export const companiesApi = {
 };
 
 export const plansApi = {
-  list: () => api<any[]>('/plans'),
-  get: (code: string) => api<any>(`/plans/${encodeURIComponent(code)}`),
+  list: () => api<PlanDto[]>('/plans'),
+  get: (code: string) => api<PlanDto>(`/plans/${encodeURIComponent(code)}`),
 };
 
 export const tenantsApi = {
-  list: () => api<any[]>('/tenants'),
+  list: () => api<TenantRowDto[]>('/tenants'),
   get: (companyId: string) =>
-    api<any>(`/tenants/${encodeURIComponent(companyId)}`),
+    api<TenantRowDto>(`/tenants/${encodeURIComponent(companyId)}`),
   provision: (companyId: string, force = false) =>
     api(`/tenants/${encodeURIComponent(companyId)}/provision`, {
       method: 'POST',
@@ -912,19 +905,25 @@ export const tenantsApi = {
       '/tenants/schema-migrate-all',
       { method: 'POST' },
     ),
-  opsSummary: () => api<any>('/tenants/ops/summary'),
+  opsSummary: () => api<TenantOpsSummaryDto>('/tenants/ops/summary'),
 };
 
 export const driversApi = {
   list: (companyId: string, includeArchived = false) =>
-    api<any[]>(
+    api<DriverRecordDto[]>(
       `/drivers?companyId=${encodeURIComponent(companyId)}${includeArchived ? '&includeArchived=1' : ''}`,
     ),
-  get: (id: string) => api<any>(`/drivers/${id}`),
+  get: (id: string) => api<DriverRecordDto>(`/drivers/${id}`),
   create: (body: unknown) =>
-    api<any>('/drivers', { method: 'POST', body: JSON.stringify(body) }),
+    api<DriverRecordDto>('/drivers', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   update: (id: string, body: unknown) =>
-    api<any>(`/drivers/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+    api<DriverRecordDto>(`/drivers/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
   remove: (id: string) => api(`/drivers/${id}`, { method: 'DELETE' }),
   dispatchReady: (id: string) =>
     api<{
@@ -955,7 +954,9 @@ export const driversApi = {
   restore: (id: string) =>
     api(`/drivers/${id}/restore`, { method: 'POST', body: '{}' }),
   qualifications: (driverId: string) =>
-    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/qualifications`),
+    api<DriverQualificationRow[]>(
+      `/drivers/${encodeURIComponent(driverId)}/qualifications`,
+    ),
   createQualification: (driverId: string, body: unknown) =>
     api(`/drivers/${encodeURIComponent(driverId)}/qualifications`, {
       method: 'POST',
@@ -984,7 +985,7 @@ export const driversApi = {
       totalLoads: number;
     }>(`/drivers/${id}/performance`),
   equipmentAssignments: (driverId: string) =>
-    api<any[]>(
+    api<EquipmentAssignmentDto[]>(
       `/drivers/${encodeURIComponent(driverId)}/equipment-assignments`,
     ),
   assignEquipment: (driverId: string, body: unknown) =>
@@ -998,7 +999,9 @@ export const driversApi = {
       body: '{}',
     }),
   safetyEvents: (driverId: string) =>
-    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/safety-events`),
+    api<SafetyEventDto[]>(
+      `/drivers/${encodeURIComponent(driverId)}/safety-events`,
+    ),
   createSafetyEvent: (driverId: string, body: unknown) =>
     api(`/drivers/${encodeURIComponent(driverId)}/safety-events`, {
       method: 'POST',
@@ -1012,7 +1015,9 @@ export const driversApi = {
   removeSafetyEvent: (id: string) =>
     api(`/safety-events/${id}`, { method: 'DELETE' }),
   trainingRecords: (driverId: string) =>
-    api<any[]>(`/drivers/${encodeURIComponent(driverId)}/training-records`),
+    api<TrainingRecordDto[]>(
+      `/drivers/${encodeURIComponent(driverId)}/training-records`,
+    ),
   createTrainingRecord: (driverId: string, body: unknown) =>
     api(`/drivers/${encodeURIComponent(driverId)}/training-records`, {
       method: 'POST',
@@ -1032,7 +1037,7 @@ export const documentsApi = {
     const q = new URLSearchParams();
     if (params.driverId) q.set('driverId', params.driverId);
     if (params.companyId) q.set('companyId', params.companyId);
-    return api<any[]>(`/documents?${q}`);
+    return api<DriverDocument[]>(`/documents?${q}`);
   },
   upsert: (body: unknown) =>
     api('/documents', { method: 'POST', body: JSON.stringify(body) }),
@@ -1041,7 +1046,9 @@ export const documentsApi = {
 
 export const contractsApi = {
   list: (driverId: string) =>
-    api<any[]>(`/contracts?driverId=${encodeURIComponent(driverId)}`),
+    api<EmploymentContractDto[]>(
+      `/contracts?driverId=${encodeURIComponent(driverId)}`,
+    ),
   upsert: (body: unknown) =>
     api('/contracts', { method: 'POST', body: JSON.stringify(body) }),
   sign: (id: string, body: unknown) =>
@@ -1053,7 +1060,7 @@ export const contractsApi = {
 
 export const invitesApi = {
   list: (companyId: string) =>
-    api<any[]>(`/invites?companyId=${encodeURIComponent(companyId)}`),
+    api<Invite[]>(`/invites?companyId=${encodeURIComponent(companyId)}`),
   create: (
     companyId: string,
     extra?: {
@@ -1063,13 +1070,14 @@ export const invitesApi = {
       name?: string;
     },
   ) =>
-    api<any>('/invites', {
+    api<InviteDetailDto>('/invites', {
       method: 'POST',
       body: JSON.stringify({ companyId, ...extra }),
     }),
-  byToken: (token: string) => api<any>(`/invites/by-token/${token}`),
+  byToken: (token: string) =>
+    api<InviteDetailDto>(`/invites/by-token/${token}`),
   complete: (token: string, body: unknown) =>
-    api<any>(`/invites/${token}/complete`, {
+    api<InviteDetailDto>(`/invites/${token}/complete`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),
@@ -1079,16 +1087,16 @@ export const invitesApi = {
       { method: 'POST', body: JSON.stringify(body) },
     ),
   revoke: (id: string) =>
-    api<any>(`/invites/${id}/revoke`, { method: 'POST', body: '{}' }),
+    api<Invite>(`/invites/${id}/revoke`, { method: 'POST', body: '{}' }),
   regenerate: (id: string) =>
-    api<any>(`/invites/${id}/regenerate`, { method: 'POST', body: '{}' }),
+    api<Invite>(`/invites/${id}/regenerate`, { method: 'POST', body: '{}' }),
 };
 
 export const assetsApi = {
   list: (companyId: string, type?: string) => {
     const q = new URLSearchParams({ companyId });
     if (type) q.set('type', type);
-    return api<any[]>(`/assets?${q}`);
+    return api<Asset[]>(`/assets?${q}`);
   },
   equipmentTypes: (companyId: string) =>
     api<Array<{ id: string; code: string; name: string; system: boolean }>>(
@@ -1117,10 +1125,10 @@ export const loadsApi = {
     const q = new URLSearchParams({ companyId: params.companyId });
     if (params.status) q.set('status', params.status);
     if (params.driverId) q.set('driverId', params.driverId);
-    return api<any[]>(`/loads?${q}`);
+    return api<Load[]>(`/loads?${q}`);
   },
   active: (companyId: string) =>
-    api<any[]>(`/loads/active?companyId=${encodeURIComponent(companyId)}`),
+    api<Load[]>(`/loads/active?companyId=${encodeURIComponent(companyId)}`),
   create: (body: unknown) =>
     api('/loads', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: unknown) =>
@@ -1137,7 +1145,7 @@ export const loadsApi = {
 
 export const manifestsApi = {
   list: (companyId: string) =>
-    api<any[]>(`/manifests?companyId=${encodeURIComponent(companyId)}`),
+    api<Manifest[]>(`/manifests?companyId=${encodeURIComponent(companyId)}`),
   create: (body: unknown) =>
     api('/manifests', { method: 'POST', body: JSON.stringify(body) }),
   update: (id: string, body: unknown) =>
@@ -1155,7 +1163,7 @@ export const manifestsApi = {
 
 export const carrierProfilesApi = {
   get: (companyId: string) =>
-    api<any>(`/carrier-profiles/${encodeURIComponent(companyId)}`),
+    api<CarrierProfile>(`/carrier-profiles/${encodeURIComponent(companyId)}`),
   upsert: (companyId: string, body: unknown) =>
     api(`/carrier-profiles/${encodeURIComponent(companyId)}`, {
       method: 'PUT',
@@ -1167,7 +1175,7 @@ export const tripSheetsApi = {
   list: (params: { companyId: string; driverId?: string }) => {
     const q = new URLSearchParams({ companyId: params.companyId });
     if (params.driverId) q.set('driverId', params.driverId);
-    return api<any[]>(`/trip-sheets?${q}`);
+    return api<TripSheet[]>(`/trip-sheets?${q}`);
   },
   create: (body: unknown) =>
     api('/trip-sheets', { method: 'POST', body: JSON.stringify(body) }),
@@ -1181,7 +1189,7 @@ export const settlementsApi = {
     const q = new URLSearchParams({ companyId: params.companyId });
     if (params.driverId) q.set('driverId', params.driverId);
     if (params.status) q.set('status', params.status);
-    return api<any[]>(`/settlements?${q}`);
+    return api<Settlement[]>(`/settlements?${q}`);
   },
   create: (body: unknown) =>
     api('/settlements', { method: 'POST', body: JSON.stringify(body) }),
@@ -1195,16 +1203,20 @@ export const settlementsApi = {
 
 export const reportsApi = {
   summary: (companyId: string) =>
-    api<any>(`/reports/summary?companyId=${encodeURIComponent(companyId)}`),
+    api<CompanyReportSummary>(
+      `/reports/summary?companyId=${encodeURIComponent(companyId)}`,
+    ),
   analytics: (companyId: string) =>
-    api<any>(`/reports/analytics?companyId=${encodeURIComponent(companyId)}`),
+    api<ReportAnalyticsDto>(
+      `/reports/analytics?companyId=${encodeURIComponent(companyId)}`,
+    ),
 };
 
 export const maintenanceApi = {
   list: (companyId: string, assetId?: string) => {
     const q = new URLSearchParams({ companyId });
     if (assetId) q.set('assetId', assetId);
-    return api<any[]>(`/maintenance?${q}`);
+    return api<MaintenanceRecordDto[]>(`/maintenance?${q}`);
   },
   create: (body: unknown) =>
     api('/maintenance', { method: 'POST', body: JSON.stringify(body) }),
@@ -1217,7 +1229,7 @@ export const dvirApi = {
   list: (companyId: string, assetId?: string) => {
     const q = new URLSearchParams({ companyId });
     if (assetId) q.set('assetId', assetId);
-    return api<any[]>(`/dvir?${q}`);
+    return api<DvirRecordDto[]>(`/dvir?${q}`);
   },
   create: (body: unknown) =>
     api('/dvir', { method: 'POST', body: JSON.stringify(body) }),
@@ -1228,7 +1240,7 @@ export const invoicesApi = {
   list: (companyId: string, status?: string) => {
     const q = new URLSearchParams({ companyId });
     if (status) q.set('status', status);
-    return api<any[]>(`/invoices?${q}`);
+    return api<InvoiceDto[]>(`/invoices?${q}`);
   },
   create: (body: unknown) =>
     api('/invoices', { method: 'POST', body: JSON.stringify(body) }),
@@ -1239,7 +1251,7 @@ export const invoicesApi = {
 
 export const billsApi = {
   list: (companyId: string) =>
-    api<any[]>(`/bills?companyId=${encodeURIComponent(companyId)}`),
+    api<BillDto[]>(`/bills?companyId=${encodeURIComponent(companyId)}`),
   create: (body: unknown) =>
     api('/bills', { method: 'POST', body: JSON.stringify(body) }),
   remove: (id: string) => api(`/bills/${id}`, { method: 'DELETE' }),
@@ -1247,14 +1259,14 @@ export const billsApi = {
 
 export const paymentsApi = {
   list: (companyId: string) =>
-    api<any[]>(`/payments?companyId=${encodeURIComponent(companyId)}`),
+    api<PaymentDto[]>(`/payments?companyId=${encodeURIComponent(companyId)}`),
   create: (body: unknown) =>
     api('/payments', { method: 'POST', body: JSON.stringify(body) }),
 };
 
 export const accountsApi = {
   list: (companyId: string) =>
-    api<any[]>(`/accounts?companyId=${encodeURIComponent(companyId)}`),
+    api<AccountDto[]>(`/accounts?companyId=${encodeURIComponent(companyId)}`),
   seedDefaults: (companyId: string) =>
     api('/accounts/seed-defaults', {
       method: 'POST',
@@ -1266,7 +1278,7 @@ export const messagesApi = {
   list: (companyId: string, toUserId?: string) => {
     const q = new URLSearchParams({ companyId });
     if (toUserId) q.set('toUserId', toUserId);
-    return api<any[]>(`/messages?${q}`);
+    return api<MessageDto[]>(`/messages?${q}`);
   },
   create: (body: unknown) =>
     api('/messages', { method: 'POST', body: JSON.stringify(body) }),
@@ -1277,7 +1289,7 @@ export const messagesApi = {
 export const commentsApi = {
   list: (companyId: string, entityType: string, entityId: string) => {
     const q = new URLSearchParams({ companyId, entityType, entityId });
-    return api<any[]>(`/comments?${q}`);
+    return api<CommentDto[]>(`/comments?${q}`);
   },
   create: (body: unknown) =>
     api('/comments', { method: 'POST', body: JSON.stringify(body) }),
@@ -1285,7 +1297,7 @@ export const commentsApi = {
 
 export const auditApi = {
   list: (companyId: string, limit = 100) =>
-    api<any[]>(
+    api<AuditEntryDto[]>(
       `/audit?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
     ),
   create: (body: unknown) =>
@@ -1299,7 +1311,7 @@ export const notificationsApi = {
       twilioConfigured: boolean;
     }>('/notifications/health/detail'),
   list: (companyId: string, limit = 50) =>
-    api<any[]>(
+    api<NotificationRecord[]>(
       `/notifications?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
     ),
   sendSms: (body: {

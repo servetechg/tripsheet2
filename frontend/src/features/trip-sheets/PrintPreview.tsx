@@ -2,8 +2,18 @@ import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, BackButton, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 
-export function PrintPreview({ company, header, trips, expenses, notes, onBack, branding }: any) {
-  const ref = useRef<any>(null);
+import type { PrintPreviewProps } from '@/features/trip-sheets/types';
+
+export function PrintPreview({
+  company,
+  header,
+  trips,
+  expenses,
+  notes,
+  onBack,
+  branding,
+}: PrintPreviewProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
   const sn = company.shortName || "CO";
   const accent = sn.slice(-1), base = sn.slice(0,-1);
   const brandAccent = branding?.accentColor || '#D4A017';

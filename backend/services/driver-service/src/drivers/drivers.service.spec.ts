@@ -8,6 +8,7 @@ describe('DriversService.dispatchReady', () => {
   let prisma: {
     driver: {
       findUnique: jest.Mock;
+      findFirst: jest.Mock;
     };
   };
 
@@ -30,17 +31,21 @@ describe('DriversService.dispatchReady', () => {
     prisma = {
       driver: {
         findUnique: jest.fn(),
+        findFirst: jest.fn(),
       },
     };
     documentsService = { findAll: jest.fn() };
     const config = { get: jest.fn() };
-    const qualifications = new QualificationsService({} as any, config as any);
+    const qualifications = new QualificationsService(
+      {} as unknown as ConstructorParameters<typeof QualificationsService>[0],
+      config as unknown as ConstructorParameters<typeof QualificationsService>[1],
+    );
     service = new DriversService(
-      prisma as any,
-      config as any,
-      {} as any,
+      prisma as unknown as ConstructorParameters<typeof DriversService>[0],
+      config as unknown as ConstructorParameters<typeof DriversService>[1],
+      {} as unknown as ConstructorParameters<typeof DriversService>[2],
       qualifications,
-      documentsService as any,
+      documentsService as unknown as ConstructorParameters<typeof DriversService>[4],
     );
   });
 
@@ -58,6 +63,7 @@ describe('DriversService.dispatchReady', () => {
 
   it('throws when driver missing', async () => {
     prisma.driver.findUnique.mockResolvedValue(null);
+    prisma.driver.findFirst.mockResolvedValue(null);
     await expect(service.dispatchReady('x')).rejects.toBeInstanceOf(
       NotFoundException,
     );

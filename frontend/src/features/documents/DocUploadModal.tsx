@@ -1,17 +1,21 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useState, useRef, useEffect, Fragment } from 'react';
 import { G, SPACE, RADIUS, FONT_UI, FONT_MONO, page, pagePlain, pageCentered } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, Skeleton, G2, Icons } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 
-export function DocUploadModal({ docType, onUpload, onClose }: any) {
+import type { DocUploadModalProps } from '@/features/documents/types';
+import type { FileUploadData } from '@/types/app';
+
+export function DocUploadModal({ docType, onUpload, onClose }: DocUploadModalProps) {
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
-  const [preview, setPreview] = useState<any>(null);
-  const [fileInfo, setFileInfo] = useState<any>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [fileInfo, setFileInfo] = useState<FileUploadData | null>(null);
   const [dragging, setDragging] = useState(false);
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
-  const fileRef = useRef<any>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const handleFile = (file) => {
     if (!file) return;
@@ -48,8 +52,8 @@ export function DocUploadModal({ docType, onUpload, onClose }: any) {
         onUpload(docType.id, { ...fileInfo, expiry, notes }),
       );
       notify(`${docType?.label || fileInfo.name || 'Document'} uploaded successfully`);
-    } catch (e: any) {
-      const msg = e?.message || 'Upload failed.';
+    } catch (e: unknown) {
+      const msg = getApiErrorMessage(e, 'Upload failed.');
       setErr(msg);
       notify(msg, 'error');
     } finally {

@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useState } from 'react';
 import { G } from '@/lib/theme';
 import { StatCard, StatsGrid, Icons } from '@/components/ui';
@@ -8,21 +9,25 @@ import { CarrierProfileForm } from './CarrierProfileForm';
 import { EManifestForm } from './EManifestForm';
 import { EManifestCard } from './EManifestCard';
 import { LeadSheet } from './LeadSheet';
+import type { EManifestTabProps } from '@/types/tabs';
+import type { Manifest } from '@/types/app';
 
-function normalizeManifest(row: any) {
+function normalizeManifest(row: Record<string, unknown>): Manifest {
   const formData =
-    row?.formData && typeof row.formData === 'object' ? row.formData : {};
+    row?.formData && typeof row.formData === 'object'
+      ? (row.formData as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
   const estimated = String(row?.estimatedArrival || '');
   const [eta = '', etaTime = ''] = estimated.split(/[ T]/, 2);
   return {
     ...formData,
     ...row,
-    portCode: formData.portCode || row.portOfEntry || '',
-    eta: formData.eta || eta,
-    etaTime: formData.etaTime || etaTime,
-    tripLoadId: formData.tripLoadId || row.loadId || '',
+    portCode: String(formData.portCode ?? row.portOfEntry ?? ''),
+    eta: String(formData.eta ?? eta),
+    etaTime: String(formData.etaTime ?? etaTime),
+    tripLoadId: String(formData.tripLoadId ?? row.loadId ?? ''),
     shipments: Array.isArray(row.shipments) ? row.shipments : [],
-  };
+  } as unknown as Manifest;
 }
 
 export function EManifestTab({
@@ -38,13 +43,16 @@ export function EManifestTab({
   loads,
   apiEnabled,
   refreshAll,
-}: any) {
+}: EManifestTabProps) {
   const [subTab, setSubTab] = useState('list');
-  const [editingManifest, setEditingManifest] = useState<any>(null);
-  const [viewLeadSheet, setViewLeadSheet] = useState<any>(null);
+  const [editingManifest, setEditingManifest] = useState<Manifest | null>(null);
+  const [viewLeadSheet, setViewLeadSheet] = useState<Manifest | null>(null);
 
-  const [pending, setPending] = useState<any>({});
-  const [actionError, setActionError] = useState<any>(null);
+  const [pending, setPending] = useState<Record<string, string>>({});
+  const [actionError, setActionError] = useState<{
+    id: string;
+    msg: string;
+  } | null>(null);
   const confirm = useConfirm();
 
   const runGatewayAction = (
@@ -57,7 +65,7 @@ export function EManifestTab({
     }: { failRate?: number; successMsg?: string } = {},
   ) => {
     setActionError(null);
-    setPending((p: any) => ({ ...p, [id]: label }));
+    setPending((p) => ({ ...p, [id]: label }));
 
     const finish = async () => {
       try {
@@ -78,12 +86,12 @@ export function EManifestTab({
           await apply();
           if (successMsg) notify(successMsg);
         }
-      } catch (e: any) {
-        const msg = e?.message || `${label} failed. Please try again.`;
+      } catch (e: unknown) {
+        const msg = getApiErrorMessage(e, `${label} failed. Please try again.`);
         setActionError({ id, msg });
         notify(msg, 'error');
       } finally {
-        setPending((p: any) => {
+        setPending((p) => {
           const n = { ...p };
           delete n[id];
           return n;
@@ -104,7 +112,7 @@ export function EManifestTab({
     return (carrierCode || 'XXXX') + suffix;
   };
 
-  const toApiBody = (m: any) => ({
+  const toApiBody = (m) => ({
     companyId: company.id,
     type: m.type,
     crn: m.crn,
@@ -137,15 +145,18 @@ export function EManifestTab({
     },
   });
 
-  const saveManifest = async (m: any) => {
+  const saveManifest = async (m: Manifest) => {
     try {
       if (apiEnabled) {
-        const existing = manifests.find((x: any) => x.id === m.id);
-        let saved: any;
+        const existing = manifests.find((x) => x.id === m.id);
+        let saved: Manifest;
         if (existing) {
-          saved = await manifestsApi.update(m.id, toApiBody(m));
+          saved = (await manifestsApi.update(
+            m.id,
+            toApiBody(m),
+          )) as Manifest;
         } else {
-          saved = await manifestsApi.create(toApiBody(m));
+          saved = (await manifestsApi.create(toApiBody(m))) as Manifest;
         }
         const persistedId = existing?.id || saved?.id;
         if (
@@ -166,7 +177,7 @@ export function EManifestTab({
         }
         await refreshAll?.();
       } else {
-        setManifests((p: any[]) => {
+        setManifests((p) => {
           const ex = p.find((x) => x.id === m.id);
           return ex ? p.map((x) => (x.id === m.id ? m : x)) : [...p, m];
         });
@@ -178,8 +189,8 @@ export function EManifestTab({
           ? 'eManifest submitted successfully.'
           : 'eManifest draft saved.',
       );
-    } catch (e: any) {
-      notify(e?.message || 'Failed to save eManifest', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to save eManifest'), 'error');
       throw e;
     }
   };
@@ -236,13 +247,13 @@ export function EManifestTab({
       />
     );
 
-  const aciCount = manifests.filter((m: any) => m.type === 'ACI').length;
-  const aceCount = manifests.filter((m: any) => m.type === 'ACE').length;
+  const aciCount = manifests.filter((m) => m.type === 'ACI').length;
+  const aceCount = manifests.filter((m) => m.type === 'ACE').length;
   const acceptedCount = manifests.filter(
-    (m: any) => m.status === 'accepted',
+    (m) => m.status === 'accepted',
   ).length;
   const pendingCount = manifests.filter(
-    (m: any) => m.status === 'submitted',
+    (m) => m.status === 'submitted',
   ).length;
 
   const submitManifest = (id: string) =>
@@ -253,7 +264,7 @@ export function EManifestTab({
         if (apiEnabled) {
           await manifestsApi.submit(id);
         } else {
-          setManifests((p: any[]) =>
+          setManifests((p) =>
             p.map((m) =>
               m.id === id
                 ? {
@@ -280,7 +291,7 @@ export function EManifestTab({
         if (apiEnabled) {
           await manifestsApi.accept(id);
         } else {
-          setManifests((p: any[]) =>
+          setManifests((p) =>
             p.map((m) =>
               m.id === id
                 ? {
@@ -307,7 +318,7 @@ export function EManifestTab({
             'Duplicate CCN / invalid data',
           );
         } else {
-          setManifests((p: any[]) =>
+          setManifests((p) =>
             p.map((m) =>
               m.id === id
                 ? {
@@ -339,7 +350,7 @@ export function EManifestTab({
         if (apiEnabled) {
           await manifestsApi.cancel(id);
         } else {
-          setManifests((p: any[]) =>
+          setManifests((p) =>
             p.map((m) =>
               m.id === id ? { ...m, status: 'cancelled' } : m,
             ),
@@ -366,26 +377,26 @@ export function EManifestTab({
         await manifestsApi.remove(id);
         await refreshAll?.();
       } else {
-        setManifests((p: any[]) => p.filter((m) => m.id !== id));
+        setManifests((p) => p.filter((m) => m.id !== id));
       }
       notify('Draft eManifest deleted.');
-    } catch (e: any) {
-      notify(e?.message || 'Delete failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Delete failed'), 'error');
     }
   };
 
-  const editManifest = (m: any) => {
+  const editManifest = (m) => {
     setEditingManifest(m);
     setSubTab(m.type === 'ACI' ? 'new_aci' : 'new_ace');
   };
 
-  const saveProfile = async (updated: any) => {
+  const saveProfile = async (updated) => {
     try {
       if (apiEnabled) {
         await carrierProfilesApi.upsert(company.id, updated);
         await refreshAll?.();
       } else {
-        setCarrierProfiles((p: any[]) => {
+        setCarrierProfiles((p) => {
           const ex = p.find((x) => x.companyId === company.id);
           return ex
             ? p.map((x) =>
@@ -394,8 +405,8 @@ export function EManifestTab({
             : [...p, { ...updated, companyId: company.id }];
         });
       }
-    } catch (e: any) {
-      notify(e?.message || 'Failed to save carrier profile', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to save carrier profile'), 'error');
     }
   };
 
@@ -548,7 +559,7 @@ export function EManifestTab({
         </div>
       )}
 
-      {sorted.map((m: any) => (
+      {sorted.map((m) => (
         <EManifestCard
           key={m.id}
           manifest={m}

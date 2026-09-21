@@ -1,4 +1,10 @@
-import type { Dispatch, SetStateAction, CSSProperties, ReactNode } from 'react';
+import type {
+  ChangeEvent,
+  Dispatch,
+  SetStateAction,
+  CSSProperties,
+  ReactNode,
+} from 'react';
 import type {
   Company,
   Asset,
@@ -11,6 +17,10 @@ import type {
 } from '@tripsheet/shared';
 
 export type Setter<T> = Dispatch<SetStateAction<T>>;
+
+export type FieldChangeEvent = ChangeEvent<
+  HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+>;
 
 export type NavTab = { id: string; icon: string; label: string };
 
@@ -50,6 +60,7 @@ export type FileUploadData = {
   data: string;
   expiry?: string;
   notes?: string;
+  displaySize?: string;
 };
 
 export type DocTypeMeta = {
@@ -60,6 +71,13 @@ export type DocTypeMeta = {
 };
 
 export type ContractForm = {
+  id?: string;
+  driverId?: string;
+  companyId?: string;
+  driverName?: string;
+  companyName?: string;
+  createdAt?: string;
+  updatedAt?: string;
   startDate?: string;
   payType?: string;
   payRate?: string;
@@ -72,12 +90,19 @@ export type ContractForm = {
   trialDays?: string;
   noticeDays?: string;
   benefits?: string;
+  deductions?: string;
+  notes?: string;
   signedByDriver?: boolean;
   signedByAdmin?: boolean;
   signedAt?: string;
   driverSignature?: string;
   adminSignature?: string;
-  [key: string]: unknown;
+};
+
+/** API loads may include audit timestamps not on the shared Load model. */
+export type LoadWithTimestamps = Load & {
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type StyleProps = { style?: CSSProperties; children?: ReactNode };

@@ -1,7 +1,9 @@
 import { G, RADIUS } from '@/lib/theme';
 import { NavIcon } from '@/components/ui/Icons';
+import type { BottomNavProps } from '@/types/workspace';
+import type { NavTab } from '@/types/app';
 
-export function BottomNav({ tabs, active, onChange }: any) {
+export function BottomNav({ tabs, active, onChange }: BottomNavProps) {
   return (
     <div
       style={{
@@ -18,7 +20,7 @@ export function BottomNav({ tabs, active, onChange }: any) {
         WebkitOverflowScrolling: 'touch',
       }}
     >
-      {tabs.map((t: any) => {
+      {tabs.map((t) => {
         const on = active === t.id;
         const iconColor = on ? G.navActiveText : G.muted;
         return (

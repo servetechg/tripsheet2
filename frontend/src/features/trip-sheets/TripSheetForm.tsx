@@ -17,13 +17,13 @@ const emptyTrip = () => ({
   notes: '',
 });
 
-const emptyExp = () => ({
+const emptyExp = (): import('@tripsheet/shared').Expense => ({
   id: uid(),
   category: 'Fuel',
   description: '',
   amount: '',
   receiptNo: '',
-  paidBy: 'Company Card',
+  currency: 'CAD',
 });
 
 const FALLBACK_EXPENSE = [
@@ -79,10 +79,13 @@ export function TripSheetForm({
   editSheet,
   onSave,
   onBack,
-}: any) {
+}: import('@/features/trip-sheets/types').TripSheetFormProps) {
   const [init] = useState(() => ({
     hdr: editSheet?.header || {
-      truckNo: user?.truckNo || '',
+      truckNo: String(
+        (user as import('@/types/session').AppUser & { truckNo?: string })
+          .truckNo || '',
+      ),
       startDate: '',
       endDate: '',
       driver1: user?.name || '',
@@ -94,8 +97,12 @@ export function TripSheetForm({
   }));
 
   const [hdr, setHdr] = useState(init.hdr);
-  const [trips, setTrips] = useState<any[]>(init.trips);
-  const [exps, setExps] = useState<any[]>(init.expenses);
+  const [trips, setTrips] = useState<import('@tripsheet/shared').TripLeg[]>(
+    init.trips,
+  );
+  const [exps, setExps] = useState<import('@tripsheet/shared').Expense[]>(
+    init.expenses,
+  );
   const [notes, setNotes] = useState(init.notes);
   const [preview, setPreview] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -128,7 +135,7 @@ export function TripSheetForm({
       })
       .then((rows) => {
         const names = (Array.isArray(rows) ? rows : [])
-          .map((r: any) => String(r.name || '').trim())
+          .map((r) => String(r.name || '').trim())
           .filter(Boolean);
         if (names.length) setExpCats(names);
       })
@@ -136,7 +143,7 @@ export function TripSheetForm({
   }, [company?.id]);
 
   const updH = (k: string, v: string) => {
-    setHdr((h: any) => ({ ...h, [k]: v }));
+    setHdr((h) => ({ ...h, [k]: v }));
     if (errors.header?.[k as keyof typeof errors.header]) {
       setErrors((prev) => ({
         ...prev,
@@ -425,16 +432,22 @@ export function TripSheetForm({
     submitted &&
     (Boolean(errors.general) ||
       Object.keys(errors.header || {}).some((k) =>
-        Boolean((errors.header as any)[k]),
+        Boolean(errors.header?.[k as keyof typeof errors.header]),
       ) ||
       Object.keys(errors.trips || {}).some((id) =>
         Object.keys(errors.trips![id] || {}).some((k) =>
-          Boolean((errors.trips![id] as any)[k]),
+          Boolean(
+            errors.trips?.[id]?.[k as keyof NonNullable<typeof errors.trips>[string]],
+          ),
         ),
       ) ||
       Object.keys(errors.expenses || {}).some((id) =>
         Object.keys(errors.expenses![id] || {}).some((k) =>
-          Boolean((errors.expenses![id] as any)[k]),
+          Boolean(
+            errors.expenses?.[id]?.[
+              k as keyof NonNullable<typeof errors.expenses>[string]
+            ],
+          ),
         ),
       ));
 

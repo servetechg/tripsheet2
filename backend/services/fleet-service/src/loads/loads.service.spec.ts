@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { LoadsService } from './loads.service';
+import type { CreateLoadDto } from './dto/create-load.dto';
 
 describe('LoadsService', () => {
   let service: LoadsService;
@@ -42,12 +43,15 @@ describe('LoadsService', () => {
       if (key === 'DRIVER_SERVICE_URL') return '';
       return undefined;
     });
-    service = new LoadsService(prisma as any, config as any);
+    service = new LoadsService(
+      prisma as unknown as ConstructorParameters<typeof LoadsService>[0],
+      config as unknown as ConstructorParameters<typeof LoadsService>[1],
+    );
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
-    delete (global as any).fetch;
+    Reflect.deleteProperty(globalThis, 'fetch');
   });
 
   describe('create', () => {
@@ -58,7 +62,7 @@ describe('LoadsService', () => {
           driverId: '',
           origin: 'A',
           destination: 'B',
-        } as any),
+        } as CreateLoadDto),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -70,7 +74,7 @@ describe('LoadsService', () => {
           driverId: 'd1',
           origin: 'Calgary',
           destination: 'Toronto',
-        } as any),
+        } as CreateLoadDto),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.load.create).not.toHaveBeenCalled();
     });
@@ -88,7 +92,7 @@ describe('LoadsService', () => {
         driverId: 'd1',
         origin: 'Calgary',
         destination: 'Toronto',
-      } as any);
+      } as CreateLoadDto);
 
       expect(result.id).toBe('L1');
       expect(prisma.load.create).toHaveBeenCalled();
@@ -123,7 +127,7 @@ describe('LoadsService', () => {
         }
         return { ok: true, json: async () => ({}) };
       });
-      global.fetch = fetchMock as any;
+      global.fetch = fetchMock as unknown as typeof fetch;
 
       await expect(
         service.create({
@@ -131,14 +135,14 @@ describe('LoadsService', () => {
           driverId: 'd1',
           origin: 'Calgary',
           destination: 'Toronto',
-        } as any),
+        } as CreateLoadDto),
       ).rejects.toThrow(/medical/);
       expect(prisma.load.create).not.toHaveBeenCalled();
     });
 
     it('rejects Out of Service truck', async () => {
       prisma.load.findFirst.mockResolvedValue(null);
-      global.fetch = jest.fn(async () => ({ ok: false })) as any;
+      global.fetch = jest.fn(async () => ({ ok: false })) as unknown as typeof fetch;
       prisma.asset.findUnique.mockResolvedValue({
         id: 't1',
         companyId: 'c1',
@@ -152,7 +156,7 @@ describe('LoadsService', () => {
           truckId: 't1',
           origin: 'Calgary',
           destination: 'Toronto',
-        } as any),
+        } as CreateLoadDto),
       ).rejects.toThrow(/Out of Service/);
       expect(prisma.load.create).not.toHaveBeenCalled();
     });

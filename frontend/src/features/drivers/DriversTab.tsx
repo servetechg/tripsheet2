@@ -21,6 +21,13 @@ import { matchesDriverRef } from '@/lib/driverIds';
 import { useCan } from '@/lib/permissions';
 import { EmailChangeModal } from '@/components/account/EmailChangeModal';
 import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
+import type { DriversTabProps } from '@/features/drivers/types';
+import type { BranchDto } from '@/types/dtos';
+import type { DriverEditFormState } from '@/types/tabs';
+import type { InviteDetailDto } from '@/types/dtos';
+import type { Invite } from '@tripsheet/shared';
+import { getApiErrorMessage } from '@/lib/format';
+import type { AppUser } from '@/types/session';
 
 export function DriversTab({
   company,
@@ -35,16 +42,16 @@ export function DriversTab({
   setInvites,
   apiEnabled,
   refreshAll,
-}: any) {
+}: DriversTabProps) {
   const { can } = useCan();
   const confirm = useConfirm();
   const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
   const [view, setView] = useState('list');
-  const [selectedDriver, setSD] = useState<any>(null);
+  const [selectedDriver, setSD] = useState<AppUser | null>(null);
   const [show, setShow] = useState(false);
-  const [editDriver, setEditDriver] = useState<any>(null);
-  const [initialF, setInitialF] = useState<any>(null);
-  const [generatedLink, setGeneratedLink] = useState<any>(null);
+  const [editDriver, setEditDriver] = useState<AppUser | null>(null);
+  const [initialF, setInitialF] = useState<DriverEditFormState | null>(null);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
   const [generatedInviteId, setGeneratedInviteId] = useState<string | null>(
     null,
   );
@@ -54,11 +61,13 @@ export function DriversTab({
   const [busy, setBusy] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [archivedExtra, setArchivedExtra] = useState<any[]>([]);
+  const [archivedExtra, setArchivedExtra] = useState<AppUser[]>([]);
 
-  const showInviteLink = (invite: any) => {
+  const showInviteLink = (invite: Invite | InviteDetailDto) => {
     setGeneratedInviteId(invite?.id ?? null);
-    setInviteEmail(invite?.email || '');
+    setInviteEmail(
+      'email' in invite && invite.email ? String(invite.email) : '',
+    );
     setGeneratedLink(
       `${window.location.origin}/invite?invite=${encodeURIComponent(invite.token)}`,
     );
@@ -71,18 +80,18 @@ export function DriversTab({
         showInviteLink(invite);
         await refreshAll?.();
       } else {
-        const invite = {
+        const invite: Invite = {
           id: uid(),
           token: uid() + uid(),
           companyId: company.id,
           status: 'pending',
           createdAt: new Date().toLocaleDateString('en-CA'),
         };
-        setInvites((p: any[]) => [...p, invite]);
+        setInvites((p) => [...p, invite]);
         showInviteLink(invite);
       }
-    } catch (e: any) {
-      notify(e?.message || 'Failed to create invite', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to create invite'), 'error');
     }
   };
 
@@ -103,7 +112,7 @@ export function DriversTab({
     if (channel === 'email') {
       const emailNorm = to.toLowerCase();
       const existingAccount = (users || []).find(
-        (u: any) =>
+        (u) =>
           String(u.email || '').toLowerCase() === emailNorm &&
           (u.status || u.lifecycleStatus || 'active') !== 'archived',
       );
@@ -115,10 +124,12 @@ export function DriversTab({
         return;
       }
       const pendingDup = pendingInvites.find(
-        (i: any) =>
+        (i) =>
           i.status === 'pending' &&
           i.id !== generatedInviteId &&
-          String(i.email || '').toLowerCase() === emailNorm,
+          String(
+            ('email' in i ? i.email : '') || '',
+          ).toLowerCase() === emailNorm,
       );
       if (pendingDup) {
         notify(
@@ -144,19 +155,22 @@ export function DriversTab({
         notify(`Invite sent to ${to}`);
       }
       await refreshAll?.();
-    } catch (e: any) {
-      notify(e?.message || `Could not send invite by ${channel}`, 'error');
+    } catch (e: unknown) {
+      notify(
+        getApiErrorMessage(e, `Could not send invite by ${channel}`),
+        'error',
+      );
     } finally {
       setSending(null);
     }
   };
 
   const myInvites = (invites || []).filter(
-    (i: any) => i.companyId === company.id,
+    (i) => i.companyId === company.id,
   );
-  const pendingInvites = myInvites.filter((i: any) => i.status === 'pending');
+  const pendingInvites = myInvites.filter((i) => i.status === 'pending');
   const completedInvites = myInvites.filter(
-    (i: any) => i.status === 'completed',
+    (i) => i.status === 'completed',
   );
   const [f, setF] = useState({
     name: '',
@@ -190,8 +204,8 @@ export function DriversTab({
       .list(company.id, true)
       .then((list) => {
         const extra = (list || [])
-          .filter((d: any) => d.lifecycleStatus === 'archived')
-          .map((d: any) => ({
+          .filter((d) => d.lifecycleStatus === 'archived')
+          .map((d) => ({
             id: d.userId || d.id,
             driverRecordId: d.id,
             name: d.name,
@@ -210,8 +224,8 @@ export function DriversTab({
   }, [apiEnabled, includeArchived, company?.id]);
 
   const rosterDrivers = useMemo(() => {
-    const byKey = new Map<string, any>();
-    const put = (d: any) => {
+    const byKey = new Map<string, AppUser>();
+    const put = (d) => {
       const email = String(d.email || '').toLowerCase();
       for (const [k, row] of byKey) {
         if (email && String(row.email || '').toLowerCase() === email) {
@@ -236,7 +250,7 @@ export function DriversTab({
   }, [drivers, archivedExtra, includeArchived]);
   const [branchFilter, setBranchFilter] = useState('all');
   const [docFilter, setDocFilter] = useState('all');
-  const [branches, setBranches] = useState<any[]>([]);
+  const [branches, setBranches] = useState<BranchDto[]>([]);
   const [err, setErr] = useState('');
 
   useEffect(() => {
@@ -258,10 +272,10 @@ export function DriversTab({
     };
   }, [apiEnabled, company?.id]);
 
-  const driverDocsFor = (d: any) =>
-    (driverDocs || []).filter((doc: any) => matchesDriverRef(doc.driverId, d));
+  const driverDocsFor = (d) =>
+    (driverDocs || []).filter((doc) => matchesDriverRef(doc.driverId, d));
 
-  const driverCompliance = (d: any) => {
+  const driverCompliance = (d) => {
     const myDocs = driverDocsFor(d);
     const today = new Date().toISOString().slice(0, 10);
     const warn = new Date();
@@ -270,9 +284,9 @@ export function DriversTab({
     const missingRequired = DRIVER_DOC_TYPES.filter(
       (t) =>
         t.required &&
-        !myDocs.find((doc: any) => doc.type === t.id && doc.status !== 'expired'),
+        !myDocs.find((doc) => doc.type === t.id && doc.status !== 'expired'),
     ).length;
-    const expiringSoon = myDocs.filter((doc: any) => {
+    const expiringSoon = myDocs.filter((doc) => {
       if (doc.status === 'expiring_soon') return true;
       if (doc.expiryDate && doc.expiryDate >= today && doc.expiryDate <= warnStr) {
         return true;
@@ -281,14 +295,14 @@ export function DriversTab({
     }).length;
     const hasFast =
       Boolean(d.fastCard?.trim()) ||
-      myDocs.some((doc: any) => doc.type === 'fast_card' && doc.status !== 'expired');
+      myDocs.some((doc) => doc.type === 'fast_card' && doc.status !== 'expired');
     const hasHazmat = myDocs.some(
-      (doc: any) => doc.type === 'hazmat' && doc.status !== 'expired',
+      (doc) => doc.type === 'hazmat' && doc.status !== 'expired',
     );
     return { missingRequired, expiringSoon, hasFast, hasHazmat };
   };
 
-  const revokeInvite = async (inv: any) => {
+  const revokeInvite = async (inv) => {
     const ok = await confirm({
       title: 'Revoke invite',
       message: 'This link will no longer work. Continue?',
@@ -301,17 +315,21 @@ export function DriversTab({
         await invitesApi.revoke(inv.id);
         await refreshAll?.();
       } else {
-        setInvites((p: any[]) =>
-          p.map((i) => (i.id === inv.id ? { ...i, status: 'revoked' } : i)),
+        setInvites((p) =>
+          p.map((i) =>
+            i.id === inv.id
+              ? ({ ...i, status: 'revoked' } as unknown as Invite)
+              : i,
+          ),
         );
       }
       notify('Invite revoked');
-    } catch (e: any) {
-      notify(e?.message || 'Revoke failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Revoke failed'), 'error');
     }
   };
 
-  const regenerateInvite = async (inv: any) => {
+  const regenerateInvite = async (inv) => {
     try {
       if (apiEnabled) {
         const next = await invitesApi.regenerate(inv.id);
@@ -321,7 +339,7 @@ export function DriversTab({
         }
       } else {
         const token = uid();
-        setInvites((p: any[]) =>
+        setInvites((p) =>
           p.map((i) =>
             i.id === inv.id ? { ...i, token, status: 'pending', createdAt: new Date().toLocaleDateString('en-CA') } : i,
           ),
@@ -329,8 +347,8 @@ export function DriversTab({
         showInviteLink({ ...inv, token });
       }
       notify('Invite regenerated');
-    } catch (e: any) {
-      notify(e?.message || 'Regenerate failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Regenerate failed'), 'error');
     }
   };
 
@@ -389,7 +407,7 @@ export function DriversTab({
   const driverFieldErrors = validateDriverForm();
   const isDriverFormValid = Object.keys(driverFieldErrors).length === 0;
 
-  const openEditDriver = (d: any) => {
+  const openEditDriver = (d) => {
     const init = {
       name: d.name || '',
       email: d.email || '',
@@ -416,12 +434,12 @@ export function DriversTab({
     setShow(true);
   };
 
-  const ensureDriverRecordId = async (d: any): Promise<string | null> => {
+  const ensureDriverRecordId = async (d): Promise<string | null> => {
     if (d.driverRecordId) return d.driverRecordId;
     if (!apiEnabled) return null;
     try {
       const list = await driversApi.list(company.id).catch(() => []);
-      const match = (list as any[]).find(
+      const match = (list).find(
         (x) =>
           x.userId === d.id ||
           (x.email && d.email && x.email.toLowerCase() === d.email.toLowerCase()),
@@ -488,7 +506,7 @@ export function DriversTab({
         } else {
           if (
             users.find(
-              (u: any) =>
+              (u) =>
                 u.email.toLowerCase() === f.email.trim().toLowerCase(),
             )
           ) {
@@ -527,27 +545,27 @@ export function DriversTab({
         }
         await refreshAll?.();
       } else if (editDriver) {
-        setUsers((p: any[]) =>
+        setUsers((p) =>
           p.map((u) => (u.id === editDriver.id ? { ...u, ...f } : u)),
         );
       } else {
         if (
           users.find(
-            (u: any) => u.email.toLowerCase() === f.email.trim().toLowerCase(),
+            (u) => u.email.toLowerCase() === f.email.trim().toLowerCase(),
           )
         ) {
           setErr('Email already in use.');
           return;
         }
-        setUsers((p: any[]) => [
+        setUsers((p) => [
           ...p,
           { ...f, id: uid(), role: 'driver', companyId: company.id },
         ]);
       }
       resetForm();
       notify(editDriver ? 'Driver profile updated' : 'Driver created successfully');
-    } catch (e: any) {
-      const msg = e?.message || 'Failed to save driver';
+    } catch (e: unknown) {
+      const msg = getApiErrorMessage(e, 'Failed to save driver');
       setErr(msg);
       notify(msg, 'error');
     } finally {
@@ -555,7 +573,7 @@ export function DriversTab({
     }
   };
 
-  const removeDriver = async (d: any) => {
+  const removeDriver = async (d) => {
     const ok = await confirm({
       title: 'Archive driver',
       message: `Archive ${d.name}? Historical records are retained.`,
@@ -574,15 +592,18 @@ export function DriversTab({
         }
         await refreshAll?.();
       } else {
-        setUsers((p: any[]) => p.filter((u) => u.id !== d.id));
+        setUsers((p) => p.filter((u) => u.id !== d.id));
       }
       notify(`${d.name} archived.`);
-    } catch (e: any) {
-      notify(e?.message || 'Archive failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Archive failed'), 'error');
     }
   };
 
-  const approveDriver = async (d: any, e?: { stopPropagation?: () => void }) => {
+  const approveDriver = async (
+    d: AppUser,
+    e?: { stopPropagation?: () => void },
+  ) => {
     e?.stopPropagation?.();
     try {
       const recordId = await ensureDriverRecordId(d);
@@ -593,7 +614,7 @@ export function DriversTab({
         await authApi.setUserStatus(d.id, 'active').catch(() => {});
       }
       if (!apiEnabled) {
-        setUsers?.((p: any[]) =>
+        setUsers?.((p) =>
           p.map((u) =>
             u.id === d.id ? { ...u, lifecycleStatus: 'active', active: true } : u,
           ),
@@ -601,24 +622,24 @@ export function DriversTab({
       }
       await refreshAll?.();
       notify(`${d.name} approved — now active for dispatch`);
-    } catch (err: any) {
-      notify(err?.message || 'Approve failed', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Approve failed'), 'error');
     }
   };
 
-  const restoreDriver = async (d: any) => {
+  const restoreDriver = async (d) => {
     const recordId = d.driverRecordId;
     if (!recordId || !apiEnabled) return;
     try {
       await driversApi.restore(recordId);
       await refreshAll?.();
       notify(`${d.name} restored to active roster.`, 'success');
-    } catch (e: any) {
-      notify(e?.message || 'Restore failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Restore failed'), 'error');
     }
   };
 
-  const filteredDrivers = rosterDrivers.filter((d: any) => {
+  const filteredDrivers = rosterDrivers.filter((d) => {
     const q = searchQ.trim().toLowerCase();
     if (q) {
       const hay = `${d.name} ${d.email} ${d.licenseNo || ''} ${d.employeeNumber || ''} ${d.fastCard || ''} ${d.branchId || ''}`.toLowerCase();
@@ -641,7 +662,7 @@ export function DriversTab({
     editDriver
       ? initialF &&
         Object.keys(initialF).some(
-          (k) => (f as any)[k] !== (initialF as any)[k],
+          (k) => (f)[k] !== (initialF)[k],
         )
       : !blank(f.name) && !blank(f.email) && !blank(f.password),
   );
@@ -678,9 +699,9 @@ export function DriversTab({
         />
         <StatCard
           label="In Transit"
-          value={drivers.filter((d: any) =>
+          value={drivers.filter((d) =>
             loads.some(
-              (l: any) =>
+              (l) =>
                 matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
             ),
           ).length}
@@ -1019,8 +1040,8 @@ export function DriversTab({
             ✓ COMPLETED ONBOARDINGS ({completedInvites.length})
           </div>
           <div style={{ fontSize: 11, color: G.muted }}>
-            {completedInvites.map((inv: any) => {
-              const d = users.find((u: any) => u.id === inv.driverId);
+            {completedInvites.map((inv) => {
+              const d = users.find((u) => u.id === inv.driverId);
               return (
                 <div
                   key={inv.id}
@@ -1062,7 +1083,7 @@ export function DriversTab({
             {Icons.pending({ size: 14, color: G.gold })}
             PENDING INVITES ({pendingInvites.length})
           </div>
-          {pendingInvites.map((inv: any) => {
+          {pendingInvites.map((inv) => {
             const link = `${window.location.origin}/invite?invite=${encodeURIComponent(inv.token)}`;
             return (
               <div
@@ -1185,7 +1206,7 @@ export function DriversTab({
           <Inp
             label="Full Name *"
             value={f.name}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, name: e.target.value }))
             }
             onBlur={() => markTouched('name')}
@@ -1220,7 +1241,7 @@ export function DriversTab({
             <Inp
               label="Email *"
               value={f.email}
-              onChange={(e: any) =>
+              onChange={(e) =>
                 setF((x) => ({ ...x, email: e.target.value }))
               }
               onBlur={() => markTouched('email')}
@@ -1233,7 +1254,7 @@ export function DriversTab({
           <Inp
             label={editDriver ? 'Password' : 'Password *'}
             value={f.password}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, password: e.target.value }))
             }
             onBlur={() => markTouched('password')}
@@ -1247,7 +1268,7 @@ export function DriversTab({
             label="Phone"
             phone
             value={f.phone}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, phone: e.target.value }))
             }
             placeholder="(403) 555-0100"
@@ -1269,7 +1290,7 @@ export function DriversTab({
           <Inp
             label="Date of Birth"
             value={f.dob}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, dob: e.target.value }))
             }
             placeholder="YYYY-MM-DD"
@@ -1278,7 +1299,7 @@ export function DriversTab({
           <Sel
             label="Citizenship"
             value={f.citizenship}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, citizenship: e.target.value }))
             }
           >
@@ -1291,7 +1312,7 @@ export function DriversTab({
           <Inp
             label="License No."
             value={f.licenseNo}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, licenseNo: e.target.value }))
             }
             placeholder="e.g. AB-123456"
@@ -1299,7 +1320,7 @@ export function DriversTab({
           <Inp
             label="FAST Card #"
             value={f.fastCard}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, fastCard: e.target.value }))
             }
             placeholder="Optional"
@@ -1329,7 +1350,7 @@ export function DriversTab({
           <Inp
             label="Emergency Contact Name"
             value={f.emergencyName}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, emergencyName: e.target.value }))
             }
             placeholder="Full name"
@@ -1338,7 +1359,7 @@ export function DriversTab({
             label="Emergency Contact Phone"
             phone
             value={f.emergencyPhone}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, emergencyPhone: e.target.value }))
             }
             placeholder="(403) 555-0100"
@@ -1347,7 +1368,7 @@ export function DriversTab({
         <Inp
           label="Notes"
           value={f.notes}
-          onChange={(e: any) =>
+          onChange={(e) =>
             setF((x) => ({ ...x, notes: e.target.value }))
           }
           placeholder="Any additional notes..."
@@ -1368,7 +1389,7 @@ export function DriversTab({
           <Sel
             label="Driver type"
             value={f.driverType}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, driverType: e.target.value }))
             }
           >
@@ -1381,7 +1402,7 @@ export function DriversTab({
           <Inp
             label="Employee #"
             value={f.employeeNumber}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, employeeNumber: e.target.value }))
             }
           />
@@ -1389,7 +1410,7 @@ export function DriversTab({
             label="Hire date"
             type="date"
             value={f.hireDate}
-            onChange={(e: any) =>
+            onChange={(e) =>
               setF((x) => ({ ...x, hireDate: e.target.value }))
             }
           />
@@ -1397,7 +1418,7 @@ export function DriversTab({
         <Sel
           label="Availability"
           value={f.availabilityStatus}
-          onChange={(e: any) =>
+          onChange={(e) =>
             setF((x) => ({ ...x, availabilityStatus: e.target.value }))
           }
         >
@@ -1417,31 +1438,31 @@ export function DriversTab({
           </div>
         </Card>
       ) : (
-        filteredDrivers.map((d: any) => {
+        filteredDrivers.map((d) => {
           const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
           const lifecycleLabel =
             DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] ||
             humanizeEnum(lifecycle);
           const canDispatch = lifecycleAllowsDispatch(lifecycle);
           const active = loads.find(
-            (l: any) =>
+            (l) =>
               matchesDriverRef(l.driverId, d) && l.status === 'in_transit',
           );
-          const sc = sheets.filter((s: any) =>
+          const sc = sheets.filter((s) =>
             matchesDriverRef(s.driverId, d),
           ).length;
-          const myDocs = (driverDocs || []).filter((doc: any) =>
+          const myDocs = (driverDocs || []).filter((doc) =>
             matchesDriverRef(doc.driverId, d),
           );
           const missing = DRIVER_DOC_TYPES.filter(
             (t) =>
               t.required &&
               !myDocs.find(
-                (doc: any) => doc.type === t.id && doc.status !== 'expired',
+                (doc) => doc.type === t.id && doc.status !== 'expired',
               ),
           ).length;
           const expiring = myDocs.filter(
-            (doc: any) => doc.status === 'expiring_soon',
+            (doc) => doc.status === 'expiring_soon',
           ).length;
           return (
             <Card
@@ -1699,7 +1720,7 @@ export function DriversTab({
                                 await authApi.setUserStatus(d.id, 'suspended').catch(() => {});
                               }
                               if (!apiEnabled) {
-                                setUsers?.((p: any[]) =>
+                                setUsers?.((p) =>
                                   p.map((u) =>
                                     u.id === d.id
                                       ? { ...u, lifecycleStatus: 'suspended', active: false }
@@ -1709,8 +1730,8 @@ export function DriversTab({
                               }
                               await refreshAll?.();
                               notify(`${d.name} suspended`);
-                            } catch (err: any) {
-                              notify(err?.message || 'Suspend failed', 'error');
+                            } catch (err: unknown) {
+                              notify(getApiErrorMessage(err, 'Suspend failed'), 'error');
                             }
                           }}
                           style={{
@@ -1747,7 +1768,7 @@ export function DriversTab({
                                 await authApi.setUserStatus(d.id, 'active').catch(() => {});
                               }
                               if (!apiEnabled) {
-                                setUsers?.((p: any[]) =>
+                                setUsers?.((p) =>
                                   p.map((u) =>
                                     u.id === d.id
                                       ? { ...u, lifecycleStatus: 'active', active: true }
@@ -1757,8 +1778,8 @@ export function DriversTab({
                               }
                               await refreshAll?.();
                               notify(`${d.name} unsuspended — now active`);
-                            } catch (err: any) {
-                              notify(err?.message || 'Unsuspend failed', 'error');
+                            } catch (err: unknown) {
+                              notify(getApiErrorMessage(err, 'Unsuspend failed'), 'error');
                             }
                           }}
                           style={{
@@ -1861,7 +1882,7 @@ export function DriversTab({
               void authApi.listUsers(company.id).then((rows) => {
                 const fresh = rows.find((r) => r.id === editDriver.id);
                 if (!fresh) return;
-                setEditDriver((prev: any) =>
+                setEditDriver((prev) =>
                   prev
                     ? {
                         ...prev,

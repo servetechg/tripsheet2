@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { G, RADIUS, pagePlain } from '@/lib/theme';
 import { Btn, BackButton, Card, Pill, SectionTitle, StatCard, StatsGrid, Sel, Icons } from '@/components/ui';
@@ -31,6 +32,11 @@ import {
 } from '@/lib/driverIds';
 import { useCan } from '@/lib/permissions';
 import { useSession } from '@/context/SessionContext';
+import type { DriverProfileProps } from '@/features/drivers/types';
+import type { DriverDocument, Expense } from '@tripsheet/shared';
+import type { DocTypeMeta, FileUploadData } from '@/types/app';
+import type { EmploymentContractDto } from '@/types/dtos';
+import type { DriverQualificationRow } from '@/types/session';
 
 export function DriverProfile({
   driver,
@@ -43,7 +49,7 @@ export function DriverProfile({
   onBack,
   apiEnabled,
   refreshAll,
-}: any) {
+}: DriverProfileProps) {
   const { can } = useCan();
   const { user } = useSession();
   const confirm = useConfirm();
@@ -54,12 +60,13 @@ export function DriverProfile({
   const [availabilityStatus, setAvailabilityStatus] = useState(
     driver.availabilityStatus || 'available',
   );
-  const [uploadModal, setUploadModal] = useState<any>(null);
-  const [viewDoc, setViewDoc] = useState<any>(null);
+  const [uploadModal, setUploadModal] = useState<DocTypeMeta | null>(null);
+  const [viewDoc, setViewDoc] = useState<DriverDocument | null>(null);
   const [showWage, setShowWage] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [wageContract, setWageContract] = useState<any>(null);
-  const [qualifications, setQualifications] = useState<any[]>(
+  const [wageContract, setWageContract] =
+    useState<EmploymentContractDto | null>(null);
+  const [qualifications, setQualifications] = useState<DriverQualificationRow[]>(
     driver.qualifications || [],
   );
 
@@ -127,8 +134,8 @@ export function DriverProfile({
       await driversApi.update(recordId, { availabilityStatus });
       await refreshAll?.();
       notify('Availability updated');
-    } catch (e: any) {
-      notify(e?.message || 'Failed to update availability', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to update availability'), 'error');
     } finally {
       setBusy(false);
     }
@@ -136,18 +143,18 @@ export function DriverProfile({
 
   const myContract = wageContract;
 
-  const myLoads = loads.filter((l: any) => matchesDriverRef(l.driverId, driver));
-  const mySheets = sheets.filter((s: any) =>
+  const myLoads = loads.filter((l) => matchesDriverRef(l.driverId, driver));
+  const mySheets = sheets.filter((s) =>
     matchesDriverRef(s.driverId, driver),
   );
-  const myDocs = (driverDocs || []).filter((d: any) =>
+  const myDocs = (driverDocs || []).filter((d) =>
     matchesDriverRef(d.driverId, driver),
   );
-  const active = myLoads.find((l: any) => l.status === 'in_transit');
+  const active = myLoads.find((l) => l.status === 'in_transit');
 
-  const getDoc = (typeId: string) => myDocs.find((d: any) => d.type === typeId);
+  const getDoc = (typeId: string) => myDocs.find((d) => d.type === typeId);
 
-  const saveContract = async (c: any) => {
+  const saveContract = async (c) => {
     try {
       setBusy(true);
       if (apiEnabled) {
@@ -181,7 +188,7 @@ export function DriverProfile({
         if (existingId) body.id = existingId;
 
         const saved = await contractsApi.upsert(body);
-        setWageContract(saved);
+        setWageContract(saved as import('@/types/dtos').EmploymentContractDto);
         await refreshAll?.();
         notify('Wage / contract saved');
       } else {
@@ -193,14 +200,14 @@ export function DriverProfile({
         });
       }
       setShowWage(false);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to save contract', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to save contract'), 'error');
     } finally {
       setBusy(false);
     }
   };
 
-  const uploadDoc = async (typeId: string, fileData: any) => {
+  const uploadDoc = async (typeId: string, fileData: FileUploadData) => {
     try {
       setBusy(true);
       if (apiEnabled) {
@@ -220,12 +227,12 @@ export function DriverProfile({
         await refreshAll?.();
         notify('Document uploaded');
       } else {
-        const existing = myDocs.find((d: any) => d.type === typeId);
-        const newDoc = {
+        const existing = myDocs.find((d) => d.type === typeId);
+        const newDoc: import('@tripsheet/shared').DriverDocument = {
           id: existing?.id || `local-${Date.now()}`,
           driverId: recordId,
           companyId: company.id,
-          type: typeId,
+          type: typeId as import('@tripsheet/shared').DriverDocument['type'],
           fileName: fileData.name,
           fileSize: fileData.size,
           fileType: fileData.fileType,
@@ -235,15 +242,15 @@ export function DriverProfile({
           status: 'uploaded',
           notes: fileData.notes || '',
         };
-        setDriverDocs((p: any[]) =>
+        setDriverDocs((p) =>
           existing
-            ? p.map((d: any) => (d.id === existing.id ? newDoc : d))
+            ? p.map((d) => (d.id === existing.id ? newDoc : d))
             : [...p, newDoc],
         );
       }
       setUploadModal(null);
-    } catch (e: any) {
-      notify(e?.message || 'Upload failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Upload failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -262,15 +269,15 @@ export function DriverProfile({
         await documentsApi.remove(docId);
         await refreshAll?.();
       } else {
-        setDriverDocs((p: any[]) => p.filter((d: any) => d.id !== docId));
+        setDriverDocs((p) => p.filter((d) => d.id !== docId));
       }
       notify('Document deleted successfully');
-    } catch (e: any) {
-      notify(e?.message || 'Delete failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Delete failed'), 'error');
     }
   };
 
-  const fileDocs = myDocs.filter((d: any) => d.type !== '__contract__');
+  const fileDocs = myDocs.filter((d) => d.type !== '__contract__');
   const missingDocs = DRIVER_DOC_TYPES.filter(
     (t) => t.required && !getDoc(t.id),
   ).length;
@@ -368,8 +375,8 @@ export function DriverProfile({
                   await driversApi.approve(recordId);
                   await refreshAll?.();
                   notify(`${driver.name} approved`);
-                } catch (e: any) {
-                  notify(e?.message || 'Approve failed', 'error');
+                } catch (e: unknown) {
+                  notify(getApiErrorMessage(e, 'Approve failed'), 'error');
                 }
               }}
               style={{
@@ -402,8 +409,8 @@ export function DriverProfile({
                   await driversApi.suspend(recordId);
                   await refreshAll?.();
                   notify(`${driver.name} suspended`);
-                } catch (e: any) {
-                  notify(e?.message || 'Suspend failed', 'error');
+                } catch (e: unknown) {
+                  notify(getApiErrorMessage(e, 'Suspend failed'), 'error');
                 }
               }}
               style={{
@@ -435,8 +442,8 @@ export function DriverProfile({
                   await driversApi.unsuspend(recordId);
                   await refreshAll?.();
                   notify(`${driver.name} unsuspended — now active`);
-                } catch (e: any) {
-                  notify(e?.message || 'Unsuspend failed', 'error');
+                } catch (e: unknown) {
+                  notify(getApiErrorMessage(e, 'Unsuspend failed'), 'error');
                 }
               }}
               style={{
@@ -730,8 +737,8 @@ export function DriverProfile({
                     }}
                   >
                     <div style={{ fontWeight: 600, color: G.text, marginBottom: 2 }}>Owner-Operator Profile</div>
-                    {(driver.ownerOperatorProfile as any).corporationName ||
-                      (driver.ownerOperatorProfile as any).gstHstNumber ||
+                    {String(driver.ownerOperatorProfile?.corporationName || '') ||
+                      String(driver.ownerOperatorProfile?.gstHstNumber || '') ||
                       'Configured'}
                   </div>
                 )}
@@ -1172,7 +1179,7 @@ export function DriverProfile({
                     </div>
                   </Card>
                 ) : (
-                  qualifications.map((q: any) => (
+                  qualifications.map((q) => (
                     <Card key={q.id} style={{ marginBottom: 8 }}>
                       <div
                         style={{
@@ -1263,11 +1270,12 @@ export function DriverProfile({
                     .sort((a, b) =>
                       (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
                     )
-                    .map((s: any) => {
+                    .map((s) => {
                       const cad = (s.expenses || [])
-                        .filter((e: any) => e.currency === 'CAD')
+                        .filter((e) => e.currency === 'CAD')
                         .reduce(
-                          (a: number, e: any) => a + (parseFloat(e.amount) || 0),
+                          (a: number, e: Expense) =>
+                            a + (parseFloat(String(e.amount)) || 0),
                           0,
                         );
                       return (
@@ -1326,7 +1334,7 @@ export function DriverProfile({
                     <div style={{ color: G.muted, marginTop: 8 }}>No loads yet.</div>
                   </Card>
                 ) : (
-                  myLoads.map((l: any) => (
+                  myLoads.map((l) => (
                     <Card key={l.id}>
                       <div
                         style={{

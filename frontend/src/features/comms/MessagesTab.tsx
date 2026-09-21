@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, SectionTitle } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
-import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum, getApiErrorMessage } from '@/lib/format';
 import { messagesApi, commentsApi, notificationsApi, auditApi } from '@/lib/api';
+import type { MessagesTabProps } from '@/types/tabs';
+import type { CommentDto, MessageDto } from '@/types/dtos';
 import { SMS_DISABLED_HINT, useSmsEnabled } from '@/hooks/useSmsEnabled';
 
 export function MessagesTab({
@@ -12,10 +14,10 @@ export function MessagesTab({
   loads,
   adminUser,
   apiEnabled,
-}: any) {
+}: MessagesTabProps) {
   const { smsEnabled } = useSmsEnabled(Boolean(apiEnabled));
-  const [msgs, setMsgs] = useState<any[]>([]);
-  const [comments, setComments] = useState<any[]>([]);
+  const [msgs, setMsgs] = useState<MessageDto[]>([]);
+  const [comments, setComments] = useState<CommentDto[]>([]);
   const [loadId, setLoadId] = useState('');
   const [f, setF] = useState({
     toUserId: '',
@@ -37,9 +39,9 @@ export function MessagesTab({
         const cm = await commentsApi.list(company.id, 'load', loadId);
         setComments(cm);
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setLoadErr(
-        e?.message ||
+        getApiErrorMessage(e) ||
         'Messages could not be loaded. The notification service may be offline — run npm run start:dev in /backend.',
       );
     }
@@ -55,7 +57,7 @@ export function MessagesTab({
       notify('Message body required', 'error');
       return;
     }
-    const to = drivers.find((d: any) => d.id === f.toUserId);
+    const to = drivers.find((d) => d.id === f.toUserId);
     try {
       await messagesApi.create({
         companyId: company.id,
@@ -78,8 +80,8 @@ export function MessagesTab({
       setF({ toUserId: '', body: '', threadType: 'driver' });
       notify('Message sent');
       await refresh();
-    } catch (e: any) {
-      notify(e?.message || 'Send failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Send failed'), 'error');
     }
   };
 
@@ -101,8 +103,8 @@ export function MessagesTab({
       setLoadId('');
       notify('Comment added');
       await refresh();
-    } catch (e: any) {
-      notify(e?.message || 'Comment failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Comment failed'), 'error');
     }
   };
 
@@ -121,8 +123,8 @@ export function MessagesTab({
       notify('SMS queued');
       setSmsTo('');
       setSmsBody('');
-    } catch (e: any) {
-      notify(e?.message || 'SMS failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'SMS failed'), 'error');
     }
   };
 
@@ -148,10 +150,10 @@ export function MessagesTab({
         <Sel
           label="To driver"
           value={f.toUserId}
-          onChange={(e: any) => setF({ ...f, toUserId: e.target.value })}
+          onChange={(e) => setF({ ...f, toUserId: e.target.value })}
         >
           <option value="">— select —</option>
-          {drivers.map((d: any) => (
+          {drivers.map((d) => (
             <option key={d.id} value={d.id}>
               {d.name}
             </option>
@@ -160,7 +162,7 @@ export function MessagesTab({
         <Sel
           label="Thread"
           value={f.threadType}
-          onChange={(e: any) => setF({ ...f, threadType: e.target.value })}
+          onChange={(e) => setF({ ...f, threadType: e.target.value })}
         >
           <option value="driver">Driver</option>
           <option value="internal">Internal</option>
@@ -169,7 +171,7 @@ export function MessagesTab({
         <Inp
           label="Message"
           value={f.body}
-          onChange={(e: any) => setF({ ...f, body: e.target.value })}
+          onChange={(e) => setF({ ...f, body: e.target.value })}
         />
         <Btn onClick={() => void send()}>Send Message</Btn>
         <div style={{ marginTop: 12 }}>
@@ -193,10 +195,10 @@ export function MessagesTab({
         <Sel
           label="Load"
           value={loadId}
-          onChange={(e: any) => setLoadId(e.target.value)}
+          onChange={(e) => setLoadId(e.target.value)}
         >
           <option value="">— select —</option>
-          {loads.map((l: any) => (
+          {loads.map((l) => (
             <option key={l.id} value={l.id}>
               {formatLoadLabel(l)}
             </option>
@@ -205,7 +207,7 @@ export function MessagesTab({
         <Inp
           label="Comment"
           value={c.body}
-          onChange={(e: any) => setC({ body: e.target.value })}
+          onChange={(e) => setC({ body: e.target.value })}
         />
         <Btn onClick={() => void addComment()}>Add Comment</Btn>
         {comments.map((cm) => (
@@ -226,14 +228,14 @@ export function MessagesTab({
           label="To phone"
           phone
           value={smsTo}
-          onChange={(e: any) => setSmsTo(e.target.value)}
+          onChange={(e) => setSmsTo(e.target.value)}
           placeholder="(403) 555-0100"
           disabled={!smsEnabled}
         />
         <Inp
           label="Body"
           value={smsBody}
-          onChange={(e: any) => setSmsBody(e.target.value)}
+          onChange={(e) => setSmsBody(e.target.value)}
           disabled={!smsEnabled}
         />
         <Btn disabled={!smsEnabled} title={smsEnabled ? undefined : SMS_DISABLED_HINT} onClick={() => void sendSms()}>

@@ -22,6 +22,9 @@ import { companiesApi } from '@/lib/api';
 import { useCan } from '@/lib/permissions';
 import { ROLE_LABELS } from '@tripsheet/shared';
 import type { Role } from '@tripsheet/shared';
+import type { CompanyAdminPanelProps } from '@/types/workspace';
+import type { CompanyEntitlementsDto } from '@/types/dtos';
+import type { SheetPrintPreviewState } from '@/types/workspace';
 
 export function CompanyAdminPanel({
   company,
@@ -48,28 +51,30 @@ export function CompanyAdminPanel({
   refreshAll,
   activeTab,
   onTabChange,
-}: any) {
+}: CompanyAdminPanelProps) {
   const { canTab, can, role } = useCan();
   const tab = activeTab || 'dashboard';
   const setTab = onTabChange || (() => {});
-  const [adminPreview, setAdminPreview] = useState<any>(null);
-  const [entitlements, setEntitlements] = useState<any>(null);
+  const [adminPreview, setAdminPreview] =
+    useState<SheetPrintPreviewState | null>(null);
+  const [entitlements, setEntitlements] =
+    useState<CompanyEntitlementsDto | null>(null);
   const sn = company.shortName;
 
   const myDrivers = users.filter(
-    (u: any) => u.role === 'driver' && u.companyId === company.id,
+    (u) => u.role === 'driver' && u.companyId === company.id,
   );
-  const myLoads = loads.filter((l: any) => l.companyId === company.id);
-  const mySheets = sheets.filter((s: any) => s.companyId === company.id);
+  const myLoads = loads.filter((l) => l.companyId === company.id);
+  const mySheets = sheets.filter((s) => s.companyId === company.id);
   const myTrucks = assets.filter(
-    (a: any) => a.companyId === company.id && a.type === 'truck',
+    (a) => a.companyId === company.id && a.type === 'truck',
   );
   const myTrailers = assets.filter(
-    (a: any) => a.companyId === company.id && a.type === 'trailer',
+    (a) => a.companyId === company.id && a.type === 'trailer',
   );
-  const myManifests = manifests.filter((m: any) => m.companyId === company.id);
+  const myManifests = manifests.filter((m) => m.companyId === company.id);
   const myCarrier = carrierProfiles.find(
-    (p: any) => p.companyId === company.id,
+    (p) => p.companyId === company.id,
   ) || {
     companyId: company.id,
     cbsaCarrierCode: '',
@@ -113,7 +118,9 @@ export function CompanyAdminPanel({
     in_transit: G.gold,
     delivered: G.success,
     cancelled: G.danger,
-  };
+  } as const;
+  const statusColor = (status: string) =>
+    STATUS_COLOR[status as keyof typeof STATUS_COLOR] ?? G.muted;
 
   const tabLoading = useFakeLoad(tab, 380);
 
@@ -172,7 +179,7 @@ export function CompanyAdminPanel({
               trucks={myTrucks}
               trailers={myTrailers}
               users={users}
-              statusColor={STATUS_COLOR}
+              statusColor={statusColor}
               onTrack={() => setTab('track')}
               onEManifest={() => setTab('emanifest')}
               driverDocs={driverDocs}
@@ -185,7 +192,7 @@ export function CompanyAdminPanel({
               loads={myLoads}
               setLoads={setLoads}
               users={users}
-              statusColor={STATUS_COLOR}
+              statusColor={statusColor}
               {...apiProps}
             />
           )}
@@ -231,7 +238,7 @@ export function CompanyAdminPanel({
           {tab === 'fleet' && (
             <FleetOpsTab
               company={company}
-              assets={assets.filter((a: any) => a.companyId === company.id)}
+              assets={assets.filter((a) => a.companyId === company.id)}
               drivers={myDrivers}
               adminUser={adminUser}
               apiEnabled={apiEnabled}
@@ -242,7 +249,14 @@ export function CompanyAdminPanel({
               sheets={mySheets}
               users={users}
               company={company}
-              onViewPdf={setAdminPreview}
+              onViewPdf={(sheet) =>
+                setAdminPreview({
+                  header: sheet.header,
+                  trips: sheet.trips,
+                  expenses: sheet.expenses,
+                  notes: sheet.notes ?? '',
+                })
+              }
             />
           )}
           {tab === 'messages' && (
@@ -259,7 +273,7 @@ export function CompanyAdminPanel({
               company={company}
               drivers={myDrivers}
               driverDocs={driverDocs}
-              assets={assets.filter((a: any) => a.companyId === company.id)}
+              assets={assets.filter((a) => a.companyId === company.id)}
               adminUser={adminUser}
               apiEnabled={apiEnabled}
               onGoDrivers={() => setTab('drivers')}

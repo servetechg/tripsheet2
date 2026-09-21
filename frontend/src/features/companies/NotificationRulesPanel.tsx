@@ -3,7 +3,8 @@ import { G, RADIUS } from '@/lib/theme';
 import { Btn, Card, Pill, Icons, Chk } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 
 export interface NotificationRuleItem {
   id: string;
@@ -181,12 +182,12 @@ export function NotificationRulesPanel({
         `Rule "${rule.eventType}" ${nextEnabled ? 'enabled' : 'disabled'}`,
         'success',
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Revert optimistic update
       setLocalRules((prev) =>
         prev.map((r) => (r.id === rule.id ? { ...r, enabled: !nextEnabled } : r)),
       );
-      notify(err?.message || 'Failed to update notification rule', 'error');
+      notify(getApiErrorMessage(err, 'Failed to update notification rule'), 'error');
     } finally {
       setTogglingIds((prev) => {
         const next = new Set(prev);
@@ -221,10 +222,10 @@ export function NotificationRulesPanel({
       );
       await onReload();
       notify(`All rules ${enable ? 'enabled' : 'disabled'}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       await onReload();
-      notify(err?.message || 'Failed to update some rules', 'error');
+      notify(getApiErrorMessage(err, 'Failed to update some rules'), 'error');
     } finally {
       setTogglingIds((prev) => {
         const next = new Set(prev);

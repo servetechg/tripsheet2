@@ -13,6 +13,9 @@ import { notify } from '@/components/feedback/Toast';
 import { TenantIssueAlert, tenantNeedsAttention } from '@/components/feedback/TenantIssueAlert';
 import { TenantOpsDashboard } from './TenantOpsDashboard';
 import { useConfirm } from '@/context/ConfirmContext';
+import type { SuperAdminPanelProps } from '@/types/workspace';
+import type { PlanDto, PlatformCompany } from '@/types/dtos';
+import { getApiErrorMessage } from '@/lib/format';
 
 const PLAN_FALLBACK = [
   { code: 'starter', name: 'Starter' },
@@ -123,14 +126,14 @@ export function SuperAdminPanel({
   activeTab,
   onTabChange,
   loading,
-}: any) {
+}: SuperAdminPanelProps) {
   const [tab, setTab] = useState('companies');
   const currentTab = activeTab || tab;
   const changeTab = onTabChange || setTab;
   const [show, setShow] = useState(false);
   const [ok, setOk] = useState('');
   const [err, setErr] = useState('');
-  const [plans, setPlans] = useState<any[]>([]);
+  const [plans, setPlans] = useState<PlanDto[]>([]);
   const [busy, setBusy] = useState(false);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [f, setF] = useState(INITIAL_COMPANY_FORM);
@@ -147,7 +150,7 @@ export function SuperAdminPanel({
   const updEdit = (k: string, v: string) =>
     setEditForm((x) => ({ ...x, [k]: v }));
 
-  const visibleCompanies = companies.filter((c: any) =>
+  const visibleCompanies = companies.filter((c) =>
     showArchived ? true : c.active !== false,
   );
 
@@ -165,7 +168,7 @@ export function SuperAdminPanel({
       errs.adminEmail = 'Enter a valid email address';
     } else if (
       users.find(
-        (u: any) => u.email.toLowerCase() === f.adminEmail.trim().toLowerCase(),
+        (u) => u.email.toLowerCase() === f.adminEmail.trim().toLowerCase(),
       )
     ) {
       errs.adminEmail = 'Admin email already in use';
@@ -252,7 +255,7 @@ export function SuperAdminPanel({
           address: f.address.trim(),
           planCode: f.planCode || 'starter',
           active: true,
-        })) as any;
+        })) as PlatformCompany;
         await authApi.createUser({
           name: f.adminName.trim(),
           email: f.adminEmail.trim().toLowerCase(),
@@ -265,7 +268,7 @@ export function SuperAdminPanel({
       } else {
         const cid = uid();
         const slug = derivedSlug;
-        setCompanies((p: any[]) => [
+        setCompanies((p) => [
           ...p,
           {
             id: cid,
@@ -276,14 +279,18 @@ export function SuperAdminPanel({
             address: f.address.trim(),
             active: true,
             status: 'active',
-            plan: { code: f.planCode },
+            plan: {
+              id: f.planCode,
+              code: f.planCode,
+              name: f.planCode,
+            },
             tenantDatabase: {
               dbName: `fq_tenant_${slug.replace(/-/g, '_')}`,
               status: 'pending_provision',
             },
           },
         ]);
-        setUsers((p: any[]) => [
+        setUsers((p) => [
           ...p,
           {
             id: uid(),
@@ -299,14 +306,14 @@ export function SuperAdminPanel({
       closeForm();
       setOk(`✓ "${createdName}" created — tenant database provisioned (or queued for retry).`);
       setTimeout(() => setOk(''), 5000);
-    } catch (e: any) {
-      setErr(e?.message || 'Failed to create company');
+    } catch (e: unknown) {
+      setErr(getApiErrorMessage(e, 'Failed to create company'));
     } finally {
       setBusy(false);
     }
   };
 
-  const openEdit = (c: any) => {
+  const openEdit = (c) => {
     setEditId(c.id);
     setEditForm({
       name: c.name || '',
@@ -335,8 +342,8 @@ export function SuperAdminPanel({
         shortName: editForm.shortName.trim().toUpperCase(),
         tagline: editForm.tagline.trim(),
         address: editForm.address.trim(),
-      })) as any;
-      setCompanies((prev: any[]) =>
+      })) as PlatformCompany;
+      setCompanies((prev) =>
         prev.map((c) =>
           c.id === editId
             ? {
@@ -351,14 +358,14 @@ export function SuperAdminPanel({
       );
       notify('Company updated.');
       closeEdit();
-    } catch (e: any) {
-      setErr(e?.message || 'Update failed');
+    } catch (e: unknown) {
+      setErr(getApiErrorMessage(e, 'Update failed'));
     } finally {
       setBusy(false);
     }
   };
 
-  const toggleCo = async (c: any) => {
+  const toggleCo = async (c) => {
     const id = c.id;
     const archiving = c.active !== false;
     const ok = await confirm(
@@ -381,12 +388,12 @@ export function SuperAdminPanel({
         await companiesApi.toggleActive(id);
         await refreshAll?.('all');
         notify(archiving ? 'Company archived.' : 'Company restored.');
-      } catch (e: any) {
-        notify(e?.message || 'Toggle failed', 'error');
+      } catch (e: unknown) {
+        notify(getApiErrorMessage(e, 'Toggle failed'), 'error');
       }
       return;
     }
-    setCompanies((p: any[]) =>
+    setCompanies((p) =>
       p.map((co) => (co.id === id ? { ...co, active: !co.active } : co)),
     );
   };
@@ -467,19 +474,21 @@ export function SuperAdminPanel({
       >
         {[
           ['Total', companies.length],
-          ['Active', companies.filter((c: any) => c.active).length],
+          ['Active', companies.filter((c) => c.active).length],
           [
             'DB ready',
             companies.filter(
-              (c: any) => c.tenantDatabase?.status === 'active',
+              (c) => c.tenantDatabase?.status === 'active',
             ).length,
           ],
           [
             'Needs attention',
             companies.filter(
-              (c: any) =>
+              (c) =>
                 !c.active ||
-                tenantNeedsAttention(c.tenantDatabase),
+                tenantNeedsAttention(
+                  c.tenantDatabase as Parameters<typeof tenantNeedsAttention>[0],
+                ),
             ).length,
           ],
         ].map(([label, value]) => (
@@ -558,7 +567,7 @@ export function SuperAdminPanel({
                   { code: 'professional', name: 'Professional' },
                   { code: 'enterprise', name: 'Enterprise' },
                 ]
-            ).map((p: any) => (
+            ).map((p) => (
               <option key={p.code} value={p.code}>
                 {p.name}
                 {p.maxDrivers === -1
@@ -683,17 +692,17 @@ export function SuperAdminPanel({
           No companies found.
         </Card>
       ) : (
-        visibleCompanies.map((c: any) => {
+        visibleCompanies.map((c) => {
         const admin = users.find(
-          (u: any) => isCompanyOwnerRole(u.role) && u.companyId === c.id,
+          (u) => isCompanyOwnerRole(u.role) && u.companyId === c.id,
         );
         const drivers = users.filter(
-          (u: any) => u.role === 'driver' && u.companyId === c.id,
+          (u) => u.role === 'driver' && u.companyId === c.id,
         ).length;
         const planOptions = plans.length ? plans : PLAN_FALLBACK;
         const planName =
           planOptions.find(
-            (p: any) => p.code === (c.plan?.code || c.planCode || 'starter'),
+            (p) => p.code === (c.plan?.code || c.planCode || 'starter'),
           )?.name ||
           c.plan?.code ||
           c.planCode ||
@@ -834,7 +843,13 @@ export function SuperAdminPanel({
                   </details>
 
                   {c.tenantDatabase?.issue ? (
-                    <TenantIssueAlert issue={c.tenantDatabase.issue} />
+                    <TenantIssueAlert
+                      issue={
+                        c.tenantDatabase.issue as unknown as Parameters<
+                          typeof TenantIssueAlert
+                        >[0]['issue']
+                      }
+                    />
                   ) : null}
                 </div>
               </div>
@@ -870,30 +885,31 @@ export function SuperAdminPanel({
                         const planCode = e.target.value;
                         void companiesApi
                           .changePlan(c.id, planCode)
-                          .then((updated: any) => {
-                            setCompanies((prev: any[]) =>
-                              prev.map((co) =>
-                                co.id === c.id
+                          .then((updated) => {
+                            const co = updated as PlatformCompany;
+                            setCompanies((prev) =>
+                              prev.map((row) =>
+                                row.id === c.id
                                   ? {
-                                      ...co,
-                                      plan: updated.plan,
-                                      planId: updated.planId,
-                                      subscription: updated.subscription,
+                                      ...row,
+                                      plan: co.plan,
+                                      planId: co.planId,
+                                      subscription: co.subscription,
                                     }
-                                  : co,
+                                  : row,
                               ),
                             );
                             notify(
-                              `Plan updated to ${updated.plan?.name || planCode}`,
+                              `Plan updated to ${co.plan?.name || planCode}`,
                             );
                           })
-                          .catch((err: any) =>
-                            notify(err?.message || 'Plan change failed', 'error'),
+                          .catch((err) =>
+                            notify(getApiErrorMessage(err, 'Plan change failed'), 'error'),
                           );
                       }}
                       style={{ marginBottom: 0, width: '100%' }}
                     >
-                      {planOptions.map((p: any) => (
+                      {planOptions.map((p) => (
                         <option key={p.code} value={p.code}>
                           {p.name}
                         </option>
@@ -923,8 +939,8 @@ export function SuperAdminPanel({
                           notify('Tenant DB provisioned');
                           return refreshAll?.('all');
                         })
-                        .catch((err: any) =>
-                          notify(err?.message || 'Provision failed', 'error'),
+                        .catch((err) =>
+                          notify(getApiErrorMessage(err, 'Provision failed'), 'error'),
                         );
                     }}
                   >

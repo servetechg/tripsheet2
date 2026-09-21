@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useState, useMemo } from 'react';
 import { G, RADIUS } from '@/lib/theme';
 import { Btn, Inp, Modal, Pill, Icons } from '@/components/ui';
@@ -130,8 +131,8 @@ export function DepartmentsPanel({
       await onReload();
       notify(editingDept ? 'Department updated' : 'Department added');
       setModalOpen(false);
-    } catch (err: any) {
-      notify(err?.message || 'Failed to save department', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Failed to save department'), 'error');
     } finally {
       setBusy(false);
     }

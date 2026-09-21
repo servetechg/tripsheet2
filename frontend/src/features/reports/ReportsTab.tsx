@@ -4,6 +4,11 @@ import { Btn, Card, SectionTitle, Pill, Skeleton } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { reportsApi, notificationsApi } from '@/lib/api';
 import { formatLoadLabel, humanizeEnum } from '@/lib/format';
+import type { NotificationRecord } from '@tripsheet/shared';
+import type {
+  CompanyReportSummary,
+  ReportsAnalyticsView,
+} from '@/types/tabs';
 
 function Stat({
   label,
@@ -52,9 +57,9 @@ export function ReportsTab({
   company: { id: string; shortName?: string };
   apiEnabled?: boolean;
 }) {
-  const [summary, setSummary] = useState<any>(null);
-  const [analytics, setAnalytics] = useState<any>(null);
-  const [smsLog, setSmsLog] = useState<any[]>([]);
+  const [summary, setSummary] = useState<CompanyReportSummary | null>(null);
+  const [analytics, setAnalytics] = useState<ReportsAnalyticsView | null>(null);
+  const [smsLog, setSmsLog] = useState<NotificationRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const [view, setView] = useState<'ops' | 'analytics'>('ops');
@@ -331,7 +336,7 @@ export function ReportsTab({
                 {(analytics.revenueByLane || []).length === 0 && (
                   <div style={{ color: G.muted, fontSize: 13 }}>No lane data.</div>
                 )}
-                {(analytics.revenueByLane || []).slice(0, 15).map((row: any) => (
+                {(analytics.revenueByLane || []).slice(0, 15).map((row) => (
                   <div
                     key={row.lane}
                     style={{
@@ -355,7 +360,7 @@ export function ReportsTab({
                 {(analytics.maintenanceByTruck || []).length === 0 && (
                   <div style={{ color: G.muted, fontSize: 13 }}>No maintenance costs.</div>
                 )}
-                {(analytics.maintenanceByTruck || []).map((row: any) => (
+                {(analytics.maintenanceByTruck || []).map((row) => (
                   <div
                     key={row.unitNo}
                     style={{
@@ -374,7 +379,7 @@ export function ReportsTab({
 
               <Card style={{ marginBottom: 16 }}>
                 <SectionTitle>Load profitability</SectionTitle>
-                {(analytics.loadProfitability || []).slice(0, 20).map((row: any) => (
+                {(analytics.loadProfitability || []).slice(0, 20).map((row) => (
                   <div
                     key={row.loadId}
                     style={{
@@ -388,7 +393,12 @@ export function ReportsTab({
                     }}
                   >
                     <span>
-                      {formatLoadLabel(row)} · rev $
+                      {formatLoadLabel({
+                        origin: String(row.origin ?? ''),
+                        destination: String(row.destination ?? ''),
+                        tripNo: String(row.tripNo ?? ''),
+                      })}{' '}
+                      · rev $
                       {Number(row.revenue).toFixed(0)} · cost $
                       {Number(row.cost).toFixed(0)}
                     </span>

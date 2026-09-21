@@ -1,3 +1,4 @@
+import { getApiErrorMessage } from '@/lib/format';
 import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
 import { Btn, Card, Inp, Sel, Pill, Skeleton } from '@/components/ui';
@@ -21,8 +22,12 @@ export function DriverEquipmentPanel({
   apiEnabled?: boolean;
   refreshAll?: () => Promise<void>;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [assets, setAssets] = useState<any[]>([]);
+  const [rows, setRows] = useState<
+    import('@/types/dtos').EquipmentAssignmentDto[]
+  >([]);
+  const [assets, setAssets] = useState<import('@tripsheet/shared').Asset[]>(
+    [],
+  );
   const [truckId, setTruckId] = useState('');
   const [trailerId, setTrailerId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,8 +64,8 @@ export function DriverEquipmentPanel({
       await load();
       await refreshAll?.();
       notify(`${assetType} assigned`);
-    } catch (e: any) {
-      notify(e?.message || 'Assign failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Assign failed'), 'error');
     } finally {
       setBusy(false);
     }
@@ -124,14 +129,17 @@ export function DriverEquipmentPanel({
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontWeight: 700, color: G.text }}>
-                  {r.assetType.toUpperCase()} ·{' '}
+                  {(r.assetType ?? 'asset').toUpperCase()} ·{' '}
                   {r.unitNo ||
                     (r.assetType === 'trailer'
                       ? 'Unnumbered trailer'
                       : 'Unnumbered truck')}
                 </div>
                 <div style={{ fontSize: 11, color: G.muted, marginTop: 4 }}>
-                  {r.role} · from {new Date(r.assignedAt).toLocaleDateString('en-CA')}
+                  {r.role} · from{' '}
+                  {r.assignedAt
+                    ? new Date(r.assignedAt).toLocaleDateString('en-CA')
+                    : '—'}
                   {r.unassignedAt
                     ? ` → ${new Date(r.unassignedAt).toLocaleDateString('en-CA')}`
                     : ' · active'}
@@ -157,7 +165,9 @@ export function DriverSafetyPanel({
   companyId: string;
   apiEnabled?: boolean;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<import('@/types/dtos').SafetyEventDto[]>(
+    [],
+  );
   const [form, setForm] = useState({
     type: 'incident',
     occurredAt: new Date().toISOString().slice(0, 10),
@@ -192,8 +202,8 @@ export function DriverSafetyPanel({
       setForm((f) => ({ ...f, description: '' }));
       await load();
       notify('Safety event recorded');
-    } catch (e: any) {
-      notify(e?.message || 'Failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed'), 'error');
     }
   };
 
@@ -244,7 +254,9 @@ export function DriverTrainingPanel({
   companyId: string;
   apiEnabled?: boolean;
 }) {
-  const [rows, setRows] = useState<any[]>([]);
+  const [rows, setRows] = useState<import('@/types/dtos').TrainingRecordDto[]>(
+    [],
+  );
   const [form, setForm] = useState({
     courseCode: 'orientation',
     completedAt: new Date().toISOString().slice(0, 10),
@@ -279,8 +291,8 @@ export function DriverTrainingPanel({
       });
       await load();
       notify('Training record added');
-    } catch (e: any) {
-      notify(e?.message || 'Failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed'), 'error');
     }
   };
 
@@ -334,7 +346,7 @@ export function DriverPerformancePanel({
   recordId: string;
   apiEnabled?: boolean;
 }) {
-  const [perf, setPerf] = useState<any>(null);
+  const [perf, setPerf] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     if (!apiEnabled || !recordId) return;
@@ -360,18 +372,21 @@ export function DriverPerformancePanel({
     );
   }
 
-  const items = [
-    ['Total miles', perf.totalMiles],
-    ['Deliveries', perf.deliveriesCompleted],
-    ['On-time %', perf.onTimePct != null ? `${perf.onTimePct}%` : '—'],
+  const items: Array<[string, string | number]> = [
+    ['Total miles', String(perf.totalMiles ?? '—')],
+    ['Deliveries', String(perf.deliveriesCompleted ?? '—')],
+    [
+      'On-time %',
+      perf.onTimePct != null ? `${String(perf.onTimePct)}%` : '—',
+    ],
     ['Revenue (loads)', `$${Number(perf.revenue || 0).toFixed(0)}`],
-    ['In transit', perf.inTransit],
+    ['In transit', String(perf.inTransit ?? '—')],
   ];
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10 }}>
       {items.map(([label, value]) => (
-        <Card key={label as string}>
+        <Card key={label}>
           <div style={{ fontSize: 9, letterSpacing: 2, color: G.muted }}>{label}</div>
           <div style={{ fontSize: 22, fontWeight: 800, color: G.gold, marginTop: 4 }}>
             {value}

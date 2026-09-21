@@ -155,8 +155,8 @@ export class ProvisioningService {
       await adminClient.query(
         `GRANT ALL PRIVILEGES ON DATABASE ${quoteIdent(dbName)} TO ${quoteIdent(admin.user)}`,
       );
-    } catch (e: any) {
-      const msg = e?.message || String(e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       await this.fail(companyId, dbName, msg, opts?.actorName);
       throw new BadRequestException(`Provision failed: ${msg}`);
     } finally {
@@ -264,8 +264,8 @@ export class ProvisioningService {
       await this.seedCommodities(tenantClient, companyId);
       await this.seedBorderPorts(tenantClient, companyId);
       await this.seedOpsRefs(tenantClient, companyId);
-    } catch (e: any) {
-      const msg = e?.message || String(e);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
       await this.fail(companyId, dbName, msg, opts?.actorName);
       throw new BadRequestException(`Schema bootstrap failed: ${msg}`);
     } finally {
@@ -733,10 +733,10 @@ export class ProvisioningService {
         results.push(
           await this.provisionCompany(row.companyId, { actorName }),
         );
-      } catch (e: any) {
+      } catch (e: unknown) {
         results.push({
           companyId: row.companyId,
-          error: e?.message || String(e),
+          error: e instanceof Error ? e.message : String(e),
         });
       }
     }

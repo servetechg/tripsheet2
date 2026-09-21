@@ -6,14 +6,18 @@ import { notify } from '@/components/feedback/Toast';
 import { ROLE_LABELS, isCompanyOwnerRole, isSuperAdminRole } from '@tripsheet/shared';
 import { useConfirm, type ConfirmOptions } from '@/context/ConfirmContext';
 import { EmailChangeModal } from '@/components/account/EmailChangeModal';
-import { humanizeEnum } from '@/lib/format';
+import { humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
+
+import type { PlatformCompany, InviteDetailDto } from '@/types/dtos';
+import type { AppUser } from '@/types/session';
 
 interface UsersPanelProps {
   cid: string;
-  company?: any;
-  staff: any[];
-  setStaff: React.Dispatch<React.SetStateAction<any[]>>;
-  pendingInvites: any[];
+  company?: PlatformCompany;
+  staff: AppUser[];
+  setStaff: React.Dispatch<React.SetStateAction<AppUser[]>>;
+  pendingInvites: InviteDetailDto[];
   reloadInvites: () => Promise<void> | void;
   customRoles: CustomRoleDto[];
   can: (perm: string) => boolean;
@@ -98,7 +102,7 @@ export function UsersPanel({
   >('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [editUser, setEditUser] = useState<any>(null);
+  const [editUser, setEditUser] = useState<AppUser | null>(null);
   const [editName, setEditName] = useState('');
   const [editBusy, setEditBusy] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -208,8 +212,8 @@ export function UsersPanel({
       void refreshAll?.(cid);
       void reloadInvites();
       await reloadStaff();
-    } catch (err: any) {
-      notify(err?.message || 'Invite failed', 'error');
+    } catch (err: unknown) {
+      notify(getApiErrorMessage(err, 'Invite failed'), 'error');
     } finally {
       setInviteBusy(false);
     }
@@ -582,7 +586,7 @@ export function UsersPanel({
                               }
                               return reloadInvites();
                             })
-                            .catch((err: any) => notify(err?.message || 'Regenerate failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Regenerate failed'), 'error'));
                         }}
                       >
                         Resend / Copy
@@ -599,7 +603,7 @@ export function UsersPanel({
                             .revoke(inv.id)
                             .then(() => reloadInvites())
                             .then(() => notify('Invite revoked'))
-                            .catch((err: any) => notify(err?.message || 'Revoke failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Revoke failed'), 'error'));
                         }}
                       >
                         Revoke
@@ -1002,7 +1006,7 @@ export function UsersPanel({
                                 'success',
                               ),
                             )
-                            .catch((err: any) => notify(err?.message || 'Update failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Update failed'), 'error'));
                         }}
                       >
                         <optgroup label="System Roles">
@@ -1062,7 +1066,7 @@ export function UsersPanel({
                             .setUserStatus(u.id, 'suspended')
                             .then(() => reloadStaff())
                             .then(() => notify('User suspended. Active sessions are revoked.'))
-                            .catch((err: any) => notify(err?.message || 'Suspend failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Suspend failed'), 'error'));
                         }}
                       >
                         Suspend
@@ -1079,7 +1083,7 @@ export function UsersPanel({
                             .setUserStatus(u.id, 'locked')
                             .then(() => reloadStaff())
                             .then(() => notify('User locked. Active sessions are revoked.'))
-                            .catch((err: any) => notify(err?.message || 'Lock failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Lock failed'), 'error'));
                         }}
                       >
                         Lock
@@ -1100,7 +1104,7 @@ export function UsersPanel({
                               .unlockUser(u.id)
                               .then(() => reloadStaff())
                               .then(() => notify('User unlocked. Temporary lockout cleared.', 'success'))
-                              .catch((err: any) => notify(err?.message || 'Unlock failed', 'error'));
+                              .catch((err) => notify(getApiErrorMessage(err, 'Unlock failed'), 'error'));
                           }}
                         >
                           Unlock
@@ -1118,7 +1122,7 @@ export function UsersPanel({
                             .setUserStatus(u.id, 'active')
                             .then(() => reloadStaff())
                             .then(() => notify('User reactivated', 'success'))
-                            .catch((err: any) => notify(err?.message || 'Reactivate failed', 'error'));
+                            .catch((err) => notify(getApiErrorMessage(err, 'Reactivate failed'), 'error'));
                         }}
                       >
                         Reactivate
@@ -1143,7 +1147,7 @@ export function UsersPanel({
                               .setUserStatus(u.id, 'archived')
                               .then(() => reloadStaff())
                               .then(() => notify('User archived'))
-                              .catch((err: any) => notify(err?.message || 'Archive failed', 'error'));
+                              .catch((err) => notify(getApiErrorMessage(err, 'Archive failed'), 'error'));
                           })();
                         }}
                       >
@@ -1201,8 +1205,8 @@ export function UsersPanel({
                     await reloadStaff();
                     notify('Profile updated', 'success');
                     setEditUser(null);
-                  } catch (err: any) {
-                    notify(err?.message || 'Save failed', 'error');
+                  } catch (err: unknown) {
+                    notify(getApiErrorMessage(err, 'Save failed'), 'error');
                   } finally {
                     setEditBusy(false);
                   }

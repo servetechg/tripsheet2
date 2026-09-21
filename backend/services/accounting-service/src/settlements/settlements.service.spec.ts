@@ -3,6 +3,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
+import type { CreateSettlementDto } from './dto/create-settlement.dto';
 
 describe('SettlementsService', () => {
   let service: SettlementsService;
@@ -26,7 +27,9 @@ describe('SettlementsService', () => {
         delete: jest.fn(),
       },
     };
-    service = new SettlementsService(prisma as any);
+    service = new SettlementsService(
+      prisma as unknown as ConstructorParameters<typeof SettlementsService>[0],
+    );
   });
 
   describe('create', () => {
@@ -46,7 +49,7 @@ describe('SettlementsService', () => {
           { label: 'Mileage', amount: 200 },
           { label: 'Bonus', amount: 150 },
         ],
-      } as any);
+      } as CreateSettlementDto);
 
       expect(prisma.settlement.create).toHaveBeenCalledWith(
         expect.objectContaining({

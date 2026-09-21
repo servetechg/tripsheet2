@@ -5,7 +5,9 @@ describe('FilesService', () => {
     const config = {
       get: jest.fn().mockReturnValue(undefined),
     };
-    const files = new FilesService(config as any);
+    const files = new FilesService(
+      config as unknown as ConstructorParameters<typeof FilesService>[0],
+    );
     expect(files.isConfigured()).toBe(false);
   });
 
@@ -20,7 +22,9 @@ describe('FilesService', () => {
         return map[key];
       }),
     };
-    const files = new FilesService(config as any);
+    const files = new FilesService(
+      config as unknown as ConstructorParameters<typeof FilesService>[0],
+    );
     expect(files.isConfigured()).toBe(true);
   });
 });

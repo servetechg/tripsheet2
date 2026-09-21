@@ -4,7 +4,8 @@ import { Btn, Card, Inp, Sel, SectionTitle, Pill, Divider, Skeleton } from '@/co
 import { Err } from '@/components/feedback/Err';
 import { notify } from '@/components/feedback/Toast';
 import { settlementsApi, contractsApi } from '@/lib/api';
-import { blank, formatLoadLabel, humanizeEnum } from '@/lib/format';
+import { blank, formatLoadLabel, humanizeEnum, getApiErrorMessage } from '@/lib/format';
+// getApiErrorMessage imported below
 import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
 import { PAY_TYPES } from '@/lib/docTypes';
 import type { SettlementLine } from '@tripsheet/shared';
@@ -23,20 +24,14 @@ export function AccountingTab({
   loads = [],
   adminUser,
   apiEnabled,
-}: {
-  company: { id: string };
-  drivers: any[];
-  sheets: any[];
-  loads?: any[];
-  adminUser?: any;
-  apiEnabled?: boolean;
-}) {
-  const [list, setList] = useState<any[]>([]);
+}: import('@/types/tabs').AccountingTabProps) {
+  const [list, setList] = useState<import('@tripsheet/shared').Settlement[]>([]);
   const [loadingList, setLoadingList] = useState(Boolean(apiEnabled));
   const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
-  const [wageContract, setWageContract] = useState<any>(null);
+  const [wageContract, setWageContract] =
+    useState<import('@/types/dtos').EmploymentContractDto | null>(null);
   const [f, setF] = useState({
     driverId: '',
     periodStart: '',
@@ -59,8 +54,8 @@ export function AccountingTab({
     try {
       const rows = await settlementsApi.list({ companyId: company.id });
       setList(rows);
-    } catch (e: any) {
-      notify(e?.message || 'Failed to load settlements', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Failed to load settlements'), 'error');
     } finally {
       setLoadingList(false);
     }
@@ -124,7 +119,8 @@ export function AccountingTab({
     }
 
     for (const load of loads.filter((l) => matchesDriverRef(l.driverId, { id: f.driverId, driverRecordId }))) {
-      const ts = load.pickupTime || load.createdAt;
+      const loadMeta = load as import('@/types/app').LoadWithTimestamps;
+      const ts = load.pickupTime || loadMeta.createdAt || load.lastUpdate;
       const t = ts ? new Date(ts).getTime() : NaN;
       if (!Number.isFinite(t) || t < start || t > end) continue;
       if (load.status !== 'delivered') continue;
@@ -145,7 +141,9 @@ export function AccountingTab({
     .filter((l) => l.kind === 'expense')
     .reduce((s, l) => s + l.amount, 0);
 
-  const settlementDriverName = (settlement: any) => {
+  const settlementDriverName = (
+    settlement: import('@tripsheet/shared').Settlement,
+  ) => {
     if (settlement.driverName) return settlement.driverName;
     const driver = drivers.find((d) =>
       matchesDriverRef(settlement.driverId, {
@@ -159,7 +157,7 @@ export function AccountingTab({
   const tripSheetLabel = (tripSheetId: string) => {
     const sheet = sheets.find((item) => item.id === tripSheetId);
     const tripNumbers = (sheet?.trips || [])
-      .map((trip: any) => trip.tripNo)
+      .map((trip) => trip.tripNo)
       .filter(Boolean);
     return tripNumbers.length
       ? `Trip ${tripNumbers.map((tripNo: string) => `#${tripNo}`).join(', ')}`
@@ -206,8 +204,8 @@ export function AccountingTab({
       setWageContract(null);
       notify('Settlement draft created');
       await load();
-    } catch (e: any) {
-      setErr(e?.message || 'Failed to create settlement');
+    } catch (e: unknown) {
+      setErr(getApiErrorMessage(e, 'Failed to create settlement'));
     } finally {
       setBusy(false);
     }
@@ -218,8 +216,8 @@ export function AccountingTab({
       await settlementsApi.approve(id);
       notify('Settlement approved');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Approve failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Approve failed'), 'error');
     }
   };
 
@@ -228,8 +226,8 @@ export function AccountingTab({
       await settlementsApi.pay(id);
       notify('Settlement marked paid');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Pay failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Pay failed'), 'error');
     }
   };
 
@@ -238,8 +236,8 @@ export function AccountingTab({
       await settlementsApi.remove(id);
       notify('Draft deleted');
       await load();
-    } catch (e: any) {
-      notify(e?.message || 'Delete failed', 'error');
+    } catch (e: unknown) {
+      notify(getApiErrorMessage(e, 'Delete failed'), 'error');
     }
   };
 
@@ -472,6 +470,8 @@ export function AccountingTab({
       <div style={{ marginTop: 24 }}>
         <BillingPanel
           company={company}
+          drivers={drivers}
+          sheets={sheets}
           loads={loads}
           adminUser={adminUser}
           apiEnabled={apiEnabled}
