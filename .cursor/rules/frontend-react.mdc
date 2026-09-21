@@ -26,7 +26,12 @@ alwaysApply: false
 2. Gate UI by permission when mutating
 3. Manual smoke: one happy path in browser — don't document unless asked
 
+## Types
+
+- Follow `.cursor/rules/typescript-professional.mdc` (always on): typed props, `@tripsheet/shared` for domain, `features/<domain>/types.ts` for UI-only shapes.
+
 ## Do not
 
 - Add new CSS frameworks; use existing inline `G.*` theme tokens
 - Fetch with raw fetch outside `api.ts` unless public/unauthenticated route
+- Add `: any` on new components or API helpers

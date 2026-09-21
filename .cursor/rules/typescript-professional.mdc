@@ -1,0 +1,53 @@
+---
+description: Professional TypeScript — type sources, no new any, planned strictness
+alwaysApply: true
+---
+
+# TypeScript professional standards
+
+## Policy
+
+- **New and modified code** must use accurate types. Do **not** add new `any`, `as any`, or `@ts-ignore` except with a one-line comment and ticket/issue reference.
+- The repo still has legacy `any`. Do **not** mass-refactor it unless the user asks for a dedicated typing pass. When you edit a file, **improve types in the code you touch** (props, returns, callbacks, API payloads).
+- Goal: eventual **strict, professional** typing across frontend, backend, and shared — one source of truth per concept, **no duplicated type definitions**.
+
+## Where types live (single source of truth)
+
+| Concern | Location |
+|---------|----------|
+| Cross-app domain (Load, Company, Role, permissions, status enums) | `shared/` → `@tripsheet/shared` |
+| Frontend app shell (nav, routing, session shape) | `frontend/src/types/` |
+| Frontend feature-only (UI state, tab props, view models) | `frontend/src/features/<domain>/types.ts` or `types/` |
+| HTTP request bodies / query | Backend `dto/*.dto.ts` (class-validator) |
+| Service-internal helpers | Colocate `*.types.ts` in the same Nest module |
+
+**Rules:** Import domain models from `@tripsheet/shared`. Do not redefine the same entity in frontend and backend. Map API/Prisma shapes to shared types at boundaries when fields differ.
+
+## Practices (apply on every change)
+
+- Explicit **props and hook return types**; extract `interface XxxProps` / `type XxxResult` when non-trivial.
+- **`import type`** for type-only imports; enable strict inference (avoid generics that collapse to `{ id?: string }`-style widows — use shared models like `Load`).
+- Prefer **`unknown`** over `any` for untrusted data; narrow with guards or validators (DTOs on backend).
+- Prefer **`satisfies`**, `Pick` / `Omit` / `Partial` on shared types over copy-pasted field lists.
+- API layer: type `lib/api.ts` methods and feature fetchers; avoid `(data: any)`.
+- React: typed event handlers (`ChangeEvent<HTMLInputElement>`), discriminated unions for UI state.
+- Do not use type assertions to silence errors — fix the model, add a mapper, or extend shared types once.
+
+## Quick examples
+
+```typescript
+// ❌ Avoid
+export function Panel({ user, loads }: any) { ... }
+
+// ✅ Prefer
+import type { Load } from '@tripsheet/shared';
+import type { SessionUser } from '@/types/app';
+
+export interface PanelProps {
+  user: SessionUser;
+  loads: Load[];
+}
+export function Panel({ user, loads }: PanelProps) { ... }
+```
+
+Build shared after changing `shared/`: `cd shared && npm run build`.

@@ -27,6 +27,10 @@ alwaysApply: false
 3. Tenant-aware Prisma queries use `requireCompanyId()` / store from ALS
 4. Run the **chapter test** for that domain (see `AGENTS.md`)
 
+## Types
+
+- Follow `.cursor/rules/typescript-professional.mdc`: DTOs for inputs; reuse `@tripsheet/shared` enums/models; module-local `*.types.ts` for internal-only shapes — no duplicate domain interfaces.
+
 ## Do not
 
 - Add a new microservice without explicit request

@@ -10,6 +10,7 @@ FleetQuix / TripSheet monorepo. Read this file first; do not re-explore the whol
 | Microservices | `backend/services/*-service/` | NestJS + Prisma each |
 | Shared tenant runtime | `backend/shared/tenant-runtime/` | Tenant DB routing — read before cross-tenant bugs |
 | Shared types | `shared/` | Build before backend: `cd shared && npm run build` |
+| TypeScript policy | `.cursor/rules/typescript-professional.mdc` | No new `any`; domain types from `@tripsheet/shared` + feature `types/`; legacy `any` cleaned in a future pass |
 | Frontend | `frontend/` | React + Vite, port **5173** |
 | Architecture ADRs | `docs/*-COMPLETE.md`, `docs/*-PLAN.md` | Source of truth per chapter |
 | Testing guides | `docs/*-TESTING-GUIDE.md`, `docs/TESTING-GUIDES-INDEX.md` | Use instead of inventing test steps |

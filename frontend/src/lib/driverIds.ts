@@ -1,3 +1,5 @@
+import type { Load } from '@tripsheet/shared';
+
 /** Resolve the driver-service record id used for documents/contracts. */
 export function driverRecordIdOf(driver: {
   id: string;
@@ -24,10 +26,10 @@ export function matchesDriverRef(
 }
 
 /** Current assignment for driver UI (in transit first, then assigned). */
-export function pickCurrentDriverLoad<T extends { driverId?: string; status?: string }>(
-  loads: T[],
+export function pickCurrentDriverLoad(
+  loads: Load[],
   driver: { id: string; driverRecordId?: string | null },
-): T | null {
+): Load | null {
   const mine = loads.filter((l) => matchesDriverRef(l.driverId, driver));
   return (
     mine.find((l) => l.status === 'in_transit') ||
