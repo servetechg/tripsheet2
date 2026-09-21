@@ -40,8 +40,11 @@ assert(has('accountant', 'drivers.wage.view'), 'accountant can view wage');
 assert(!has('accountant', 'drivers.wage.edit'), 'accountant wage is view-only in v1 catalog');
 
 assert(has('driver', 'dispatch.view'), 'driver views own dispatch');
+assert(has('driver', 'dispatch.trip.start'), 'driver can start own trip');
+assert(has('driver', 'dispatch.trip.complete'), 'driver can complete own trip');
 assert(!has('driver', 'dispatch.create'), 'driver does not create dispatch');
 assert(!has('driver', 'dispatch.edit'), 'driver does not edit others’ dispatch via catalog');
+assert(!has('driver', 'dispatch.cancel'), 'driver cannot cancel dispatch');
 assert(has('driver', 'payroll.view'), 'driver payroll self');
 assert(!has('driver', 'users.create'), 'driver is not user-admin');
 

@@ -303,7 +303,12 @@ export class LoadsService {
 
     return this.prisma.load.update({
       where: { id },
-      data: { status: dto.status },
+      data: {
+        status: dto.status,
+        ...(dto.status === 'delivered'
+          ? { actualDelivery: new Date().toISOString() }
+          : {}),
+      },
     });
   }
 

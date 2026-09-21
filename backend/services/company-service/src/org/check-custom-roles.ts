@@ -13,7 +13,7 @@ function assert(cond: unknown, msg: string) {
   if (!cond) throw new Error(msg);
 }
 
-assert(KNOWN_PERMISSION_CODES.length === 55, 'catalog size drifted from auth');
+assert(KNOWN_PERMISSION_CODES.length === 57, 'catalog size drifted from auth');
 assert(
   CUSTOM_ROLE_DENIED_PERMISSIONS.includes('company.delete'),
   'company.delete must stay denied on custom roles',

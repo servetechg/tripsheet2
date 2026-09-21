@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { G, FONT_MONO, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons, AddressAutocomplete, Modal } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Divider, SectionTitle, G2, Icons, AddressAutocomplete, Modal, Skeleton } from '@/components/ui';
 import { Err } from '@/components/feedback/Err';
 import { OkBox } from '@/components/feedback/OkBox';
 import { blank, humanizeEnum } from '@/lib/format';
@@ -122,6 +122,7 @@ export function SuperAdminPanel({
   refreshAll,
   activeTab,
   onTabChange,
+  loading,
 }: any) {
   const [tab, setTab] = useState('companies');
   const currentTab = activeTab || tab;
@@ -150,6 +151,40 @@ export function SuperAdminPanel({
     showArchived ? true : c.active !== false,
   );
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const validateCompanyForm = () => {
+    const errs: Record<string, string> = {};
+    const derivedSlug = toKebabSlug(f.slug || f.shortName || f.name);
+    if (blank(f.name)) errs.name = 'Company full name is required';
+    if (blank(derivedSlug)) errs.slug = 'Slug identifier is required';
+    if (blank(f.adminName)) errs.adminName = 'Admin full name is required';
+    if (blank(f.adminEmail)) {
+      errs.adminEmail = 'Admin email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.adminEmail.trim())) {
+      errs.adminEmail = 'Enter a valid email address';
+    } else if (
+      users.find(
+        (u: any) => u.email.toLowerCase() === f.adminEmail.trim().toLowerCase(),
+      )
+    ) {
+      errs.adminEmail = 'Admin email already in use';
+    }
+    if (blank(f.adminPassword)) {
+      errs.adminPassword = 'Password is required';
+    } else if (f.adminPassword.length < 8) {
+      errs.adminPassword = 'Password must be at least 8 characters';
+    }
+    return errs;
+  };
+
+  const formErrors = validateCompanyForm();
+  const isFormValid = Object.keys(formErrors).length === 0;
+
+  const markTouched = (k: string) => {
+    setTouched((prev) => ({ ...prev, [k]: true }));
+  };
+
   const handleNameChange = (val: string) => {
     setF((prev) => {
       const next = { ...prev, name: val };
@@ -168,6 +203,7 @@ export function SuperAdminPanel({
   const resetForm = () => {
     setF(INITIAL_COMPANY_FORM);
     setSlugManuallyEdited(false);
+    setTouched({});
     setErr('');
   };
 
@@ -190,27 +226,19 @@ export function SuperAdminPanel({
   }, [apiEnabled]);
 
   const create = async () => {
+    const errs = validateCompanyForm();
+    if (Object.keys(errs).length > 0) {
+      setTouched({
+        name: true,
+        slug: true,
+        adminName: true,
+        adminEmail: true,
+        adminPassword: true,
+      });
+      setErr('Please fill in all required fields correctly.');
+      return;
+    }
     const derivedSlug = toKebabSlug(f.slug || f.shortName || f.name);
-    if (blank(f.name) || blank(derivedSlug)) {
-      setErr('Company name and slug required.');
-      return;
-    }
-    if (blank(f.adminName) || blank(f.adminEmail) || blank(f.adminPassword)) {
-      setErr('Admin login details required.');
-      return;
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.adminEmail.trim())) {
-      setErr('Enter a valid admin email address.');
-      return;
-    }
-    if (
-      users.find(
-        (u: any) => u.email.toLowerCase() === f.adminEmail.trim().toLowerCase(),
-      )
-    ) {
-      setErr('Admin email already in use.');
-      return;
-    }
 
     try {
       setBusy(true);
@@ -481,12 +509,16 @@ export function SuperAdminPanel({
               label="Company Full Name *"
               value={f.name}
               onChange={(e) => handleNameChange(e.target.value)}
+              onBlur={() => markTouched('name')}
+              error={touched.name ? formErrors.name : undefined}
               placeholder="e.g. Denali Transport Inc."
             />
             <Inp
               label="Slug (URL identifier) *"
               value={f.slug}
               onChange={(e) => handleSlugChange(e.target.value)}
+              onBlur={() => markTouched('slug')}
+              error={touched.slug ? formErrors.slug : undefined}
               placeholder="e.g. denali-transport"
               hint="Auto-formatted into URL-safe kebab-case"
             />
@@ -553,16 +585,22 @@ export function SuperAdminPanel({
               label="Admin Full Name *"
               value={f.adminName}
               onChange={(e) => upd('adminName', e.target.value)}
+              onBlur={() => markTouched('adminName')}
+              error={touched.adminName ? formErrors.adminName : undefined}
             />
             <Inp
               label="Admin Email *"
               value={f.adminEmail}
               onChange={(e) => upd('adminEmail', e.target.value)}
+              onBlur={() => markTouched('adminEmail')}
+              error={touched.adminEmail ? formErrors.adminEmail : undefined}
             />
             <Inp
               label="Password *"
               value={f.adminPassword}
               onChange={(e) => upd('adminPassword', e.target.value)}
+              onBlur={() => markTouched('adminPassword')}
+              error={touched.adminPassword ? formErrors.adminPassword : undefined}
               type="password"
             />
           </G2>
@@ -570,6 +608,7 @@ export function SuperAdminPanel({
             <Btn
               onClick={() => void create()}
               loading={busy}
+              disabled={busy || !isFormValid}
               loadingLabel="Creating company…"
             >
               Create Company
@@ -637,7 +676,14 @@ export function SuperAdminPanel({
         </div>
       </Modal>
 
-      {visibleCompanies.map((c: any) => {
+      {loading && (!companies || companies.length === 0) ? (
+        <Skeleton rows={4} height={96} />
+      ) : visibleCompanies.length === 0 ? (
+        <Card style={{ padding: 40, textAlign: 'center', color: G.muted }}>
+          No companies found.
+        </Card>
+      ) : (
+        visibleCompanies.map((c: any) => {
         const admin = users.find(
           (u: any) => isCompanyOwnerRole(u.role) && u.companyId === c.id,
         );
@@ -904,7 +950,8 @@ export function SuperAdminPanel({
             </div>
           </Card>
         );
-      })}
+      })
+      )}
         </>
       )}
     </AppShell>

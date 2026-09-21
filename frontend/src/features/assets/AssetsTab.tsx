@@ -99,16 +99,45 @@ export function AssetsTab({
     setErr('');
   };
 
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const markTouched = (k: string) => {
+    setTouched((prev) => ({ ...prev, [k]: true }));
+  };
+
+  const validateAssetForm = () => {
+    const errs: Record<string, string> = {};
+    if (blank(f.unitNo)) {
+      errs.unitNo = 'Unit No. is required';
+    } else if (
+      !editAsset &&
+      assets.some(
+        (a: any) =>
+          a.companyId === company?.id &&
+          a.unitNo?.trim().toLowerCase() === f.unitNo.trim().toLowerCase(),
+      )
+    ) {
+      errs.unitNo = 'Unit No. already exists';
+    }
+    return errs;
+  };
+
+  const assetFieldErrors = validateAssetForm();
+  const isAssetFormValid = Object.keys(assetFieldErrors).length === 0;
+
   const resetAssetForm = () => {
     setF(emptyAsset);
     setEditAsset(null);
     setShow(false);
+    setTouched({});
     setErr('');
   };
 
   const saveAsset = async () => {
-    if (blank(f.unitNo)) {
-      setErr('Unit No. is required.');
+    const errs = validateAssetForm();
+    if (Object.keys(errs).length > 0) {
+      setTouched({ unitNo: true });
+      setErr(Object.values(errs)[0]);
       return;
     }
     const type =
@@ -124,15 +153,6 @@ export function AssetsTab({
       companyId: company.id,
     };
     if (!editAsset) {
-      if (
-        assets.find(
-          (a: any) =>
-            a.companyId === company.id && a.unitNo === f.unitNo.trim(),
-        )
-      ) {
-        setErr('Unit No. already exists.');
-        return;
-      }
       (body as any).status = 'available';
     }
     try {
@@ -307,6 +327,8 @@ export function AssetsTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, unitNo: e.target.value }))
               }
+              onBlur={() => markTouched('unitNo')}
+              error={touched.unitNo ? assetFieldErrors.unitNo : undefined}
               placeholder="e.g. 32054"
             />
             <Inp
@@ -407,7 +429,12 @@ export function AssetsTab({
             placeholder="Optional notes"
           />
           <div style={{ display: 'flex', gap: 10 }}>
-            <Btn onClick={() => void saveAsset()} loading={busy} loadingLabel="Saving…">
+            <Btn
+              onClick={() => void saveAsset()}
+              loading={busy}
+              disabled={busy || !isAssetFormValid}
+              loadingLabel="Saving…"
+            >
               {editAsset ? 'SAVE CHANGES' : 'SAVE ASSET'}
             </Btn>
             <Btn variant="outline" disabled={busy} onClick={resetAssetForm}>

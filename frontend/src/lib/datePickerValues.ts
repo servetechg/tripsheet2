@@ -90,12 +90,29 @@ export function syntheticInputChange(value: string): ChangeEvent<HTMLInputElemen
 export const DEFAULT_START_YEAR = 1950;
 export const DEFAULT_END_YEAR = new Date().getFullYear() + 10;
 
-export function pickerYearRange(min?: string, max?: string): { start: Date; end: Date } {
+export function pickerYearRange(
+  min?: string,
+  max?: string,
+  selected?: Date | null,
+): { start: Date; end: Date } {
   const minDate = min ? parsePickerValue('date', min) : null;
   const maxDate = max ? parsePickerValue('date', max) : null;
+  const effectiveStart =
+    selected && minDate && selected < minDate
+      ? selected
+      : minDate;
+  const effectiveEnd =
+    selected && maxDate && selected > maxDate
+      ? selected
+      : maxDate;
+
   return {
-    start: new Date(minDate?.getFullYear() ?? DEFAULT_START_YEAR, 0, 1),
-    end: new Date(maxDate?.getFullYear() ?? DEFAULT_END_YEAR, 11, 31),
+    start: effectiveStart
+      ? new Date(effectiveStart.getFullYear(), effectiveStart.getMonth(), 1)
+      : new Date(DEFAULT_START_YEAR, 0, 1),
+    end: effectiveEnd
+      ? new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth() + 1, 0)
+      : new Date(DEFAULT_END_YEAR, 11, 31),
   };
 }
 

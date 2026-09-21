@@ -16,7 +16,9 @@ import {
   contractsApi,
   driversApi,
   settlementsApi,
+  loadsApi,
 } from '@/lib/api';
+import { useCan } from '@/lib/permissions';
 import {
   AVAILABILITY_LABELS,
 } from '@/lib/driverLifecycle';
@@ -25,6 +27,7 @@ import {
   matchesDriverRef,
   pickCurrentDriverLoad,
 } from '@/lib/driverIds';
+import { DriverLoadCard } from '@/features/drivers/DriverLoadCard';
 
 export function DriverDashboard({
   user,
@@ -56,7 +59,7 @@ export function DriverDashboard({
   const sortedSheets = [...mySheets].sort((a, b) =>
     (b.createdAt || '') >= (a.createdAt || '') ? 1 : -1,
   );
-  const myLoad = pickCurrentDriverLoad(loads, user);
+  const myLoad: any = pickCurrentDriverLoad(loads, user);
   const myDocs = (driverDocs || []).filter(
     (d: any) =>
       matchesDriverRef(d.driverId, user) && d.type !== '__contract__',
@@ -72,11 +75,42 @@ export function DriverDashboard({
     user.availabilityStatus || 'available',
   );
   const [availBusy, setAvailBusy] = useState(false);
+  const [loadStatusBusy, setLoadStatusBusy] = useState(false);
+  const { can } = useCan();
   const myContract = apiEnabled ? apiContract || localContract : localContract;
+  const recentDelivered = useMemo(
+    () =>
+      [...loads]
+        .filter(
+          (l: any) =>
+            matchesDriverRef(l.driverId, user) && l.status === 'delivered',
+        )
+        .sort((a: any, b: any) => {
+          const ta = a.actualDelivery || a.updatedAt || a.createdAt || '';
+          const tb = b.actualDelivery || b.updatedAt || b.createdAt || '';
+          return tb >= ta ? 1 : -1;
+        })
+        .slice(0, 8),
+    [loads, user],
+  );
   const [uploadModal, setUploadModal] = useState<any>(null);
   const [viewDoc, setViewDoc] = useState<any>(null);
   const tabLoading = useFakeLoad(tab, 350);
   const availabilitySelectId = useId();
+
+  const setTripStatus = async (loadId: string, status: 'in_transit' | 'delivered') => {
+    if (!apiEnabled) return;
+    setLoadStatusBusy(true);
+    try {
+      await loadsApi.setStatus(loadId, status);
+      notify(status === 'in_transit' ? 'Trip started' : 'Trip marked delivered');
+      await refreshAll?.();
+    } catch (e: any) {
+      notify(e?.message || 'Could not update trip status', 'error');
+    } finally {
+      setLoadStatusBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!apiEnabled || tab !== 'contract') return;
@@ -503,6 +537,8 @@ export function DriverDashboard({
                   <Btn
                     size="sm"
                     style={{ flexShrink: 0, minHeight: 42 }}
+                    loading={availBusy}
+                    loadingLabel="Saving…"
                     disabled={
                       availBusy ||
                       availabilityStatus === (user.availabilityStatus || 'available')
@@ -1136,59 +1172,17 @@ export function DriverDashboard({
 
           {tab === 'status' && (
             <div>
+              <SectionTitle>My load</SectionTitle>
               {myLoad ? (
-                <Card>
-                  <SectionTitle>ACTIVE LOAD</SectionTitle>
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: 16,
-                    }}
-                  >
-                    {[
-                      ['Trip #', myLoad.tripNo || 'Unavailable'],
-                      ['From', myLoad.origin],
-                      ['To', myLoad.destination],
-                      ['Truck', myLoad.truckNo || 'Unnumbered truck'],
-                      ['Trailer', myLoad.trailerNo || 'Unnumbered trailer'],
-                      ['Pickup', myLoad.pickupTime || '—'],
-                      [
-                        'Speed',
-                        myLoad.status === 'in_transit'
-                          ? `${myLoad.speed} km/h`
-                          : '—',
-                      ],
-                    ].map(([k, v]) => (
-                      <div key={k}>
-                        <div
-                          style={{
-                            fontSize: 9,
-                            letterSpacing: 2,
-                            color: G.muted,
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {k}
-                        </div>
-                        <div
-                          style={{ fontSize: 13, fontWeight: 600, marginTop: 3 }}
-                        >
-                          {v}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ marginTop: 16 }}>
-                    <Pill
-                      color={
-                        myLoad.status === 'in_transit' ? G.gold : G.info
-                      }
-                    >
-                      {myLoad.status.replace('_', ' ').toUpperCase()}
-                    </Pill>
-                  </div>
-                </Card>
+                <DriverLoadCard
+                  load={myLoad}
+                  mode="active"
+                  loadStatusBusy={loadStatusBusy}
+                  canStart={can('dispatch.trip.start')}
+                  canComplete={can('dispatch.trip.complete')}
+                  onStart={() => void setTripStatus(myLoad.id, 'in_transit')}
+                  onDeliver={() => void setTripStatus(myLoad.id, 'delivered')}
+                />
               ) : (
                 <Card style={{ textAlign: 'center', padding: 60 }}>
                   <div>{Icons.dispatch({ size: 40, color: G.muted })}</div>
@@ -1196,6 +1190,22 @@ export function DriverDashboard({
                     No active load assigned to you right now.
                   </div>
                 </Card>
+              )}
+              {recentDelivered.length > 0 && (
+                <div style={{ marginTop: 16 }}>
+                  <SectionTitle>Recent trips</SectionTitle>
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 10,
+                    }}
+                  >
+                    {recentDelivered.map((l: any) => (
+                      <DriverLoadCard key={l.id} load={l} mode="history" />
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}

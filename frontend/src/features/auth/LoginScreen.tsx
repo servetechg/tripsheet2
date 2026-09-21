@@ -22,12 +22,12 @@ type Step =
   | { kind: 'password' }
   | { kind: 'mfa'; mfaToken: string }
   | {
-      kind: 'enroll';
-      mfaToken: string;
-      secret?: string;
-      qr?: string;
-      recovery?: string[];
-    };
+    kind: 'enroll';
+    mfaToken: string;
+    secret?: string;
+    qr?: string;
+    recovery?: string[];
+  };
 
 function finishSession(
   res: AuthTokens,
@@ -209,10 +209,12 @@ export function LoginScreen({
             />
             <Btn
               full
+              loading={loading}
+              loadingLabel="Signing in…"
               onClick={() => void goPassword()}
               disabled={loading || !email.trim() || !pass.trim()}
             >
-              {loading ? 'Signing in…' : 'Continue'}
+              Sign In
             </Btn>
             <p style={{ marginTop: 16, fontSize: 13 }}>
               <a href={PATHS.forgotPassword} style={{ color: G.gold }}>
@@ -232,10 +234,12 @@ export function LoginScreen({
             />
             <Btn
               full
+              loading={loading}
+              loadingLabel="Verifying…"
               onClick={() => void goMfa()}
               disabled={loading || code.trim().length < 4}
             >
-              {loading ? 'Verifying…' : 'Verify'}
+              Verify
             </Btn>
             <Btn
               full
@@ -286,10 +290,12 @@ export function LoginScreen({
             />
             <Btn
               full
+              loading={loading}
+              loadingLabel="Enabling…"
               onClick={() => void goEnrollConfirm()}
               disabled={loading || code.trim().length < 6}
             >
-              {loading ? 'Enabling…' : 'Enable MFA & sign in'}
+              Enable MFA & sign in
             </Btn>
           </>
         )}

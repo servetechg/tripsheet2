@@ -30,6 +30,7 @@ export interface DatePickerInputProps {
   mode: DatePickerMode;
   value?: string;
   onChange?: (e: ChangeEvent<HTMLInputElement>) => void;
+  onBlur?: (e?: any) => void;
   placeholder?: string;
   disabled?: boolean;
   min?: string;
@@ -49,9 +50,20 @@ function TimeSelects({
   min?: Date | null;
   max?: Date | null;
 }) {
-  const base = value ?? new Date();
+  const base = value ?? (min && min > new Date() ? min : new Date());
   const hour = base.getHours();
   const minute = base.getMinutes();
+
+  const isSameDay = (d1: Date, d2: Date) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
+
+  const isMinDay = min ? isSameDay(base, min) : false;
+  const isMaxDay = max ? isSameDay(base, max) : false;
+
+  const minHour = isMinDay && min ? min.getHours() : 0;
+  const maxHour = isMaxDay && max ? max.getHours() : 23;
 
   const apply = (h: number, m: number) => {
     const next = new Date(base);
@@ -68,11 +80,16 @@ function TimeSelects({
           value={hour}
           onChange={(e) => apply(Number(e.target.value), minute)}
         >
-          {Array.from({ length: 24 }, (_, h) => (
-            <option key={h} value={h}>
-              {String(h).padStart(2, '0')}
-            </option>
-          ))}
+          {Array.from({ length: 24 }, (_, h) => {
+            const disabledHour = Boolean(
+              (isMinDay && h < minHour) || (isMaxDay && h > maxHour),
+            );
+            return (
+              <option key={h} value={h} disabled={disabledHour}>
+                {String(h).padStart(2, '0')}
+              </option>
+            );
+          })}
         </select>
       </label>
       <label className="ts-date-picker-time-label">
@@ -82,11 +99,17 @@ function TimeSelects({
           value={minute}
           onChange={(e) => apply(hour, Number(e.target.value))}
         >
-          {TIME_MINUTES.map((m) => (
-            <option key={m} value={m}>
-              {String(m).padStart(2, '0')}
-            </option>
-          ))}
+          {TIME_MINUTES.map((m) => {
+            const disabledMinute = Boolean(
+              (isMinDay && hour === minHour && min && m < min.getMinutes()) ||
+              (isMaxDay && hour === maxHour && max && m > max.getMinutes()),
+            );
+            return (
+              <option key={m} value={m} disabled={disabledMinute}>
+                {String(m).padStart(2, '0')}
+              </option>
+            );
+          })}
         </select>
       </label>
     </div>
@@ -98,6 +121,7 @@ export function DatePickerInput({
   mode,
   value = '',
   onChange,
+  onBlur,
   placeholder,
   disabled,
   min,
@@ -113,7 +137,7 @@ export function DatePickerInput({
   const selected = parsePickerValue(mode, value);
   const minDate = min ? parsePickerValue(mode === 'time' ? 'date' : mode, min) : null;
   const maxDate = max ? parsePickerValue(mode === 'time' ? 'date' : mode, max) : null;
-  const { start: startMonth, end: endMonth } = pickerYearRange(min, max);
+  const { start: startMonth, end: endMonth } = pickerYearRange(min, max, selected);
 
   const display = formatDisplayValue(mode, value);
 
@@ -121,16 +145,28 @@ export function DatePickerInput({
     onChange?.(syntheticInputChange(formatPickerValue(mode, date)));
   };
 
+  const closePopover = () => {
+    setOpen(false);
+    onBlur?.();
+  };
+
   const handleDaySelect = (day: Date | undefined) => {
     if (!day) return;
     if (mode === 'date') {
       emit(day);
-      setOpen(false);
+      closePopover();
       return;
     }
     const next = new Date(day);
     if (selected) {
       next.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+    } else if (
+      minDate &&
+      day.getFullYear() === minDate.getFullYear() &&
+      day.getMonth() === minDate.getMonth() &&
+      day.getDate() === minDate.getDate()
+    ) {
+      next.setHours(Math.max(9, minDate.getHours()), minDate.getMinutes(), 0, 0);
     } else {
       next.setHours(9, 0, 0, 0);
     }
@@ -139,17 +175,17 @@ export function DatePickerInput({
 
   const handleTimeChange = (next: Date) => {
     emit(clampDateTime(next, minDate, maxDate));
-    if (mode === 'time') setOpen(false);
+    if (mode === 'time') closePopover();
   };
 
   useEffect(() => {
     if (!open) return;
     const onDoc = (event: MouseEvent) => {
       if (wrapRef.current?.contains(event.target as Node)) return;
-      setOpen(false);
+      closePopover();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false);
+      if (event.key === 'Escape') closePopover();
     };
     document.addEventListener('mousedown', onDoc);
     document.addEventListener('keydown', onKey);
@@ -183,6 +219,11 @@ export function DatePickerInput({
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             setOpen((v) => !v);
+          }
+        }}
+        onBlur={(e) => {
+          if (!wrapRef.current?.contains(e.relatedTarget as Node)) {
+            onBlur?.(e);
           }
         }}
         className="ts-input ts-date-picker-input"
@@ -219,7 +260,7 @@ export function DatePickerInput({
               captionLayout="dropdown"
               startMonth={startMonth}
               endMonth={endMonth}
-              defaultMonth={selected ?? new Date()}
+              defaultMonth={selected ?? (minDate && minDate > new Date() ? minDate : new Date())}
               disabled={disabledMatchers.length ? disabledMatchers : undefined}
               showOutsideDays
               className="ts-day-picker"
@@ -243,7 +284,7 @@ export function DatePickerInput({
                 className="ts-date-picker-footer-btn ts-date-picker-footer-btn--ghost"
                 onClick={() => {
                   emit(null);
-                  setOpen(false);
+                  closePopover();
                 }}
               >
                 Clear
@@ -254,7 +295,7 @@ export function DatePickerInput({
             <button
               type="button"
               className="ts-date-picker-footer-btn ts-date-picker-footer-btn--primary"
-              onClick={() => setOpen(false)}
+              onClick={closePopover}
             >
               Done
             </button>

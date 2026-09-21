@@ -53,6 +53,18 @@ export const PERMISSIONS: PermissionDef[] = [
   { code: 'dispatch.cancel', module: 'dispatch', name: 'Cancel dispatch' },
   { code: 'dispatch.docs', module: 'dispatch', name: 'Upload dispatch documents' },
   { code: 'dispatch.override', module: 'dispatch', name: 'Override dispatch conflicts' },
+  {
+    code: 'dispatch.trip.start',
+    module: 'dispatch',
+    name: 'Start own trip',
+    description: 'Move own assigned load to in transit',
+  },
+  {
+    code: 'dispatch.trip.complete',
+    module: 'dispatch',
+    name: 'Complete own trip',
+    description: 'Mark own in-transit load as delivered',
+  },
 
   { code: 'fleet.view', module: 'fleet', name: 'View fleet' },
   { code: 'fleet.create', module: 'fleet', name: 'Add truck/trailer' },
@@ -144,6 +156,8 @@ export const SYSTEM_ROLES: SystemRoleDef[] = [
     description: 'Own dispatches, documents, and payroll only.',
     permissions: [
       'dispatch.view',
+      'dispatch.trip.start',
+      'dispatch.trip.complete',
       'drivers.docs.view',
       'drivers.docs.upload',
       'payroll.view',

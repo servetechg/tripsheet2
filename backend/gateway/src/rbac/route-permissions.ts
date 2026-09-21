@@ -113,7 +113,15 @@ function rule(
     if (m === 'POST') return { codes: ['dispatch.create'] };
     if (m === 'DELETE') return { codes: ['dispatch.delete'] };
     if (/\/status$/.test(p))
-      return { codes: ['dispatch.edit', 'dispatch.close', 'dispatch.cancel'] };
+      return {
+        codes: [
+          'dispatch.edit',
+          'dispatch.close',
+          'dispatch.cancel',
+          'dispatch.trip.start',
+          'dispatch.trip.complete',
+        ],
+      };
     return { codes: ['dispatch.edit'] };
   }
 

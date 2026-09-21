@@ -204,6 +204,25 @@
   color: var(--color-text);
 }
 
+.ts-day-picker .rdp-day_button:disabled,
+.ts-day-picker .rdp-day_button[disabled],
+.ts-day-picker .rdp-day_button[aria-disabled='true'],
+.ts-day-picker .rdp-day[data-disabled] .rdp-day_button,
+.ts-day-picker .rdp-disabled .rdp-day_button {
+  cursor: not-allowed !important;
+  opacity: 0.22 !important;
+  pointer-events: none !important;
+}
+
+.ts-day-picker .rdp-button_previous:disabled,
+.ts-day-picker .rdp-button_next:disabled,
+.ts-day-picker .rdp-button_previous[aria-disabled='true'],
+.ts-day-picker .rdp-button_next[aria-disabled='true'] {
+  opacity: 0.2 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}
+
 .ts-day-picker .rdp-selected .rdp-day_button {
   background: var(--color-primary);
   color: #fff;
@@ -237,6 +256,11 @@
 .ts-day-picker .rdp-button_next:hover {
   background: rgba(61, 140, 255, 0.1);
   color: var(--color-primary);
+}
+
+.ts-date-picker-time-select option:disabled {
+  color: var(--color-muted);
+  opacity: 0.4;
 }
 
 .ts-date-picker-time {

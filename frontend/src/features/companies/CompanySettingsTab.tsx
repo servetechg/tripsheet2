@@ -158,6 +158,9 @@ export function CompanySettingsTab({
     address: company.address || '',
   });
   const [newBranch, setNewBranch] = useState({ name: '', address: '' });
+  const [newBranchBusy, setNewBranchBusy] = useState(false);
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [settingsBusy, setSettingsBusy] = useState(false);
   const [editingBranch, setEditingBranch] = useState<any>(null);
   const [branchForm, setBranchForm] = useState({ name: '', address: '' });
   const [branchBusy, setBranchBusy] = useState(false);
@@ -341,14 +344,20 @@ export function CompanySettingsTab({
             />
           </G2>
           <Btn
-            onClick={() => {
-              void companiesApi
-                .update(cid, profile)
-                .then(() => {
-                  notify('Profile saved');
-                  return refreshAll?.('all');
-                })
-                .catch((err: any) => notify(err?.message || 'Save failed', 'error'));
+            loading={profileBusy}
+            loadingLabel="Saving…"
+            disabled={profileBusy}
+            onClick={async () => {
+              setProfileBusy(true);
+              try {
+                await companiesApi.update(cid, profile);
+                notify('Profile saved');
+                await refreshAll?.('all');
+              } catch (err: any) {
+                notify(err?.message || 'Save failed', 'error');
+              } finally {
+                setProfileBusy(false);
+              }
             }}
           >
             Save Profile
@@ -428,21 +437,26 @@ export function CompanySettingsTab({
             </label>
           </G2>
           <Btn
-            style={{ marginTop: 12 }}
-            onClick={() => {
-              void companiesApi
-                .patchSettings(cid, {
+            loading={settingsBusy}
+            loadingLabel="Saving…"
+            disabled={settingsBusy}
+            onClick={async () => {
+              setSettingsBusy(true);
+              try {
+                await companiesApi.patchSettings(cid, {
                   general: settings.general,
                   dispatch: settings.dispatch,
                   driver: settings.driver,
                   accounting: settings.accounting,
                   maintenance: settings.maintenance,
                   compliance: settings.compliance,
-                })
-                .then(() => notify('Settings saved'))
-                .catch((err: any) =>
-                  notify(err?.message || 'Save failed', 'error'),
-                );
+                });
+                notify('Settings saved');
+              } catch (err: any) {
+                notify(err?.message || 'Save failed', 'error');
+              } finally {
+                setSettingsBusy(false);
+              }
             }}
           >
             Save Settings
@@ -473,17 +487,21 @@ export function CompanySettingsTab({
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <Btn
                 style={{ minHeight: 42, height: 42, flexShrink: 0 }}
-                onClick={() => {
-                  void companiesApi
-                    .saveBranch(cid, newBranch)
-                    .then(() => {
-                      setNewBranch({ name: '', address: '' });
-                      notify('Branch added successfully');
-                      return reload();
-                    })
-                    .catch((err: any) =>
-                      notify(err?.message || 'Failed to add branch', 'error'),
-                    );
+                loading={newBranchBusy}
+                loadingLabel="Adding…"
+                disabled={newBranchBusy || !newBranch.name.trim()}
+                onClick={async () => {
+                  setNewBranchBusy(true);
+                  try {
+                    await companiesApi.saveBranch(cid, newBranch);
+                    setNewBranch({ name: '', address: '' });
+                    notify('Branch added successfully');
+                    await reload();
+                  } catch (err: any) {
+                    notify(err?.message || 'Failed to add branch', 'error');
+                  } finally {
+                    setNewBranchBusy(false);
+                  }
                 }}
               >
                 Add Branch

@@ -119,6 +119,7 @@ export function FieldInp({
           mode={pickerMode}
           value={value != null ? String(value) : ''}
           onChange={onChange}
+          onBlur={p.onBlur}
           placeholder={resolvedPlaceholder}
           disabled={disabled}
           min={min != null ? String(min) : undefined}

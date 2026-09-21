@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { G, labelBase, inputBase, RADIUS } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons, AddressAutocomplete } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, SectionTitle, G2, Divider, Icons, AddressAutocomplete, Skeleton } from '@/components/ui';
 import { companiesApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { useConfirm } from '@/context/ConfirmContext';
@@ -1223,11 +1223,14 @@ export function MasterDataPanel({ companyId }: { companyId: string }) {
               <option value="blocked">Blocked / suspended</option>
             </Sel>
           </div>
-          {fetching && (
+          {fetching && !rows.length ? (
+            <Skeleton rows={4} height={48} />
+          ) : null}
+          {fetching && rows.length > 0 ? (
             <div style={{ color: G.muted, fontSize: 12, marginBottom: 8 }}>
-              {rows.length ? 'Refreshing records…' : 'Loading records…'}
+              Refreshing records…
             </div>
-          )}
+          ) : null}
           {!fetching && !rows.length && (
             <div style={{ color: G.muted, fontSize: 13 }}>
               {kind === 'ports'

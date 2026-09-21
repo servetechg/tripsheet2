@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { G, RADIUS } from '@/lib/theme';
-import { Btn, Inp, Pill, Modal } from '@/components/ui';
+import { Btn, Inp, Pill, Modal, Skeleton } from '@/components/ui';
 import { authApi } from '@/lib/api';
 import { notify } from '@/components/feedback/Toast';
 import { humanizeEnum } from '@/lib/format';
@@ -582,20 +582,8 @@ export function LoginHistoryPanel({ companyId }: { companyId: string }) {
             <tbody>
               {loading && !rows.length ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '48px 16px', textAlign: 'center', color: G.muted }}>
-                    <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                      <div
-                        style={{
-                          width: 24,
-                          height: 24,
-                          border: `2px solid ${G.border}`,
-                          borderTopColor: G.gold,
-                          borderRadius: '50%',
-                          animation: 'spin 0.8s linear infinite',
-                        }}
-                      />
-                      <span style={{ fontSize: 13 }}>Loading login history...</span>
-                    </div>
+                  <td colSpan={6} style={{ padding: '16px 14px' }}>
+                    <Skeleton rows={5} height={42} />
                   </td>
                 </tr>
               ) : pagedRows.length === 0 ? (

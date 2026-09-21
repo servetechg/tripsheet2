@@ -55,6 +55,8 @@ export const KNOWN_PERMISSION_CODES = [
   'dispatch.cancel',
   'dispatch.docs',
   'dispatch.override',
+  'dispatch.trip.start',
+  'dispatch.trip.complete',
   'fleet.view',
   'fleet.create',
   'fleet.edit',
