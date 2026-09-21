@@ -65,8 +65,6 @@ type FormErrors = Partial<
     | 'detentionHours'
     | 'detentionRate'
     | 'miles'
-    | 'stop1'
-    | 'stop2'
     | 'notes'
     | 'portOfEntryId'
     | 'customsProgram',
@@ -97,7 +95,15 @@ export function DispatchTab({
   const [initialF, setInitialF] = useState<any>(null);
   const [docErr, setDocErr] = useState('');
   const [fieldErr, setFieldErr] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const markTouched = (k: string) => {
+    setTouched((prev) => ({ ...prev, [k]: true }));
+  };
+
   const [busy, setBusy] = useState(false);
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [carriers, setCarriers] = useState<any[]>([]);
   const [commodities, setCommodities] = useState<any[]>([]);
@@ -137,9 +143,9 @@ export function DispatchTab({
     detentionHours: '',
     detentionRate: '',
     miles: '',
-    stop1: '',
-    stop2: '',
+    intermediateStops: [] as string[],
   };
+  const MAX_INTERMEDIATE_STOPS = 20;
   const [f, setF] = useState(emptyForm);
   const [showAllDrivers, setShowAllDrivers] = useState(false);
 
@@ -383,6 +389,23 @@ export function DispatchTab({
     return allowedCountriesForDestination(f.crossBorder, f.originCountry);
   }, [f.crossBorder, portCountry, f.originCountry]);
 
+  const todayLocalStart = useMemo(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T00:00`;
+  }, []);
+
+  const minPickupTime = useMemo(() => {
+    if (editLoad && initialF?.pickupTime && initialF.pickupTime < todayLocalStart) {
+      return initialF.pickupTime;
+    }
+    return todayLocalStart;
+  }, [editLoad, initialF?.pickupTime, todayLocalStart]);
+
+  const minEta = useMemo(() => {
+    return f.pickupTime || minPickupTime;
+  }, [f.pickupTime, minPickupTime]);
+
   const availablePorts = useMemo(() => {
     if (!f.crossBorder) return ports;
     const targetCountry =
@@ -474,15 +497,6 @@ export function DispatchTab({
     };
   }, [apiEnabled, f.driverId, drivers]);
 
-  const visibleDrivers = showAllDrivers
-    ? drivers
-    : drivers.filter((d: any) => {
-        const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
-        const avail = d.availabilityStatus || 'available';
-        return (
-          lifecycleAllowsDispatch(lifecycle) && availabilityAllowsDispatch(avail)
-        );
-      });
   const resetForm = () => {
     setF(emptyForm);
     setEditLoad(null);
@@ -490,6 +504,7 @@ export function DispatchTab({
     setShow(false);
     setDocErr('');
     setFieldErr({});
+    setTouched({});
   };
   const openEdit = (l: any) => {
     const stops = Array.isArray(l.stops) ? l.stops : [];
@@ -532,8 +547,10 @@ export function DispatchTab({
       detentionHours: l.detentionHours != null ? String(l.detentionHours) : '',
       detentionRate: l.detentionRate != null ? String(l.detentionRate) : '',
       miles: l.miles != null ? String(l.miles) : '',
-      stop1: stops[0]?.location || stops[0] || '',
-      stop2: stops[1]?.location || stops[1] || '',
+      intermediateStops: stops.map(
+        (s: any) =>
+          (typeof s === 'string' ? s : s?.location || '') as string,
+      ),
     };
     setF(init);
     setInitialF(init);
@@ -571,6 +588,39 @@ export function DispatchTab({
       (id) => !dd.find((d: any) => d.type === id),
     );
   };
+
+  const isDriverAvailableForDispatch = (d: any) => {
+    const missing = checkDriverDocs(d.id);
+    const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
+    const avail = d.availabilityStatus || 'available';
+    const driverActive = lifecycleAllowsDispatch(lifecycle);
+    const availOk = availabilityAllowsDispatch(avail);
+    const onLoad = loads.some(
+      (l: any) =>
+        l.driverId === d.id &&
+        ['assigned', 'in_transit'].includes(l.status) &&
+        (!editLoad || l.id !== editLoad.id),
+    );
+    return missing.length === 0 && driverActive && availOk && !onLoad;
+  };
+
+  const uniqueDrivers = useMemo(() => {
+    const seen = new Set<string>();
+    return (drivers || []).filter((d: any) => {
+      const key = String(d.id || d.driverRecordId || '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [drivers]);
+
+  const visibleDrivers = useMemo(() => {
+    if (showAllDrivers) return uniqueDrivers;
+    return uniqueDrivers.filter((d: any) => {
+      if (editLoad && f.driverId === d.id) return true;
+      return isDriverAvailableForDispatch(d);
+    });
+  }, [showAllDrivers, uniqueDrivers, editLoad, f.driverId, loads, driverDocs]);
 
   const num = (v: string) => {
     const n = Number(v);
@@ -630,12 +680,25 @@ export function DispatchTab({
 
     const pickupMs = f.pickupTime ? new Date(f.pickupTime).getTime() : NaN;
     const etaMs = f.eta ? new Date(f.eta).getTime() : NaN;
+    const todayMidnight = new Date();
+    todayMidnight.setHours(0, 0, 0, 0);
+    const minAllowedMs =
+      editLoad && initialF?.pickupTime
+        ? Math.min(todayMidnight.getTime(), new Date(initialF.pickupTime).getTime())
+        : todayMidnight.getTime();
+
     if (f.pickupTime && Number.isNaN(pickupMs)) {
       errs.pickupTime = 'Invalid pickup date/time';
+    } else if (Number.isFinite(pickupMs) && pickupMs < minAllowedMs) {
+      errs.pickupTime = 'Pickup date cannot be in the past';
     }
+
     if (f.eta && Number.isNaN(etaMs)) {
       errs.eta = 'Invalid ETA';
+    } else if (Number.isFinite(etaMs) && etaMs < minAllowedMs) {
+      errs.eta = 'ETA cannot be in the past';
     }
+
     if (
       Number.isFinite(pickupMs) &&
       Number.isFinite(etaMs) &&
@@ -670,20 +733,90 @@ export function DispatchTab({
     if (f.notes.length > 500) {
       errs.notes = 'Notes max 500 characters';
     }
-    if (
-      !blank(f.stop1) &&
-      f.stop1.trim().toLowerCase() === f.origin.trim().toLowerCase()
-    ) {
-      errs.stop1 = 'Stop should differ from origin';
-    }
-    if (
-      !blank(f.stop2) &&
-      !blank(f.stop1) &&
-      f.stop2.trim().toLowerCase() === f.stop1.trim().toLowerCase()
-    ) {
-      errs.stop2 = 'Stops must be different';
-    }
     return errs;
+  };
+
+  const stopFieldErrors = useMemo(() => {
+    const out: Record<number, string> = {};
+    const origin = f.origin.trim().toLowerCase();
+    const dest = f.destination.trim().toLowerCase();
+    const seen = new Map<string, number>();
+    f.intermediateStops.forEach((stop, i) => {
+      if (blank(stop)) return;
+      const s = stop.trim().toLowerCase();
+      if (origin && s === origin) {
+        out[i] = 'Stop should differ from origin';
+        return;
+      }
+      if (dest && s === dest) {
+        out[i] = 'Stop should differ from destination';
+        return;
+      }
+      if (seen.has(s)) {
+        out[i] = 'Duplicate stop';
+        return;
+      }
+      seen.set(s, i);
+    });
+    return out;
+  }, [f.intermediateStops, f.origin, f.destination]);
+
+  const formValidationErrors = validateForm();
+  const isDispatchFormValid =
+    Object.keys(formValidationErrors).length === 0 &&
+    Object.keys(stopFieldErrors).length === 0;
+
+  const showErr = (k: keyof FormErrors): string | undefined => {
+    return touched[k] || fieldErr[k] ? formValidationErrors[k] || fieldErr[k] : undefined;
+  };
+
+  const showStopErr = (index: number): string | undefined => {
+    const err = stopFieldErrors[index];
+    if (!err) return undefined;
+    return touched[`stop_${index}`] ? err : undefined;
+  };
+
+  const addIntermediateStop = () => {
+    setF((prev) => {
+      if (prev.intermediateStops.length >= MAX_INTERMEDIATE_STOPS) return prev;
+      return {
+        ...prev,
+        intermediateStops: [...prev.intermediateStops, ''],
+      };
+    });
+  };
+
+  const removeIntermediateStop = (index: number) => {
+    setF((prev) => ({
+      ...prev,
+      intermediateStops: prev.intermediateStops.filter((_, i) => i !== index),
+    }));
+    setTouched((prev) => {
+      const next: Record<string, boolean> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (!k.startsWith('stop_')) next[k] = v;
+      }
+      return next;
+    });
+  };
+
+  const updIntermediateStop = (index: number, value: string) => {
+    setF((prev) => {
+      const next = [...prev.intermediateStops];
+      next[index] = value;
+      return { ...prev, intermediateStops: next };
+    });
+  };
+
+  const selectIntermediateStopAddress = (
+    index: number,
+    addr: GeoapifyAddress,
+  ) => {
+    const label =
+      addr.formatted ||
+      addr.address_line1 ||
+      [addr.city, addr.state_code].filter(Boolean).join(', ');
+    updIntermediateStop(index, label);
   };
 
   const payloadFromForm = () => {
@@ -692,7 +825,7 @@ export function DispatchTab({
     const broker = brokers.find((b: any) => b.id === f.brokerId);
     const carrier = carriers.find((c: any) => c.id === f.carrierId);
     const commodity = commodities.find((c: any) => c.id === f.commodityId);
-    const stops = [f.stop1, f.stop2]
+    const stops = f.intermediateStops
       .filter((s) => !blank(s))
       .map((location, i) => ({ seq: i + 1, location }));
     const selectedDriver =
@@ -755,7 +888,16 @@ export function DispatchTab({
   const save = async () => {
     const errs = validateForm();
     setFieldErr(errs);
-    if (Object.keys(errs).length > 0) {
+    const stopErrs = stopFieldErrors;
+    if (Object.keys(errs).length > 0 || Object.keys(stopErrs).length > 0) {
+      const allTouched: Record<string, boolean> = {};
+      Object.keys(errs).forEach((k) => {
+        allTouched[k] = true;
+      });
+      f.intermediateStops.forEach((_, i) => {
+        if (stopErrs[i]) allTouched[`stop_${i}`] = true;
+      });
+      setTouched((prev) => ({ ...prev, ...allTouched }));
       setDocErr('Fix the highlighted fields before saving.');
       return;
     }
@@ -837,6 +979,7 @@ export function DispatchTab({
   };
 
   const setStatus = async (id: string, s: string) => {
+    setStatusUpdatingId(id);
     try {
       if (apiEnabled) {
         await loadsApi.setStatus(id, s);
@@ -867,6 +1010,8 @@ export function DispatchTab({
       }
     } catch (e: any) {
       notify(e?.message || 'Status update failed', 'error');
+    } finally {
+      setStatusUpdatingId(null);
     }
   };
 
@@ -878,6 +1023,7 @@ export function DispatchTab({
       variant: 'danger',
     });
     if (!ok) return;
+    setDeletingId(id);
     try {
       if (apiEnabled) {
         await loadsApi.remove(id);
@@ -888,6 +1034,8 @@ export function DispatchTab({
       notify('Load deleted.');
     } catch (e: any) {
       notify(e?.message || 'Delete failed', 'error');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -1011,38 +1159,41 @@ export function DispatchTab({
                   style={{ marginBottom: 0 }}
                 />
               </div>
-              {fieldErr.driverId && (
-                <div style={{ fontSize: 11, color: G.danger, marginBottom: 6 }}>
-                  {fieldErr.driverId}
-                </div>
-              )}
               <Sel
                 value={f.driverId}
                 onChange={(e: any) => upd('driverId', e.target.value)}
+                onBlur={() => markTouched('driverId')}
+                error={showErr('driverId')}
                 style={{ marginBottom: 0 }}
               >
                 <option value="">— Select driver —</option>
+                {visibleDrivers.length === 0 && !showAllDrivers && (
+                  <option value="" disabled>
+                    — No available drivers (check "Show all" to view all) —
+                  </option>
+                )}
                 {visibleDrivers.map((d: any) => {
                   const missing = checkDriverDocs(d.id);
                   const lifecycle = d.lifecycleStatus || (d.active === false ? 'suspended' : 'active');
                   const avail = d.availabilityStatus || 'available';
                   const driverActive = lifecycleAllowsDispatch(lifecycle);
                   const availOk = availabilityAllowsDispatch(avail);
-                  const canDispatch = missing.length === 0 && driverActive && availOk;
                   const onLoad = loads.find(
                     (l: any) =>
                       l.driverId === d.id &&
-                      ['assigned', 'in_transit'].includes(l.status),
+                      ['assigned', 'in_transit'].includes(l.status) &&
+                      (!editLoad || l.id !== editLoad.id),
                   );
-                  const statusSuffix = !canDispatch
-                    ? !driverActive
+                  const isReady = missing.length === 0 && driverActive && availOk && !onLoad;
+                  const statusSuffix = isReady
+                    ? ' (✓ Ready)'
+                    : !driverActive
                       ? ` (⚠ ${DRIVER_LIFECYCLE_LABELS[lifecycle as keyof typeof DRIVER_LIFECYCLE_LABELS] || lifecycle})`
                       : !availOk
                         ? ` (⚠ ${AVAILABILITY_LABELS[avail as keyof typeof AVAILABILITY_LABELS] || avail})`
-                        : ' (⚠ Missing docs)'
-                    : onLoad
-                      ? ' (⏳ On active load)'
-                      : ' (✓ Ready)';
+                        : onLoad
+                          ? ' (⏳ On active load)'
+                          : ' (⚠ Missing docs)';
                   return (
                     <option key={d.id} value={d.id}>
                       {d.name}{statusSuffix}
@@ -1061,9 +1212,10 @@ export function DispatchTab({
                     e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
                   )
                 }
+                onBlur={() => markTouched('tripNo')}
                 placeholder="e.g. 34320"
                 maxLength={32}
-                error={fieldErr.tripNo}
+                error={showErr('tripNo')}
                 hint="Letters, numbers, - _ /"
                 style={{ marginBottom: 0 }}
               />
@@ -1082,7 +1234,8 @@ export function DispatchTab({
             const onLoad = loads.find(
               (l: any) =>
                 l.driverId === selectedDriver.id &&
-                ['assigned', 'in_transit'].includes(l.status),
+                ['assigned', 'in_transit'].includes(l.status) &&
+                (!editLoad || l.id !== editLoad.id),
             );
             const isReady = canDispatch && !onLoad;
             return (
@@ -1239,6 +1392,8 @@ export function DispatchTab({
                   label="Port of entry *"
                   value={f.portOfEntryId}
                   onChange={(e: any) => void applyPort(e.target.value)}
+                  onBlur={() => markTouched('portOfEntryId')}
+                  error={showErr('portOfEntryId')}
                 >
                   <option value="">— Select POE —</option>
                   {availablePorts.map((p: any) => (
@@ -1247,9 +1402,6 @@ export function DispatchTab({
                     </option>
                   ))}
                 </Sel>
-                {fieldErr.portOfEntryId && (
-                  <Err msg={fieldErr.portOfEntryId} />
-                )}
               </div>
             )}
           </G2>
@@ -1297,14 +1449,13 @@ export function DispatchTab({
                   label="Customs program *"
                   value={f.customsProgram}
                   onChange={(e: any) => upd('customsProgram', e.target.value)}
+                  onBlur={() => markTouched('customsProgram')}
+                  error={showErr('customsProgram')}
                 >
                   <option value="">— Select —</option>
                   {f.customsAce && <option value="ACE">ACE (US)</option>}
                   {f.customsAci && <option value="ACI">ACI (Canada)</option>}
                 </Sel>
-                {fieldErr.customsProgram && (
-                  <Err msg={fieldErr.customsProgram} />
-                )}
               </div>
             </>
           )}
@@ -1420,6 +1571,8 @@ export function DispatchTab({
                 label="Truck *"
                 value={f.truckId}
                 onChange={(e: any) => upd('truckId', e.target.value)}
+                onBlur={() => markTouched('truckId')}
+                error={showErr('truckId')}
               >
                 <option value="">— Select truck —</option>
                 {trucks
@@ -1430,18 +1583,6 @@ export function DispatchTab({
                     </option>
                   ))}
               </Sel>
-              {fieldErr.truckId && (
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: G.danger,
-                    marginTop: -8,
-                    marginBottom: 12,
-                  }}
-                >
-                  {fieldErr.truckId}
-                </div>
-              )}
             </div>
             <Sel
               label="Trailer"
@@ -1472,6 +1613,7 @@ export function DispatchTab({
                   originCountry: '' as TripCountry | '',
                 }))
               }
+              onBlur={() => markTouched('origin')}
               onSelectAddress={(addr) => {
                 const label = formatAddressLabel(addr);
                 const originCountry =
@@ -1508,7 +1650,7 @@ export function DispatchTab({
                       ? `Showing ${countryLabel(f.destinationCountry)} only`
                       : 'Pick a suggestion so country is detected'
               }
-              error={fieldErr.origin}
+              error={showErr('origin')}
             />
             <AddressAutocomplete
               label="Destination"
@@ -1523,6 +1665,7 @@ export function DispatchTab({
                   destinationCountry: '' as TripCountry | '',
                 }))
               }
+              onBlur={() => markTouched('destination')}
               onSelectAddress={(addr) => {
                 const label = formatAddressLabel(addr);
                 const destinationCountry =
@@ -1561,7 +1704,7 @@ export function DispatchTab({
                         ? 'Select origin first, or pick destination to set direction'
                         : 'Pick a suggestion so country is detected'
               }
-              error={fieldErr.destination}
+              error={showErr('destination')}
             />
           </G2>
           <G2 cols={2}>
@@ -1569,16 +1712,19 @@ export function DispatchTab({
               label="Pickup date & time *"
               type="datetime-local"
               value={f.pickupTime}
+              min={minPickupTime}
               onChange={(e: any) => upd('pickupTime', e.target.value)}
-              error={fieldErr.pickupTime}
+              onBlur={() => markTouched('pickupTime')}
+              error={showErr('pickupTime')}
             />
             <FieldInp
               label="ETA"
               type="datetime-local"
               value={f.eta}
-              min={f.pickupTime || undefined}
+              min={minEta}
               onChange={(e: any) => upd('eta', e.target.value)}
-              error={fieldErr.eta}
+              onBlur={() => markTouched('eta')}
+              error={showErr('eta')}
               hint="Must be on or after pickup"
             />
           </G2>
@@ -1591,8 +1737,9 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('customerRate', sanitizeDecimal(e.target.value, 2))
               }
+              onBlur={() => markTouched('customerRate')}
               placeholder="0.00"
-              error={fieldErr.customerRate}
+              error={showErr('customerRate')}
             />
             <FieldInp
               label="Carrier cost ($)"
@@ -1601,8 +1748,9 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('carrierCost', sanitizeDecimal(e.target.value, 2))
               }
+              onBlur={() => markTouched('carrierCost')}
               placeholder="0.00"
-              error={fieldErr.carrierCost}
+              error={showErr('carrierCost')}
             />
           </G2>
           <G2 cols={2}>
@@ -1613,8 +1761,9 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('fuelSurcharge', sanitizeDecimal(e.target.value, 2))
               }
+              onBlur={() => markTouched('fuelSurcharge')}
               placeholder="0.00"
-              error={fieldErr.fuelSurcharge}
+              error={showErr('fuelSurcharge')}
             />
             <FieldInp
               label="Accessorials ($)"
@@ -1623,8 +1772,9 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('accessorials', sanitizeDecimal(e.target.value, 2))
               }
+              onBlur={() => markTouched('accessorials')}
               placeholder="0.00"
-              error={fieldErr.accessorials}
+              error={showErr('accessorials')}
             />
           </G2>
           <G2 cols={2}>
@@ -1635,8 +1785,9 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('detentionHours', sanitizeDecimal(e.target.value, 1))
               }
+              onBlur={() => markTouched('detentionHours')}
               placeholder="0"
-              error={fieldErr.detentionHours}
+              error={showErr('detentionHours')}
             />
             <FieldInp
               label="Detention rate ($/hr)"
@@ -1645,57 +1796,119 @@ export function DispatchTab({
               onChange={(e: any) =>
                 upd('detentionRate', sanitizeDecimal(e.target.value, 2))
               }
+              onBlur={() => markTouched('detentionRate')}
               placeholder="0.00"
-              error={fieldErr.detentionRate}
+              error={showErr('detentionRate')}
             />
           </G2>
-          <G2 cols={2}>
-            <FieldInp
-              label="Miles"
-              inputMode="numeric"
-              value={f.miles}
-              onChange={(e: any) =>
-                upd('miles', sanitizeInteger(e.target.value).slice(0, 6))
-              }
-              placeholder="e.g. 1200"
-              error={fieldErr.miles}
-            />
-            <AddressAutocomplete
-              label="Stop 1 (optional)"
-              value={f.stop1}
-              onChange={(v) => upd('stop1', v)}
-              onSelectAddress={(addr) => {
-                const label =
-                  addr.formatted ||
-                  addr.address_line1 ||
-                  [addr.city, addr.state_code].filter(Boolean).join(', ');
-                upd('stop1', label);
-              }}
-              placeholder="Search intermediate stop…"
-              error={fieldErr.stop1}
-            />
-          </G2>
-          <AddressAutocomplete
-            label="Stop 2 (optional)"
-            value={f.stop2}
-            onChange={(v) => upd('stop2', v)}
-            onSelectAddress={(addr) => {
-              const label =
-                addr.formatted ||
-                addr.address_line1 ||
-                [addr.city, addr.state_code].filter(Boolean).join(', ');
-              upd('stop2', label);
-            }}
-            placeholder="Search intermediate stop…"
-            error={fieldErr.stop2}
+          <FieldInp
+            label="Miles"
+            inputMode="numeric"
+            value={f.miles}
+            onChange={(e: any) =>
+              upd('miles', sanitizeInteger(e.target.value).slice(0, 6))
+            }
+            onBlur={() => markTouched('miles')}
+            placeholder="e.g. 1200"
+            error={showErr('miles')}
           />
+          <div style={{ marginTop: 4 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                flexWrap: 'wrap',
+                marginBottom: f.intermediateStops.length ? 10 : 0,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: G.muted,
+                  letterSpacing: 0.3,
+                }}
+              >
+                Intermediate stops (optional)
+              </span>
+              <Btn
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={
+                  f.intermediateStops.length >= MAX_INTERMEDIATE_STOPS
+                }
+                onClick={addIntermediateStop}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                + Add stop
+              </Btn>
+            </div>
+            {f.intermediateStops.length === 0 ? (
+              <div style={{ fontSize: 11, color: G.muted2, lineHeight: 1.4 }}>
+                Add one or more stops between pickup and delivery.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
+                {f.intermediateStops.map((stop, index) => (
+                  <div
+                    key={`stop-${index}`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <AddressAutocomplete
+                        label={`Stop ${index + 1}`}
+                        value={stop}
+                        onChange={(v) => updIntermediateStop(index, v)}
+                        onBlur={() => markTouched(`stop_${index}`)}
+                        onSelectAddress={(addr) =>
+                          selectIntermediateStopAddress(index, addr)
+                        }
+                        placeholder="Search intermediate stop…"
+                        error={showStopErr(index)}
+                      />
+                    </div>
+                    <Btn
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Remove stop ${index + 1}`}
+                      title="Remove stop"
+                      onClick={() => removeIntermediateStop(index)}
+                      style={{
+                        marginTop: 22,
+                        flexShrink: 0,
+                        padding: '8px 10px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </Btn>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           <FieldInp
             label="Notes"
             value={f.notes}
             onChange={(e: any) => upd('notes', e.target.value.slice(0, 500))}
+            onBlur={() => markTouched('notes')}
             placeholder="Any special instructions…"
             maxLength={500}
-            error={fieldErr.notes}
+            error={showErr('notes')}
             hint={`${f.notes.length}/500`}
           />
           <div style={{ display: 'flex', gap: 10 }}>
@@ -1703,7 +1916,17 @@ export function DispatchTab({
               onClick={save}
               loading={busy}
               loadingLabel="Saving…"
-              disabled={busy || (Boolean(editLoad) && !(initialF && Object.keys(initialF).some((k) => (f as any)[k] !== (initialF as any)[k])))}
+              disabled={
+                busy ||
+                !isDispatchFormValid ||
+                (Boolean(editLoad) &&
+                  !(
+                    initialF &&
+                    Object.keys(initialF).some(
+                      (k) => (f as any)[k] !== (initialF as any)[k],
+                    )
+                  ))
+              }
             >
               {editLoad ? 'Save Changes' : 'Assign Load'}
             </Btn>
@@ -1795,7 +2018,13 @@ export function DispatchTab({
                   }}
                 >
                   {l.status === 'assigned' && can('dispatch.edit') && (
-                    <Btn size="sm" onClick={() => setStatus(l.id, 'in_transit')}>
+                    <Btn
+                      size="sm"
+                      loading={statusUpdatingId === l.id}
+                      loadingLabel="Starting…"
+                      disabled={Boolean(statusUpdatingId) || Boolean(deletingId)}
+                      onClick={() => setStatus(l.id, 'in_transit')}
+                    >
                       ▶ Start
                     </Btn>
                   )}
@@ -1803,6 +2032,9 @@ export function DispatchTab({
                     <Btn
                       variant="success"
                       size="sm"
+                      loading={statusUpdatingId === l.id}
+                      loadingLabel="Delivering…"
+                      disabled={Boolean(statusUpdatingId) || Boolean(deletingId)}
                       onClick={() => setStatus(l.id, 'delivered')}
                     >
                       ✓ Deliver
@@ -1813,6 +2045,9 @@ export function DispatchTab({
                       <Btn
                         variant="danger"
                         size="sm"
+                        loading={statusUpdatingId === l.id}
+                        loadingLabel="Cancelling…"
+                        disabled={Boolean(statusUpdatingId) || Boolean(deletingId)}
                         onClick={() => setStatus(l.id, 'cancelled')}
                       >
                         ✕ Cancel
@@ -1842,6 +2077,8 @@ export function DispatchTab({
                     <Btn
                       variant="danger"
                       size="sm"
+                      loading={deletingId === l.id}
+                      disabled={Boolean(deletingId) || Boolean(statusUpdatingId)}
                       onClick={() => deleteLoad(l.id)}
                       aria-label={`Delete Trip ${l.tripNo || ''}`}
                       title="Delete load"

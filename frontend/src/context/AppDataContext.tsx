@@ -171,8 +171,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           try {
             const one = await companiesApi.get(companyId);
             cosList = [asCompany(one)];
-          } catch {
+          } catch (err) {
             cosList = [];
+            if (scope === 'driver') {
+              const detail =
+                err instanceof Error ? err.message : 'request failed';
+              setApiError(
+                `Company profile could not be loaded (${detail}). Check gateway (port 3000) and company-service (port 3002).`,
+              );
+            }
           }
         }
         try {

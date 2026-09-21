@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { assertPermission, getTenantStore } from '@tripsheet/tenant-runtime';
 import { ActiveLoadsDto } from './dto/active-loads.dto';
 import { CreateLoadDto } from './dto/create-load.dto';
 import { ListLoadsDto } from './dto/list-loads.dto';
@@ -71,6 +73,34 @@ export class LoadsController {
 
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() dto: UpdateLoadStatusDto) {
+    const existing = await this.loadsService.findOne(id);
+    const store = getTenantStore();
+    const isDriver = store?.role === 'driver';
+
+    if (isDriver) {
+      this.assertOwnLoad(existing);
+      if (dto.status === 'in_transit') {
+        assertPermission('dispatch.trip.start');
+        if (existing.status !== 'assigned') {
+          throw new BadRequestException(
+            'Only assigned loads can be started',
+          );
+        }
+      } else if (dto.status === 'delivered') {
+        assertPermission('dispatch.trip.complete');
+        if (existing.status !== 'in_transit') {
+          throw new BadRequestException(
+            'Only in-transit loads can be marked delivered',
+          );
+        }
+      } else {
+        throw new ForbiddenException(
+          'Drivers cannot perform this status change',
+        );
+      }
+      return this.loadsService.updateStatus(id, dto);
+    }
+
     const allowed =
       dto.status === 'cancelled'
         ? 'dispatch.cancel'
@@ -102,7 +132,13 @@ export class LoadsController {
   private assertOwnLoad(load: { driverId?: string | null }) {
     const own = driverScopeId();
     if (!own) return;
-    if (own === '__none__' || load.driverId !== own) {
+    if (own === '__none__') {
+      throw new ForbiddenException('Drivers may only access their own dispatches');
+    }
+    const store = getTenantStore();
+    const ids = new Set<string>([own]);
+    if (store?.userId) ids.add(store.userId);
+    if (!load.driverId || !ids.has(load.driverId)) {
       throw new ForbiddenException('Drivers may only access their own dispatches');
     }
   }

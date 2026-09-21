@@ -358,8 +358,36 @@ export function DriversTab({
     setEditDriver(null);
     setInitialF(null);
     setShow(false);
+    setTouched({});
     setErr('');
   };
+
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const markTouched = (k: string) => {
+    setTouched((prev) => ({ ...prev, [k]: true }));
+  };
+
+  const validateDriverForm = () => {
+    const errs: Record<string, string> = {};
+    if (blank(f.name)) errs.name = 'Full name is required';
+    if (!editDriver) {
+      if (blank(f.email)) {
+        errs.email = 'Email address is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) {
+        errs.email = 'Enter a valid email address';
+      }
+      if (blank(f.password)) {
+        errs.password = 'Password is required';
+      } else if (f.password.length < 8) {
+        errs.password = 'Password must be at least 8 characters';
+      }
+    }
+    return errs;
+  };
+
+  const driverFieldErrors = validateDriverForm();
+  const isDriverFormValid = Object.keys(driverFieldErrors).length === 0;
 
   const openEditDriver = (d: any) => {
     const init = {
@@ -417,12 +445,10 @@ export function DriversTab({
   };
 
   const save = async () => {
-    if (blank(f.name) || blank(f.email) || (!editDriver && blank(f.password))) {
-      setErr(
-        editDriver
-          ? 'Name and email required.'
-          : 'Name, email and password required.',
-      );
+    const errs = validateDriverForm();
+    if (Object.keys(errs).length > 0) {
+      setTouched({ name: true, email: true, password: true });
+      setErr(Object.values(errs)[0]);
       return;
     }
     try {
@@ -1134,7 +1160,7 @@ export function DriversTab({
             <Btn
               onClick={save}
               loading={busy}
-              disabled={!isFormDirty || busy}
+              disabled={!isFormDirty || !isDriverFormValid || busy}
               loadingLabel={editDriver ? 'Saving…' : 'Creating…'}
             >
               {editDriver ? 'SAVE CHANGES' : 'CREATE DRIVER'}
@@ -1162,6 +1188,8 @@ export function DriversTab({
             onChange={(e: any) =>
               setF((x) => ({ ...x, name: e.target.value }))
             }
+            onBlur={() => markTouched('name')}
+            error={touched.name ? driverFieldErrors.name : undefined}
             placeholder="Driver full name"
           />
           {editDriver ? (
@@ -1195,6 +1223,8 @@ export function DriversTab({
               onChange={(e: any) =>
                 setF((x) => ({ ...x, email: e.target.value }))
               }
+              onBlur={() => markTouched('email')}
+              error={touched.email ? driverFieldErrors.email : undefined}
               placeholder="driver@company.com"
             />
           )}
@@ -1206,6 +1236,8 @@ export function DriversTab({
             onChange={(e: any) =>
               setF((x) => ({ ...x, password: e.target.value }))
             }
+            onBlur={() => markTouched('password')}
+            error={touched.password ? driverFieldErrors.password : undefined}
             placeholder={
               editDriver ? 'Leave blank to keep' : 'Login password'
             }

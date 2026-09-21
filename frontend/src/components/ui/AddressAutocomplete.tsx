@@ -19,6 +19,7 @@ export interface AddressAutocompleteProps {
   label?: ReactNode;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   onSelectAddress?: (address: GeoapifyAddress) => void;
   /** Restrict suggestions to these countries (ISO2 uppercase). Default: US + CA. */
   allowedCountries?: Array<'US' | 'CA'>;
@@ -38,6 +39,7 @@ export function AddressAutocomplete({
   label,
   value,
   onChange,
+  onBlur,
   onSelectAddress,
   allowedCountries = ['US', 'CA'],
   placeholder = 'Start typing address (US & Canada)...',
@@ -203,6 +205,9 @@ export function AddressAutocomplete({
             if ((value || '').trim().length >= 2) {
               setOpen(true);
             }
+          }}
+          onBlur={() => {
+            onBlur?.();
           }}
           onKeyDown={handleKeyDown}
           style={{

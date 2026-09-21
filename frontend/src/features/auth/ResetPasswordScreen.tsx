@@ -73,8 +73,14 @@ export function ResetPasswordScreen() {
           onChange={(e) => setConfirm(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void go()}
         />
-        <Btn full onClick={() => void go()} disabled={loading}>
-          {loading ? 'Saving…' : 'Update password'}
+        <Btn
+          full
+          loading={loading}
+          loadingLabel="Saving…"
+          onClick={() => void go()}
+          disabled={loading}
+        >
+          Update password
         </Btn>
         <p style={{ marginTop: 16, fontSize: 13 }}>
           <Link to="/login" style={{ color: G.gold }}>

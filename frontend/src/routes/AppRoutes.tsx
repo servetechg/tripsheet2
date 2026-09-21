@@ -8,7 +8,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { G, pageCentered } from '@/lib/theme';
-import { Btn, Icons, Inp } from '@/components/ui';
+import { Btn, Icons, Inp, Skeleton } from '@/components/ui';
 import { ToastHost } from '@/components/feedback/Toast';
 import { useAppData, type AppUser } from '@/context/AppDataContext';
 import { useSession } from '@/context/SessionContext';
@@ -174,6 +174,78 @@ function BootSplash({ label = 'Loading…' }: { label?: string }) {
   return (
     <div style={{ ...pageCentered() }}>
       <div style={{ color: G.muted, fontSize: 14 }}>{label}</div>
+    </div>
+  );
+}
+
+function DashboardSkeletonShell({ title = 'FleetQuix' }: { title?: string }) {
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--color-bg, #0b0f19)' }}>
+      <div
+        style={{
+          height: 60,
+          borderBottom: `1px solid ${G.border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 24px',
+          background: G.card,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ fontWeight: 800, fontSize: 16, color: G.gold }}>{title}</div>
+          <Skeleton rows={1} height={18} style={{ width: 80 }} />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Skeleton rows={1} height={32} style={{ width: 32, borderRadius: '50%' }} />
+          <Skeleton rows={1} height={20} style={{ width: 100 }} />
+        </div>
+      </div>
+      <div style={{ display: 'flex' }}>
+        <div
+          style={{
+            width: 220,
+            borderRight: `1px solid ${G.border}`,
+            padding: '20px 14px',
+            minHeight: 'calc(100vh - 60px)',
+            background: G.card,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} rows={1} height={36} />
+          ))}
+        </div>
+        <div style={{ flex: 1, padding: '24px 32px', maxWidth: 1400 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 24,
+            }}
+          >
+            <Skeleton rows={1} height={28} style={{ width: 220 }} />
+            <Skeleton rows={1} height={36} style={{ width: 120 }} />
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: 16,
+              marginBottom: 24,
+            }}
+          >
+            <Skeleton rows={1} height={92} />
+            <Skeleton rows={1} height={92} />
+            <Skeleton rows={1} height={92} />
+            <Skeleton rows={1} height={92} />
+          </div>
+          <Skeleton rows={5} height={60} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -466,6 +538,7 @@ function SuperAdminRoute() {
       refreshAll={data.refreshAll}
       activeTab={tab}
       onTabChange={(id: string) => navigate(adminTabPath(id))}
+      loading={data.loading}
     />
   );
 }
@@ -509,7 +582,7 @@ function CompanyWorkspace() {
     Boolean(freshSession.companyId) && !companyHydrated;
 
   if (waitingForCompany) {
-    return <BootSplash label="Loading company…" />;
+    return <DashboardSkeletonShell title="FleetQuix" />;
   }
 
   if (!company || !companyIsActive(company)) {
@@ -623,6 +696,7 @@ function DriverWorkspace() {
   const freshSession: AppUser = fromData
     ? {
         ...fromData,
+        companyId: user.companyId ?? fromData.companyId ?? null,
         email: user.email || fromData.email,
         name: user.name || fromData.name,
         pendingEmail: user.pendingEmail ?? fromData.pendingEmail,
@@ -633,7 +707,7 @@ function DriverWorkspace() {
     Boolean(freshSession.companyId) && !companyHydrated;
 
   if (waitingForCompany) {
-    return <BootSplash label="Loading company…" />;
+    return <DashboardSkeletonShell title="Driver Portal" />;
   }
 
   if (!company || !companyIsActive(company)) {
@@ -656,8 +730,25 @@ function DriverWorkspace() {
           <div style={{ color: G.muted, marginBottom: 20 }}>
             {archived
               ? 'This company has been archived. Contact your platform administrator to restore access.'
-              : 'Company not assigned to your account. Contact your administrator.'}
+              : !freshSession.companyId
+                ? 'Company not assigned to your account. Contact your administrator.'
+                : data.apiError ||
+                  'Could not load your company profile. Ensure the backend is running (npm run start:dev in /backend), then log in again.'}
           </div>
+          {freshSession.companyId && (
+            <Btn
+              full
+              variant="outline"
+              onClick={() => {
+                void data
+                  .refreshAll(freshSession.companyId, 'driver')
+                  .catch(() => undefined);
+              }}
+              style={{ padding: 12, fontSize: 13, marginBottom: 10 }}
+            >
+              RETRY
+            </Btn>
+          )}
           <Btn
             full
             onClick={() => {

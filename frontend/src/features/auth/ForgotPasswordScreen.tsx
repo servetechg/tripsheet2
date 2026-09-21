@@ -73,8 +73,14 @@ export function ForgotPasswordScreen() {
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void go()}
         />
-        <Btn full onClick={() => void go()} disabled={loading || !email.trim()}>
-          {loading ? 'Sending…' : 'Send reset link'}
+        <Btn
+          full
+          loading={loading}
+          loadingLabel="Sending…"
+          onClick={() => void go()}
+          disabled={loading || !email.trim()}
+        >
+          Send reset link
         </Btn>
         <p style={{ marginTop: 16, fontSize: 13 }}>
           <Link to="/login" style={{ color: G.gold }}>

@@ -1,13 +1,15 @@
+import type { CSSProperties } from 'react';
 import { G, RADIUS, SPACE } from '@/lib/theme';
 
 export interface SkeletonProps {
   rows?: number;
   height?: number;
+  style?: CSSProperties;
 }
 
-export function Skeleton({ rows = 3, height = 64 }: SkeletonProps) {
+export function Skeleton({ rows = 3, height = 64, style }: SkeletonProps) {
   return (
-    <div>
+    <div style={style}>
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}

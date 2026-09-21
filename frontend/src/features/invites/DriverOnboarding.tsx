@@ -55,6 +55,34 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
   const [uploading, setUploading] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [profileTouched, setProfileTouched] = useState<Record<string, boolean>>({});
+
+  const markProfileTouched = (k: string) => {
+    setProfileTouched((prev) => ({ ...prev, [k]: true }));
+  };
+
+  const validateProfile = () => {
+    const errs: Record<string, string> = {};
+    if (!profile.name?.trim()) errs.name = 'Full name is required';
+    if (!profile.email?.trim()) {
+      errs.email = 'Email address is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email.trim())) {
+      errs.email = 'Enter a valid email address';
+    }
+    const minLen = invite?.passwordPolicy?.minLength || 8;
+    if (!profile.password) {
+      errs.password = 'Password is required';
+    } else if (profile.password.length < minLen) {
+      errs.password =
+        invite?.passwordPolicy?.hint ||
+        `Password must be at least ${minLen} characters.`;
+    }
+    return errs;
+  };
+
+  const profileFieldErrors = validateProfile();
+  const isProfileValid = Object.keys(profileFieldErrors).length === 0;
+
   const upd = (k: keyof Profile, v: string) =>
     setProfile((x) => ({ ...x, [k]: v }));
 
@@ -86,16 +114,10 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
   };
 
   const goProfileNext = () => {
-    if (!profile.name || !profile.email || !profile.password) {
-      setProfileErr('Name, email and password are required.');
-      return;
-    }
-    const minLen = invite?.passwordPolicy?.minLength || 8;
-    if (profile.password.length < minLen) {
-      setProfileErr(
-        invite?.passwordPolicy?.hint ||
-          `Password must be at least ${minLen} characters.`,
-      );
+    const errs = validateProfile();
+    if (Object.keys(errs).length > 0) {
+      setProfileTouched({ name: true, email: true, password: true });
+      setProfileErr(Object.values(errs)[0]);
       return;
     }
     setProfileErr('');
@@ -333,6 +355,8 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
                 label="Full Name *"
                 value={profile.name}
                 onChange={(e) => upd('name', e.target.value)}
+                onBlur={() => markProfileTouched('name')}
+                error={profileTouched.name ? profileFieldErrors.name : undefined}
                 placeholder="Your full legal name"
                 autoComplete="name"
               />
@@ -340,6 +364,8 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
                 label="Email *"
                 value={profile.email}
                 onChange={(e) => upd('email', e.target.value)}
+                onBlur={() => markProfileTouched('email')}
+                error={profileTouched.email ? profileFieldErrors.email : undefined}
                 placeholder="your@email.com"
                 type="email"
                 autoComplete="email"
@@ -349,6 +375,8 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               label="Password * (for app login)"
               value={profile.password}
               onChange={(e) => upd('password', e.target.value)}
+              onBlur={() => markProfileTouched('password')}
+              error={profileTouched.password ? profileFieldErrors.password : undefined}
               placeholder="Choose a secure password"
               type="password"
               autoComplete="new-password"
@@ -451,6 +479,7 @@ export function DriverOnboarding({ invite, company, onComplete }: any) {
               <BackButton onClick={() => setStep(1)} />
               <Btn
                 onClick={goProfileNext}
+                disabled={!isProfileValid}
                 style={{
                   flex: 1,
                   padding: 14,

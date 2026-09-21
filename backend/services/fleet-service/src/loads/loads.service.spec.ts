@@ -171,6 +171,29 @@ describe('LoadsService', () => {
       ).resolves.toMatchObject({ status: 'in_transit' });
     });
 
+    it('sets actualDelivery when delivered', async () => {
+      prisma.load.findUnique.mockResolvedValue({
+        id: 'L1',
+        status: 'in_transit',
+      });
+      prisma.load.update.mockImplementation(async ({ data }) => ({
+        id: 'L1',
+        ...data,
+      }));
+
+      const result = await service.updateStatus('L1', { status: 'delivered' });
+      expect(result.status).toBe('delivered');
+      expect(result.actualDelivery).toBeTruthy();
+      expect(prisma.load.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'delivered',
+            actualDelivery: expect.any(String),
+          }),
+        }),
+      );
+    });
+
     it('rejects assigned → delivered', async () => {
       prisma.load.findUnique.mockResolvedValue({
         id: 'L1',

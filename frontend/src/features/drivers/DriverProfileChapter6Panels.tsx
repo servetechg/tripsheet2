@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, Pill } from '@/components/ui';
+import { Btn, Card, Inp, Sel, Pill, Skeleton } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { assetsApi, driversApi } from '@/lib/api';
 import {
@@ -353,7 +353,11 @@ export function DriverPerformancePanel({
   }, [recordId, apiEnabled]);
 
   if (!perf) {
-    return <Card style={{ padding: 24, color: G.muted }}>Loading performance…</Card>;
+    return (
+      <Card style={{ padding: 20 }}>
+        <Skeleton rows={3} height={42} />
+      </Card>
+    );
   }
 
   const items = [

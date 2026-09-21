@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { G } from '@/lib/theme';
-import { Btn, Card, SectionTitle, Pill } from '@/components/ui';
+import { Btn, Card, SectionTitle, Pill, Skeleton } from '@/components/ui';
 import { notify } from '@/components/feedback/Toast';
 import { reportsApi, notificationsApi } from '@/lib/api';
 import { formatLoadLabel, humanizeEnum } from '@/lib/format';
@@ -186,9 +186,22 @@ export function ReportsTab({
       {view === 'ops' && (
         <>
           {!summary ? (
-            <div style={{ color: G.muted, fontSize: 13 }}>
-              {loading ? 'Loading…' : 'No data yet.'}
-            </div>
+            loading ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} rows={1} height={76} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: G.muted, fontSize: 13 }}>No data yet.</div>
+            )
           ) : (
             <>
               <div
@@ -247,9 +260,24 @@ export function ReportsTab({
       {view === 'analytics' && (
         <>
           {!analytics ? (
-            <div style={{ color: G.muted, fontSize: 13 }}>
-              {loading ? 'Loading…' : 'No analytics yet. Add load rates and invoices.'}
-            </div>
+            loading ? (
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <Skeleton key={i} rows={1} height={76} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ color: G.muted, fontSize: 13 }}>
+                No analytics yet. Add load rates and invoices.
+              </div>
+            )
           ) : (
             <>
               <div

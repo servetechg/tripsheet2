@@ -62,8 +62,14 @@ export function ConfirmEmailChangeScreen() {
               Click confirm to complete your FleetQuix email change.
             </p>
             {err ? <Err msg={err} /> : null}
-            <Btn full onClick={() => void confirm()} disabled={loading}>
-              {loading ? 'Confirming…' : 'Confirm new email'}
+            <Btn
+              full
+              loading={loading}
+              loadingLabel="Confirming…"
+              onClick={() => void confirm()}
+              disabled={loading}
+            >
+              Confirm new email
             </Btn>
           </>
         )}
