@@ -107,7 +107,7 @@ export class LoadsService {
       );
     }
 
-    return this.prisma.load.create({
+    const load = await this.prisma.load.create({
       data: {
         companyId: dto.companyId,
         driverId: dto.driverId,
@@ -158,6 +158,10 @@ export class LoadsService {
         customsPars: Boolean(dto.customsPars),
       },
     });
+    void this.notifyDriverLoadAssigned(load).catch((e) =>
+      this.logger.warn(`load assigned push failed: ${String(e)}`),
+    );
+    return load;
   }
 
   async update(id: string, dto: UpdateLoadDto) {
@@ -241,7 +245,7 @@ export class LoadsService {
       await this.assertDriverBorderEligible(driverId, existing.companyId);
     }
 
-    return this.prisma.load.update({
+    const updated = await this.prisma.load.update({
       where: { id },
       data: {
         driverId: dto.driverId,
@@ -295,9 +299,20 @@ export class LoadsService {
         customsPars: dto.customsPars,
       },
     });
+    const driverChanged =
+      dto.driverId !== undefined &&
+      dto.driverId !== existing.driverId &&
+      updated.driverId &&
+      ACTIVE_STATUSES.includes(
+        updated.status as (typeof ACTIVE_STATUSES)[number],
+      );
+    if (driverChanged) {
+      void this.notifyDriverLoadAssigned(updated).catch((e) =>
+        this.logger.warn(`load reassigned push failed: ${String(e)}`),
+      );
+    }
+    return updated;
   }
-
-  async updateStatus(id: string, dto: UpdateLoadStatusDto) {
     const existing = await this.ensureExists(id);
     this.assertTransition(existing.status, dto.status);
 

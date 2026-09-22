@@ -249,7 +249,7 @@ export class QualificationsService {
     try {
       const driver = await this.prisma.driver.findUnique({
         where: { id: driverId },
-        select: { name: true, email: true },
+        select: { name: true, email: true, userId: true },
       });
       await fetch(`${notifyUrl.replace(/\/$/, '')}/notifications/log`, {
         method: 'POST',
@@ -263,6 +263,7 @@ export class QualificationsService {
           meta: {
             type: 'driver.qualification_expiry',
             driverId,
+            userId: driver?.userId || null,
             qualType,
             qualStatus: status,
           },

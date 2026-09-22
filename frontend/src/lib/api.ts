@@ -1326,6 +1326,18 @@ export const notificationsApi = {
     }),
 };
 
+export const pushApi = {
+  status: () => api<import('@tripsheet/shared').PushStatusResponse>('/push/status'),
+  register: (body: import('@tripsheet/shared').PushRegisterRequest) =>
+    api('/push/register', { method: 'POST', body: JSON.stringify(body) }),
+  unregister: (body: import('@tripsheet/shared').PushUnregisterRequest) =>
+    api('/push/unregister', { method: 'POST', body: JSON.stringify(body) }),
+  test: () =>
+    api<import('@tripsheet/shared').PushTestResponse>('/push/test', {
+      method: 'POST',
+    }),
+};
+
 export function setTokens(access: string | null, refresh?: string | null) {
   if (access) localStorage.setItem('ts_token', access);
   else localStorage.removeItem('ts_token');

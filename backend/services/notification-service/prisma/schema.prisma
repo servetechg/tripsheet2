@@ -54,3 +54,18 @@ model Comment {
   @@index([companyId])
   @@index([entityType, entityId])
 }
+
+model FcmDevice {
+  id        String    @id @default(cuid())
+  companyId String
+  userId    String
+  token     String    @unique
+  platform  String    @default("web")
+  userAgent String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  revokedAt DateTime?
+
+  @@index([companyId, userId])
+  @@index([userId])
+}

@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
 import { SmsService } from '../sms/sms.service';
+import { PushService } from '../push/push.service';
 import {
   isTenantSchemaDriftError,
   repairTenantOrgSchemas,
@@ -23,6 +24,7 @@ export class NotificationsService {
     private readonly redis: RedisService,
     private readonly emailService: EmailService,
     private readonly smsService: SmsService,
+    private readonly pushService: PushService,
   ) {}
 
   async findAll(companyId?: string, limit = 50) {
@@ -70,12 +72,17 @@ export class NotificationsService {
       if (body.senderEmail && !meta.replyTo) {
         meta.replyTo = String(body.senderEmail);
       }
-      return this.emailService.send({
+      const companyId = body.companyId ? String(body.companyId) : undefined;
+      const logRow = await this.emailService.send({
         to,
         body: text,
-        companyId: body.companyId ? String(body.companyId) : undefined,
+        companyId,
         meta,
       });
+      void this.pushService
+        .mirrorFromEmailLog({ companyId, body: text, meta })
+        .catch(() => undefined);
+      return logRow;
     }
     return this.prisma.notificationLog.create({
       data: {

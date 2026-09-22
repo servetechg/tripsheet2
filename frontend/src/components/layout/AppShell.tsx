@@ -123,7 +123,10 @@ export function AppShell({
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
           {topRight}
-          {showNotifications && <NotificationBell />}
+          {showNotifications && (
+            /* In-app inbox (header) — separate from FCM web push; wired in a later phase */
+            <NotificationBell hasUnread={false} />
+          )}
           {showUserMenu && (
             <UserMenu
               name={userName}

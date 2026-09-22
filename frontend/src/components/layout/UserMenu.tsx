@@ -263,6 +263,7 @@ export function UserMenu({
           >
             <span>Sessions & devices</span>
           </button>
+          {/* Push controls removed: browser permission is requested on login (useWebPush). */}
           <button
             type="button"
             role="menuitem"

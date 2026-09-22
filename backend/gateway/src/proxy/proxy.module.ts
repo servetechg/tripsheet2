@@ -20,6 +20,7 @@ import { CarrierProfilesProxyController } from './carrier-profiles.proxy.control
 import { SettlementsProxyController } from './settlements.proxy.controller';
 import { ReportsProxyController } from './reports.proxy.controller';
 import { NotificationsProxyController } from './notifications.proxy.controller';
+import { PushProxyController } from './push.proxy.controller';
 import {
   AccountsProxyController,
   AuditProxyController,
@@ -67,6 +68,7 @@ import {
     SettlementsProxyController,
     ReportsProxyController,
     NotificationsProxyController,
+    PushProxyController,
     MaintenanceProxyController,
     DvirProxyController,
     InvoicesProxyController,

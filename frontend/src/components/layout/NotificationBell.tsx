@@ -7,7 +7,7 @@ type NotificationBellProps = {
 };
 
 export function NotificationBell({
-  hasUnread = true,
+  hasUnread = false,
   onClick,
 }: NotificationBellProps) {
   return (

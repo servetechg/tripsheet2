@@ -241,7 +241,7 @@ function rule(
     return { codes: ['admin.audit'] };
   }
 
-  if (p.startsWith('/api/notifications') || p.startsWith('/api/messages') || p.startsWith('/api/comments')) {
+  if (p.startsWith('/api/notifications') || p.startsWith('/api/messages') || p.startsWith('/api/comments') || p.startsWith('/api/push')) {
     return { codes: 'any' };
   }
 
