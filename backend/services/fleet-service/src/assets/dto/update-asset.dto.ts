@@ -8,11 +8,6 @@ export class UpdateAssetDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(1)
-  unitNo?: string;
-
-  @IsOptional()
-  @IsString()
   year?: string;
 
   @IsOptional()

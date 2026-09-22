@@ -28,7 +28,7 @@ describe('LoadsService', () => {
   beforeEach(() => {
     prisma = {
       load: {
-        findMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         create: jest.fn(),

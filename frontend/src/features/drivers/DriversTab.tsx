@@ -488,7 +488,6 @@ export function DriversTab({
               notes: f.notes,
               sin: f.sin,
               driverType: f.driverType,
-              employeeNumber: f.employeeNumber || undefined,
               hireDate: f.hireDate || undefined,
               branchId: f.branchId || undefined,
               availabilityStatus: f.availabilityStatus || undefined,
@@ -537,7 +536,6 @@ export function DriversTab({
             sin: f.sin,
             lifecycleStatus: 'active',
             driverType: f.driverType,
-            employeeNumber: f.employeeNumber || undefined,
             hireDate: f.hireDate || undefined,
             branchId: f.branchId || undefined,
             availabilityStatus: f.availabilityStatus || 'available',
@@ -1399,13 +1397,14 @@ export function DriversTab({
               </option>
             ))}
           </Sel>
-          <Inp
-            label="Employee #"
-            value={f.employeeNumber}
-            onChange={(e) =>
-              setF((x) => ({ ...x, employeeNumber: e.target.value }))
-            }
-          />
+          {editDriver?.employeeNumber || f.employeeNumber ? (
+            <Inp
+              label="Employee #"
+              value={f.employeeNumber || editDriver?.employeeNumber || ''}
+              readOnly
+              disabled
+            />
+          ) : null}
           <Inp
             label="Hire date"
             type="date"

@@ -19,7 +19,6 @@ import { blank } from '@/lib/format';
 import {
   datetimeLocalToIso,
   formatDisplayDateTime,
-  isValidTripNo,
   parseNonNegNumber,
   sanitizeDecimal,
   sanitizeInteger,
@@ -711,10 +710,6 @@ export function DispatchTab({
       errs.eta = 'ETA must be on or after pickup';
     }
 
-    if (!isValidTripNo(f.tripNo)) {
-      errs.tripNo = 'Use letters, numbers, - _ / (max 32)';
-    }
-
     const moneyFields: (keyof FormErrors)[] = [
       'customerRate',
       'carrierCost',
@@ -868,7 +863,6 @@ export function DispatchTab({
       destination: f.destination.trim(),
       pickupTime: datetimeLocalToIso(f.pickupTime),
       eta: datetimeLocalToIso(f.eta),
-      tripNo: f.tripNo.trim(),
       notes: f.notes.trim(),
       truckNo: truck?.unitNo || '',
       trailerNo: trailer?.unitNo || '',
@@ -1212,24 +1206,17 @@ export function DispatchTab({
                 })}
               </Sel>
             </div>
-            <div>
-              <FieldInp
-                label="Trip No."
-                value={f.tripNo}
-                onChange={(e) =>
-                  upd(
-                    'tripNo',
-                    e.target.value.replace(/[^A-Za-z0-9\-_\/]/g, '').slice(0, 32),
-                  )
-                }
-                onBlur={() => markTouched('tripNo')}
-                placeholder="e.g. 34320"
-                maxLength={32}
-                error={showErr('tripNo')}
-                hint="Letters, numbers, - _ /"
-                style={{ marginBottom: 0 }}
-              />
-            </div>
+            {editLoad?.tripNo ? (
+              <div>
+                <FieldInp
+                  label="Trip No."
+                  value={editLoad.tripNo}
+                  readOnly
+                  disabled
+                  style={{ marginBottom: 0 }}
+                />
+              </div>
+            ) : null}
           </G2>
 
           {(() => {

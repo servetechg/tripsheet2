@@ -1,6 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { SearchSelectOption } from '@/components/ui';
 import { G, FONT_MONO } from '@/lib/theme';
-import { Btn, Card, Inp, Sel, SectionTitle, Pill, G2, StatCard, StatsGrid, Icons } from '@/components/ui';
+import {
+  Btn,
+  Card,
+  Inp,
+  Sel,
+  SectionTitle,
+  Pill,
+  G2,
+  StatCard,
+  StatsGrid,
+  Icons,
+  SearchSelect,
+} from '@/components/ui';
+import { useVpicCatalog } from '@/features/assets/useVpicCatalog';
+import type { VpicAssetType } from '@/features/assets/types';
+import { normalizeVinInput } from '@/features/assets/vinHelpers';
+import {
+  VinSearchSelect,
+  type VinApplyPayload,
+} from '@/features/assets/VinSearchSelect';
 import { blank, humanizeEnum, isCompactIdentifier, getApiErrorMessage } from '@/lib/format';
 import { uid } from '@/lib/uid';
 import { Err } from '@/components/feedback/Err';
@@ -55,6 +75,16 @@ export function AssetsTab({
   const [insurers, setInsurers] = useState<
     Array<{ id: string; name: string }>
   >([]);
+  const [vpicNote, setVpicNote] = useState('');
+
+  const vpicVehicleType: VpicAssetType =
+    assetTab === 'trailers'
+      ? 'trailer'
+      : assetTab === 'equipment'
+        ? 'equipment'
+        : 'truck';
+
+  const vpic = useVpicCatalog(Boolean(apiEnabled && show), vpicVehicleType, f.year, f.make);
 
   useEffect(() => {
     if (!apiEnabled || !company?.id) return;
@@ -87,7 +117,69 @@ export function AssetsTab({
         ? 'TRAILER'
         : 'EQUIPMENT';
 
-  const openEdit = (a) => {
+  const assetTypeForTab =
+    assetTab === 'trucks'
+      ? 'truck'
+      : assetTab === 'trailers'
+        ? 'trailer'
+        : 'equipment';
+
+  const fleetVinOptions = useMemo((): SearchSelectOption[] => {
+    const seen = new Set<string>();
+    const rows: SearchSelectOption[] = [];
+    for (const a of assets) {
+      if (a.companyId !== company.id || a.type !== assetTypeForTab) continue;
+      if (editAsset && a.id === editAsset.id) continue;
+      const vin = normalizeVinInput(a.vin || '');
+      if (!vin || seen.has(vin)) continue;
+      seen.add(vin);
+      const desc = [a.year, a.make, a.model].filter(Boolean).join(' ');
+      rows.push({
+        value: vin,
+        label: desc
+          ? `${vin} · Unit ${a.unitNo} · ${desc}`
+          : `${vin} · Unit ${a.unitNo}`,
+      });
+    }
+    return rows.sort((x, y) => x.value.localeCompare(y.value));
+  }, [assets, company.id, assetTypeForTab, editAsset]);
+
+  const onVinApply = (payload: VinApplyPayload) => {
+    const normalized = normalizeVinInput(payload.vin);
+    if (!normalized) {
+      setF((x) => ({ ...x, vin: '' }));
+      setVpicNote('');
+      return;
+    }
+    const fleetMatch = assets.find(
+      (a) =>
+        a.companyId === company.id &&
+        a.type === assetTypeForTab &&
+        normalizeVinInput(a.vin || '') === normalized &&
+        (!editAsset || a.id !== editAsset.id),
+    );
+    if (fleetMatch) {
+      setF((x) => ({
+        ...x,
+        vin: normalized,
+        year: fleetMatch.year != null ? String(fleetMatch.year) : x.year,
+        make: fleetMatch.make || x.make,
+        model: fleetMatch.model || x.model,
+      }));
+      setVpicNote(payload.note);
+      return;
+    }
+    setF((x) => ({
+      ...x,
+      vin: normalized,
+      year: payload.year || x.year,
+      make: payload.make || x.make,
+      model: payload.model || x.model,
+    }));
+    setVpicNote(payload.note);
+  };
+
+  const openEdit = (a: FleetAsset) => {
     setEditAsset(a);
     setF({
       type: a.type || 'truck',
@@ -106,6 +198,7 @@ export function AssetsTab({
     });
     setShow(true);
     setErr('');
+    setVpicNote('');
   };
 
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -115,20 +208,7 @@ export function AssetsTab({
   };
 
   const validateAssetForm = () => {
-    const errs: Record<string, string> = {};
-    if (blank(f.unitNo)) {
-      errs.unitNo = 'Unit No. is required';
-    } else if (
-      !editAsset &&
-      assets.some(
-        (a) =>
-          a.companyId === company?.id &&
-          a.unitNo?.trim().toLowerCase() === f.unitNo.trim().toLowerCase(),
-      )
-    ) {
-      errs.unitNo = 'Unit No. already exists';
-    }
-    return errs;
+    return {} as Record<string, string>;
   };
 
   const assetFieldErrors = validateAssetForm();
@@ -140,12 +220,12 @@ export function AssetsTab({
     setShow(false);
     setTouched({});
     setErr('');
+    setVpicNote('');
   };
 
   const saveAsset = async () => {
     const errs = validateAssetForm();
     if (Object.keys(errs).length > 0) {
-      setTouched({ unitNo: true });
       setErr(Object.values(errs)[0]);
       return;
     }
@@ -157,14 +237,15 @@ export function AssetsTab({
           : 'equipment';
     const body: Partial<Asset> & {
       type: string;
-      unitNo: string;
       companyId: string;
     } = {
       ...f,
       type,
-      unitNo: f.unitNo.trim(),
       companyId: company.id,
     };
+    if (editAsset) {
+      delete (body as { unitNo?: string }).unitNo;
+    }
     if (!editAsset) {
       body.status = 'available';
     }
@@ -328,6 +409,7 @@ export function AssetsTab({
             setF(emptyAsset);
             setShow(true);
             setErr('');
+            setVpicNote('');
           }}
         >
           + ADD {typeLabel}
@@ -338,50 +420,39 @@ export function AssetsTab({
         <Card>
           <SectionTitle>{editAsset ? `EDIT ${typeLabel}` : `ADD ${typeLabel}`}</SectionTitle>
           <Err msg={err} />
+          <div
+            style={{
+              fontSize: 11,
+              color: G.muted,
+              marginBottom: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            Start with the VIN — matching fleet VINs appear as you type. When you
+            enter a full 17-character VIN, NHTSA vPIC (US &amp; Canada) shows in
+            the list; pick it or press Enter to fill year, make, and model.
+          </div>
+          <VinSearchSelect
+            label="VIN (17 characters)"
+            value={f.vin}
+            fleetOptions={fleetVinOptions}
+            apiEnabled={Boolean(apiEnabled)}
+            onApply={onVinApply}
+            placeholder={
+              fleetVinOptions.length
+                ? 'Type or search VIN…'
+                : 'Type 17-character VIN…'
+            }
+          />
           <G2 cols={2}>
-            <Inp
-              label="Unit No. *"
-              value={f.unitNo}
-              onChange={(e) =>
-                setF((x) => ({ ...x, unitNo: e.target.value }))
-              }
-              onBlur={() => markTouched('unitNo')}
-              error={touched.unitNo ? assetFieldErrors.unitNo : undefined}
-              placeholder="e.g. 32054"
-            />
-            <Inp
-              label="Year"
-              value={f.year}
-              onChange={(e) =>
-                setF((x) => ({ ...x, year: e.target.value }))
-              }
-              placeholder="e.g. 2022"
-            />
-          </G2>
-          <G2 cols={2}>
-            <Inp
-              label="Make"
-              value={f.make}
-              onChange={(e) =>
-                setF((x) => ({ ...x, make: e.target.value }))
-              }
-            />
-            <Inp
-              label="Model"
-              value={f.model}
-              onChange={(e) =>
-                setF((x) => ({ ...x, model: e.target.value }))
-              }
-            />
-          </G2>
-          <G2 cols={2}>
-            <Inp
-              label="VIN"
-              value={f.vin}
-              onChange={(e) =>
-                setF((x) => ({ ...x, vin: e.target.value }))
-              }
-            />
+            {editAsset ? (
+              <Inp
+                label="Unit No."
+                value={f.unitNo || editAsset.unitNo || ''}
+                readOnly
+                disabled
+              />
+            ) : null}
             <Inp
               label="Plate No."
               value={f.plate}
@@ -390,6 +461,72 @@ export function AssetsTab({
               }
             />
           </G2>
+          <G2 cols={2}>
+            <SearchSelect
+              label="Year"
+              value={f.year}
+              onChange={(year) =>
+                setF((x) => ({ ...x, year, model: '' }))
+              }
+              options={vpic.years}
+              placeholder={
+                apiEnabled ? 'Search year…' : 'API offline — type year'
+              }
+              disabled={!apiEnabled && vpic.years.length === 0}
+              allowCustom
+            />
+            <SearchSelect
+              label="Make"
+              value={f.make}
+              onChange={(make) =>
+                setF((x) => ({ ...x, make, model: '' }))
+              }
+              options={vpic.makes}
+              placeholder={
+                vpic.loadingMakes
+                  ? 'Loading makes…'
+                  : apiEnabled
+                    ? 'Search make…'
+                    : 'Type make'
+              }
+              disabled={!apiEnabled && vpic.makes.length === 0}
+              allowCustom
+            />
+          </G2>
+          <G2 cols={2}>
+            <SearchSelect
+              label="Model"
+              value={f.model}
+              onChange={(model) => setF((x) => ({ ...x, model }))}
+              options={vpic.models}
+              placeholder={
+                !f.year || !f.make
+                  ? 'Select year and make first'
+                  : vpic.loadingModels
+                    ? 'Loading models…'
+                    : 'Search model…'
+              }
+              disabled={
+                (!f.year || !f.make) &&
+                vpic.models.length === 0 &&
+                !f.model
+              }
+              allowCustom
+            />
+            <div />
+          </G2>
+          {vpicNote ? (
+            <div
+              style={{
+                fontSize: 11,
+                color: G.muted,
+                marginBottom: 12,
+                lineHeight: 1.45,
+              }}
+            >
+              {vpicNote}
+            </div>
+          ) : null}
           <G2 cols={2}>
             <Sel
               label="Insurance provider"

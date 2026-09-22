@@ -17,6 +17,7 @@ import { CreateLoadDto } from './dto/create-load.dto';
 import { ListLoadsDto } from './dto/list-loads.dto';
 import { UpdateLoadDto } from './dto/update-load.dto';
 import { UpdateLoadStatusDto } from './dto/update-load-status.dto';
+import { nextSequenceFromValues, SEQUENCE_PREFIX } from '@tripsheet/shared';
 import { validateCrossBorderLoadFields } from './cross-border';
 
 const ACTIVE_STATUSES = ['assigned', 'in_transit'] as const;
@@ -107,7 +108,9 @@ export class LoadsService {
       );
     }
 
-    const load = await this.prisma.load.create({
+    const tripNo = await this.allocateLoadTripNo(dto.companyId);
+    try {
+      const load = await this.prisma.load.create({
       data: {
         companyId: dto.companyId,
         driverId: dto.driverId,
@@ -119,7 +122,7 @@ export class LoadsService {
         pickupTime: dto.pickupTime,
         eta: dto.eta,
         actualDelivery: dto.actualDelivery,
-        tripNo: dto.tripNo,
+        tripNo,
         notes: dto.notes,
         truckNo: dto.truckNo,
         trailerNo: dto.trailerNo,
@@ -158,10 +161,34 @@ export class LoadsService {
         customsPars: Boolean(dto.customsPars),
       },
     });
-    void this.notifyDriverLoadAssigned(load).catch((e) =>
-      this.logger.warn(`load assigned push failed: ${String(e)}`),
+      void this.notifyDriverLoadAssigned(load).catch((e) =>
+        this.logger.warn(`load assigned push failed: ${String(e)}`),
+      );
+      return load;
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `Trip number ${tripNo} already exists for this company`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  private async allocateLoadTripNo(companyId: string): Promise<string> {
+    const rows = await this.prisma.load.findMany({
+      where: { companyId },
+      select: { tripNo: true },
+    });
+    return nextSequenceFromValues(
+      rows.map((r) => r.tripNo),
+      SEQUENCE_PREFIX.loadTrip,
     );
-    return load;
   }
 
   async update(id: string, dto: UpdateLoadDto) {
@@ -256,7 +283,6 @@ export class LoadsService {
         pickupTime: dto.pickupTime,
         eta: dto.eta,
         actualDelivery: dto.actualDelivery,
-        tripNo: dto.tripNo,
         notes: dto.notes,
         truckNo: dto.truckNo,
         trailerNo: dto.trailerNo,
@@ -313,6 +339,8 @@ export class LoadsService {
     }
     return updated;
   }
+
+  async updateStatus(id: string, dto: UpdateLoadStatusDto) {
     const existing = await this.ensureExists(id);
     this.assertTransition(existing.status, dto.status);
 
@@ -634,6 +662,65 @@ export class LoadsService {
     } catch (e) {
       this.logger.warn(`assignment deny audit failed: ${String(e)}`);
     }
+  }
+
+  private async notifyDriverLoadAssigned(load: {
+    id: string;
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    if (!load.driverId) return;
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    if (!notifyUrl) return;
+
+    const driverBase =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    const tenantHeaders: Record<string, string> = {
+      'x-company-id': load.companyId,
+      ...(getTenantStore()?.userId
+        ? { 'x-user-id': getTenantStore()!.userId! }
+        : {}),
+    };
+    let userId: string | null = null;
+    try {
+      const res = await fetch(
+        `${driverBase.replace(/\/$/, '')}/drivers/${encodeURIComponent(load.driverId)}`,
+        { headers: tenantHeaders },
+      );
+      if (res.ok) {
+        const row = (await res.json()) as { userId?: string | null };
+        userId = row?.userId ? String(row.userId) : null;
+      }
+    } catch {
+      return;
+    }
+    if (!userId) return;
+
+    const internalKey =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    const tripLabel = load.tripNo ? `Trip #${load.tripNo}` : 'New load';
+    await fetch(`${notifyUrl.replace(/\/$/, '')}/push/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': internalKey,
+      },
+      body: JSON.stringify({
+        companyId: load.companyId,
+        userId,
+        title: 'Load assigned',
+        body: `${tripLabel}: ${load.origin} → ${load.destination}`,
+        data: {
+          type: 'load.assigned',
+          loadId: load.id,
+          link: '/',
+        },
+      }),
+    });
   }
 
   private async ensureExists(id: string) {

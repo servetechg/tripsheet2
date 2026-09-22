@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Client } from 'pg';
 import { PrismaService } from '../prisma/prisma.service';
-import { decryptSecret } from '../platform/crypto.util';
 import { parseAdminUrl } from '../platform/pg-admin.util';
+import { resolveTenantConnectionUrl } from '../platform/tenant-connection.util';
 import { pushTenantOpsSchemas } from './schema-sync.util';
 import { TenantLocalService } from '../org/tenant-local.service';
 import {
@@ -186,38 +186,40 @@ export class TenantOpsService {
 
     let pushOk: boolean | 'skipped' = 'skipped';
     let pushError: string | undefined;
-    if (row.connectionCiphertext) {
-      try {
-        const url = decryptSecret(row.connectionCiphertext);
-        const pushed = await pushTenantOpsSchemas(url, { quiet: true });
-        pushOk = pushed ? true : 'skipped';
-        if (pushed) {
-          await this.prisma.tenantDatabase.update({
-            where: { id: row.id },
-            data: { schemaVersion: '6', ...clearTenantErrorFields() },
-          });
-        } else if (
-          row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
-          /no sibling prisma projects found/i.test(row.lastError || '')
-        ) {
-          await this.prisma.tenantDatabase.update({
-            where: { id: row.id },
-            data: clearTenantErrorFields(),
-          });
-        }
-      } catch (pushErr) {
-        const msg =
-          pushErr instanceof Error ? pushErr.message : String(pushErr);
-        this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
-        pushOk = false;
-        pushError = msg.slice(0, 500);
-        await this.prisma.tenantDatabase
-          .update({
-            where: { id: row.id },
-            data: tenantErrorWriteFields(msg),
-          })
-          .catch(() => undefined);
+    try {
+      const url = await resolveTenantConnectionUrl(
+        this.prisma,
+        row,
+        this.config,
+      );
+      const pushed = await pushTenantOpsSchemas(url, { quiet: true });
+      pushOk = pushed ? true : 'skipped';
+      if (pushed) {
+        await this.prisma.tenantDatabase.update({
+          where: { id: row.id },
+          data: { schemaVersion: '6', ...clearTenantErrorFields() },
+        });
+      } else if (
+        row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
+        /no sibling prisma projects found/i.test(row.lastError || '')
+      ) {
+        await this.prisma.tenantDatabase.update({
+          where: { id: row.id },
+          data: clearTenantErrorFields(),
+        });
       }
+    } catch (pushErr) {
+      const msg =
+        pushErr instanceof Error ? pushErr.message : String(pushErr);
+      this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
+      pushOk = false;
+      pushError = msg.slice(0, 500);
+      await this.prisma.tenantDatabase
+        .update({
+          where: { id: row.id },
+          data: tenantErrorWriteFields(msg),
+        })
+        .catch(() => undefined);
     }
 
     return { ok: true, companyId, orgOk: true, pushOk, pushError };
@@ -253,38 +255,40 @@ export class TenantOpsService {
         await this.tenantLocal.getSecurityPolicy(row.companyId);
         entry.orgOk = true;
 
-        if (row.connectionCiphertext) {
-          try {
-            const url = decryptSecret(row.connectionCiphertext);
-            const pushed = await pushTenantOpsSchemas(url, { quiet: true });
-            entry.pushOk = pushed ? true : 'skipped';
-            if (pushed) {
-              await this.prisma.tenantDatabase.update({
-                where: { id: row.id },
-                data: { schemaVersion: '6', ...clearTenantErrorFields() },
-              });
-            } else if (
-              row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
-              /no sibling prisma projects found/i.test(row.lastError || '')
-            ) {
-              await this.prisma.tenantDatabase.update({
-                where: { id: row.id },
-                data: clearTenantErrorFields(),
-              });
-            }
-          } catch (pushErr) {
-            const msg =
-              pushErr instanceof Error ? pushErr.message : String(pushErr);
-            this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
-            entry.pushOk = false;
-            entry.error = msg.slice(0, 500);
-            await this.prisma.tenantDatabase
-              .update({
-                where: { id: row.id },
-                data: tenantErrorWriteFields(msg),
-              })
-              .catch(() => undefined);
+        try {
+          const url = await resolveTenantConnectionUrl(
+            this.prisma,
+            row,
+            this.config,
+          );
+          const pushed = await pushTenantOpsSchemas(url, { quiet: true });
+          entry.pushOk = pushed ? true : 'skipped';
+          if (pushed) {
+            await this.prisma.tenantDatabase.update({
+              where: { id: row.id },
+              data: { schemaVersion: '6', ...clearTenantErrorFields() },
+            });
+          } else if (
+            row.lastErrorCode === 'TENANT_SCHEMA_SYNC_SKIPPED' ||
+            /no sibling prisma projects found/i.test(row.lastError || '')
+          ) {
+            await this.prisma.tenantDatabase.update({
+              where: { id: row.id },
+              data: clearTenantErrorFields(),
+            });
           }
+        } catch (pushErr) {
+          const msg =
+            pushErr instanceof Error ? pushErr.message : String(pushErr);
+          this.logger.warn(`ops push skip/fail ${row.dbName}: ${msg}`);
+          entry.pushOk = false;
+          entry.error = msg.slice(0, 500);
+          await this.prisma.tenantDatabase
+            .update({
+              where: { id: row.id },
+              data: tenantErrorWriteFields(msg),
+            })
+            .catch(() => undefined);
         }
 
         await this.prisma.tenantLifecycleEvent.create({

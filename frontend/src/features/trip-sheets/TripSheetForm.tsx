@@ -291,10 +291,6 @@ export function TripSheetForm({
     } else {
       trips.forEach((t) => {
         const tripErr: TripErrors = {};
-        if (!t.tripNo || !String(t.tripNo).trim()) {
-          tripErr.tripNo = 'Trip No. is required';
-          hasError = true;
-        }
         if (!t.trailerNo || !String(t.trailerNo).trim()) {
           tripErr.trailerNo = 'Trailer No. is required';
           hasError = true;
@@ -643,14 +639,14 @@ export function TripSheetForm({
                 )}
               </div>
               <G2 cols={2}>
-                <Inp
-                  label="Trip No."
-                  required
-                  error={errors.trips?.[t.id]?.tripNo}
-                  value={t.tripNo}
-                  onChange={(e) => updT(t.id, 'tripNo', e.target.value)}
-                  placeholder="e.g. 34320"
-                />
+                {t.tripNo ? (
+                  <Inp
+                    label="Leg No."
+                    value={t.tripNo}
+                    readOnly
+                    disabled
+                  />
+                ) : null}
                 <Inp
                   label="Trailer No."
                   required
