@@ -70,3 +70,9 @@ Desktop.ini
 deploy/secrets/
 **/secrets/*.env
 !deploy/secrets.example.env
+backend/secrets/firebase-admin.json
+backend/secrets/*.bak
+backend/secrets/*.json
+!backend/secrets/*.example.json
+!backend/secrets/firebase-admin.json.example
+frontend/public/firebase-messaging-sw.js

@@ -3,6 +3,7 @@ import { AppDataProvider } from '@/context/AppDataContext';
 import { ConfirmProvider } from '@/context/ConfirmContext';
 import { SessionProvider } from '@/context/SessionContext';
 import { AppRoutes } from '@/routes/AppRoutes';
+import { PushNotificationProvider } from '@/components/push/PushNotificationProvider';
 
 /** Shell — providers + router. */
 export default function App() {
@@ -11,7 +12,9 @@ export default function App() {
       <ConfirmProvider>
         <AppDataProvider>
           <SessionProvider>
-            <AppRoutes />
+            <PushNotificationProvider>
+              <AppRoutes />
+            </PushNotificationProvider>
           </SessionProvider>
         </AppDataProvider>
       </ConfirmProvider>

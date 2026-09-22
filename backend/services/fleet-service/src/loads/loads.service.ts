@@ -110,7 +110,7 @@ export class LoadsService {
 
     const tripNo = await this.allocateLoadTripNo(dto.companyId);
     try {
-      return await this.prisma.load.create({
+      const load = await this.prisma.load.create({
       data: {
         companyId: dto.companyId,
         driverId: dto.driverId,
@@ -161,6 +161,10 @@ export class LoadsService {
         customsPars: Boolean(dto.customsPars),
       },
     });
+      void this.notifyDriverLoadAssigned(load).catch((e) =>
+        this.logger.warn(`load assigned push failed: ${String(e)}`),
+      );
+      return load;
     } catch (err: unknown) {
       if (
         err &&
@@ -268,7 +272,7 @@ export class LoadsService {
       await this.assertDriverBorderEligible(driverId, existing.companyId);
     }
 
-    return this.prisma.load.update({
+    const updated = await this.prisma.load.update({
       where: { id },
       data: {
         driverId: dto.driverId,
@@ -321,6 +325,19 @@ export class LoadsService {
         customsPars: dto.customsPars,
       },
     });
+    const driverChanged =
+      dto.driverId !== undefined &&
+      dto.driverId !== existing.driverId &&
+      updated.driverId &&
+      ACTIVE_STATUSES.includes(
+        updated.status as (typeof ACTIVE_STATUSES)[number],
+      );
+    if (driverChanged) {
+      void this.notifyDriverLoadAssigned(updated).catch((e) =>
+        this.logger.warn(`load reassigned push failed: ${String(e)}`),
+      );
+    }
+    return updated;
   }
 
   async updateStatus(id: string, dto: UpdateLoadStatusDto) {
@@ -645,6 +662,65 @@ export class LoadsService {
     } catch (e) {
       this.logger.warn(`assignment deny audit failed: ${String(e)}`);
     }
+  }
+
+  private async notifyDriverLoadAssigned(load: {
+    id: string;
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    if (!load.driverId) return;
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    if (!notifyUrl) return;
+
+    const driverBase =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    const tenantHeaders: Record<string, string> = {
+      'x-company-id': load.companyId,
+      ...(getTenantStore()?.userId
+        ? { 'x-user-id': getTenantStore()!.userId! }
+        : {}),
+    };
+    let userId: string | null = null;
+    try {
+      const res = await fetch(
+        `${driverBase.replace(/\/$/, '')}/drivers/${encodeURIComponent(load.driverId)}`,
+        { headers: tenantHeaders },
+      );
+      if (res.ok) {
+        const row = (await res.json()) as { userId?: string | null };
+        userId = row?.userId ? String(row.userId) : null;
+      }
+    } catch {
+      return;
+    }
+    if (!userId) return;
+
+    const internalKey =
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
+    const tripLabel = load.tripNo ? `Trip #${load.tripNo}` : 'New load';
+    await fetch(`${notifyUrl.replace(/\/$/, '')}/push/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-internal-api-key': internalKey,
+      },
+      body: JSON.stringify({
+        companyId: load.companyId,
+        userId,
+        title: 'Load assigned',
+        body: `${tripLabel}: ${load.origin} → ${load.destination}`,
+        data: {
+          type: 'load.assigned',
+          loadId: load.id,
+          link: '/',
+        },
+      }),
+    });
   }
 
   private async ensureExists(id: string) {

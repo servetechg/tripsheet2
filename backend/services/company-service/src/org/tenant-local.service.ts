@@ -382,6 +382,17 @@ export class TenantLocalService {
     }
   }
 
+  /** FCM web push tokens (019_fcm_devices). */
+  async ensureFcmDevicesSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('019_fcm_devices.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
   /** Company-scoped auto IDs: trip / employee backfill + unique indexes (019). */
   async ensureCompanySequenceIdsSchema(companyId: string) {
     const client = await this.tenantClient(companyId);
@@ -410,6 +421,7 @@ export class TenantLocalService {
     await this.ensureMdmOpsSchema(companyId);
     await this.ensureMdmPhase8InvoiceBrokerSchema(companyId);
     await this.ensureAccountingNotificationParitySchema(companyId);
+    await this.ensureFcmDevicesSchema(companyId);
     await this.ensureDriverChapter6Schema(companyId);
     await this.ensureDriverChapter6Phase4567Schema(companyId);
     await this.ensureCompanySequenceIdsSchema(companyId);

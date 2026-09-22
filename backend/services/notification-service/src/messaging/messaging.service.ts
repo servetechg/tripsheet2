@@ -1,9 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PushService } from '../push/push.service';
 
 @Injectable()
 export class MessagingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly push: PushService,
+  ) {}
 
   listMessages(companyId?: string, toUserId?: string) {
     return this.prisma.message.findMany({
@@ -25,7 +29,7 @@ export class MessagingService {
         'companyId, fromUserId, and body are required',
       );
     }
-    return this.prisma.message.create({
+    const created = await this.prisma.message.create({
       data: {
         companyId,
         threadType: String(body.threadType || 'driver'),
@@ -37,6 +41,25 @@ export class MessagingService {
         body: text,
       },
     });
+
+    const toUserId = created.toUserId;
+    if (toUserId) {
+      void this.push
+        .sendToUser({
+          companyId,
+          userId: toUserId,
+          title: 'New message',
+          body: text.slice(0, 180),
+          data: {
+            type: 'message.created',
+            messageId: created.id,
+            link: '/',
+          },
+        })
+        .catch(() => undefined);
+    }
+
+    return created;
   }
 
   async markRead(id: string) {
