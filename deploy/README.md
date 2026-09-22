@@ -88,6 +88,14 @@ After a green staging workflow:
 - `.github/workflows/staging.yml` → push to `develop`
 - `.github/workflows/production.yml` → push to `main` / `master` only
 
+### Web push (Firebase)
+
+1. **VPS** (`app.env` + `staging.app.env`): set `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_JSON_B64`  
+   Generate: `./deploy/scripts/firebase-service-account-b64.sh /path/to/service-account.json`
+2. **GitHub** (Environment **staging** + **production** → Variables): all `VITE_FIREBASE_*` from **`backend/.env.example`**
+3. **Firebase Console**: add production + staging HTTPS domains to authorized domains
+4. Deploy runs Prisma + `schema-migrate-all` (tenant `fcm_devices` table). Details: `backend/secrets/SETUP.txt`
+
 ### Branch flow
 1. Feature branch → PR → `develop` → **staging URL**
 2. Test on staging

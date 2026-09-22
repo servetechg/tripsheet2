@@ -1,6 +1,12 @@
 import { existsSync, readdirSync } from 'fs';
 import { isAbsolute, join } from 'path';
 
+export type ServiceAccountJson = {
+  project_id?: string;
+  client_email?: string;
+  private_key?: string;
+};
+
 function uniquePaths(paths: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -85,11 +91,64 @@ export function secretsDirectoryHint(serviceRoot: string): string | undefined {
         return `Found ${jsonFiles.join(', ')} in secrets/ — rename or copy to firebase-admin.json`;
       }
       if (!names.includes('firebase-admin.json')) {
-        return 'Download key from Firebase Console and save as backend/secrets/firebase-admin.json (see SETUP.txt)';
+        return 'Set FIREBASE_SERVICE_ACCOUNT_JSON_B64 in server secrets (production) or save backend/secrets/firebase-admin.json (local dev). See backend/secrets/SETUP.txt';
       }
     } catch {
       /* ignore */
     }
   }
   return undefined;
+}
+
+function parseJson(raw: string, label: string): ServiceAccountJson {
+  try {
+    return JSON.parse(raw) as ServiceAccountJson;
+  } catch {
+    throw new Error(`${label} is not valid JSON`);
+  }
+}
+
+/**
+ * Load Firebase service account from env (preferred in Docker/production).
+ * Order: FIREBASE_SERVICE_ACCOUNT_JSON_B64 → FIREBASE_SERVICE_ACCOUNT_JSON → file path.
+ */
+export function loadServiceAccountFromConfig(options: {
+  jsonB64?: string;
+  jsonRaw?: string;
+  credentialsPath?: string;
+  serviceRoot: string;
+  readFile: (path: string) => string;
+}): { account: ServiceAccountJson; source: string } | null {
+  const b64 = options.jsonB64?.trim();
+  if (b64) {
+    const decoded = Buffer.from(b64, 'base64').toString('utf8');
+    return {
+      account: parseJson(decoded, 'FIREBASE_SERVICE_ACCOUNT_JSON_B64'),
+      source: 'FIREBASE_SERVICE_ACCOUNT_JSON_B64',
+    };
+  }
+
+  const jsonRaw = options.jsonRaw?.trim();
+  if (jsonRaw) {
+    return {
+      account: parseJson(jsonRaw, 'FIREBASE_SERVICE_ACCOUNT_JSON'),
+      source: 'FIREBASE_SERVICE_ACCOUNT_JSON',
+    };
+  }
+
+  const { path: resolvedPath } = resolveFirebaseCredentialsPath(
+    options.credentialsPath,
+    options.serviceRoot,
+  );
+  if (!existsSync(resolvedPath)) {
+    return null;
+  }
+
+  return {
+    account: parseJson(
+      options.readFile(resolvedPath),
+      `Service account file ${resolvedPath}`,
+    ),
+    source: resolvedPath,
+  };
 }
