@@ -348,6 +348,19 @@ export type InviteDetailDto = Invite & {
   passwordPolicy?: { minLength?: number; hint?: string };
 };
 
+export type VpicDecodeResult = {
+  vin: string;
+  year: string;
+  make: string;
+  model: string;
+  trim?: string;
+  vehicleType?: string;
+  plantCountry?: string;
+  checkDigitValid: boolean;
+  source: 'nhtsa_vpic';
+  warnings: string[];
+};
+
 export type MaintenanceRecordDto = {
   id: string;
   companyId: string;

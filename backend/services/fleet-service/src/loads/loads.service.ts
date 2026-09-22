@@ -17,6 +17,7 @@ import { CreateLoadDto } from './dto/create-load.dto';
 import { ListLoadsDto } from './dto/list-loads.dto';
 import { UpdateLoadDto } from './dto/update-load.dto';
 import { UpdateLoadStatusDto } from './dto/update-load-status.dto';
+import { nextSequenceFromValues, SEQUENCE_PREFIX } from '@tripsheet/shared';
 import { validateCrossBorderLoadFields } from './cross-border';
 
 const ACTIVE_STATUSES = ['assigned', 'in_transit'] as const;
@@ -107,7 +108,9 @@ export class LoadsService {
       );
     }
 
-    return this.prisma.load.create({
+    const tripNo = await this.allocateLoadTripNo(dto.companyId);
+    try {
+      return await this.prisma.load.create({
       data: {
         companyId: dto.companyId,
         driverId: dto.driverId,
@@ -119,7 +122,7 @@ export class LoadsService {
         pickupTime: dto.pickupTime,
         eta: dto.eta,
         actualDelivery: dto.actualDelivery,
-        tripNo: dto.tripNo,
+        tripNo,
         notes: dto.notes,
         truckNo: dto.truckNo,
         trailerNo: dto.trailerNo,
@@ -158,6 +161,30 @@ export class LoadsService {
         customsPars: Boolean(dto.customsPars),
       },
     });
+    } catch (err: unknown) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        'code' in err &&
+        (err as { code: string }).code === 'P2002'
+      ) {
+        throw new ConflictException(
+          `Trip number ${tripNo} already exists for this company`,
+        );
+      }
+      throw err;
+    }
+  }
+
+  private async allocateLoadTripNo(companyId: string): Promise<string> {
+    const rows = await this.prisma.load.findMany({
+      where: { companyId },
+      select: { tripNo: true },
+    });
+    return nextSequenceFromValues(
+      rows.map((r) => r.tripNo),
+      SEQUENCE_PREFIX.loadTrip,
+    );
   }
 
   async update(id: string, dto: UpdateLoadDto) {
@@ -252,7 +279,6 @@ export class LoadsService {
         pickupTime: dto.pickupTime,
         eta: dto.eta,
         actualDelivery: dto.actualDelivery,
-        tripNo: dto.tripNo,
         notes: dto.notes,
         truckNo: dto.truckNo,
         trailerNo: dto.trailerNo,

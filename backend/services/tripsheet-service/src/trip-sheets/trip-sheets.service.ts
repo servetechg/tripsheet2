@@ -4,6 +4,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import {
+  nextSequenceFromValues,
+  SEQUENCE_PREFIX,
+} from '@tripsheet/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTripSheetDto } from './dto/create-trip-sheet.dto';
 import { UpdateTripSheetDto } from './dto/update-trip-sheet.dto';
@@ -26,14 +30,18 @@ export class TripSheetsService {
     return this.ensureExists(id);
   }
 
-  create(dto: CreateTripSheetDto) {
-    this.validateSheetPayload(dto.header, dto.trips, dto.expenses);
+  async create(dto: CreateTripSheetDto) {
+    const trips = await this.assignSheetLegTripNumbers(
+      dto.companyId,
+      dto.trips ?? [],
+    );
+    this.validateSheetPayload(dto.header, trips, dto.expenses);
     return this.prisma.tripSheet.create({
       data: {
         companyId: dto.companyId,
         driverId: dto.driverId,
         header: dto.header as Prisma.InputJsonValue,
-        trips: (dto.trips ?? []) as Prisma.InputJsonValue,
+        trips: trips as Prisma.InputJsonValue,
         expenses: (dto.expenses ?? []) as Prisma.InputJsonValue,
         notes: dto.notes ?? '',
       },
@@ -41,13 +49,17 @@ export class TripSheetsService {
   }
 
   async update(id: string, dto: UpdateTripSheetDto) {
-    await this.ensureExists(id);
+    const existing = await this.ensureExists(id);
+    let trips = dto.trips;
+    if (trips !== undefined) {
+      trips = await this.assignSheetLegTripNumbers(existing.companyId, trips);
+    }
     if (
       dto.header !== undefined ||
-      dto.trips !== undefined ||
+      trips !== undefined ||
       dto.expenses !== undefined
     ) {
-      this.validateSheetPayload(dto.header, dto.trips, dto.expenses);
+      this.validateSheetPayload(dto.header, trips, dto.expenses);
     }
     return this.prisma.tripSheet.update({
       where: { id },
@@ -58,8 +70,8 @@ export class TripSheetsService {
             ? (dto.header as Prisma.InputJsonValue)
             : undefined,
         trips:
-          dto.trips !== undefined
-            ? (dto.trips as Prisma.InputJsonValue)
+          trips !== undefined
+            ? (trips as Prisma.InputJsonValue)
             : undefined,
         expenses:
           dto.expenses !== undefined
@@ -102,11 +114,6 @@ export class TripSheetsService {
         const leg = trips[i] as Record<string, unknown>;
         if (!leg || typeof leg !== 'object') {
           throw new BadRequestException(`Trip leg #${i + 1} is invalid`);
-        }
-        if (!leg.tripNo || !String(leg.tripNo).trim()) {
-          throw new BadRequestException(
-            `Trip leg #${i + 1} requires a trip number`,
-          );
         }
         if (!leg.trailerNo || !String(leg.trailerNo).trim()) {
           throw new BadRequestException(
@@ -178,6 +185,50 @@ export class TripSheetsService {
     await this.ensureExists(id);
     await this.prisma.tripSheet.delete({ where: { id } });
     return { deleted: true, id };
+  }
+
+  private async assignSheetLegTripNumbers(
+    companyId: string,
+    trips: unknown[],
+  ): Promise<unknown[]> {
+    if (!Array.isArray(trips)) return trips;
+    const known = await this.collectSheetLegTripNumbers(companyId);
+    const prefix = SEQUENCE_PREFIX.sheetLeg;
+    let next = nextSequenceFromValues(known, prefix);
+    return trips.map((raw) => {
+      if (!raw || typeof raw !== 'object') return raw;
+      const leg = { ...(raw as Record<string, unknown>) };
+      const existing = leg.tripNo ? String(leg.tripNo).trim() : '';
+      if (existing) {
+        known.push(existing);
+        return leg;
+      }
+      leg.tripNo = next;
+      known.push(next);
+      next = nextSequenceFromValues(known, prefix);
+      return leg;
+    });
+  }
+
+  private async collectSheetLegTripNumbers(
+    companyId: string,
+  ): Promise<string[]> {
+    const sheets = await this.prisma.tripSheet.findMany({
+      where: { companyId },
+      select: { trips: true },
+    });
+    const out: string[] = [];
+    for (const sheet of sheets) {
+      if (!Array.isArray(sheet.trips)) continue;
+      for (const raw of sheet.trips) {
+        if (!raw || typeof raw !== 'object') continue;
+        const tripNo = (raw as Record<string, unknown>).tripNo;
+        if (tripNo && String(tripNo).trim()) {
+          out.push(String(tripNo).trim());
+        }
+      }
+    }
+    return out;
   }
 
   private async ensureExists(id: string) {

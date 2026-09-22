@@ -37,6 +37,7 @@ import type {
   TenantRowDto,
   TrainingRecordDto,
   TripSheet,
+  VpicDecodeResult,
   Asset,
   CarrierProfile,
   Invite,
@@ -1093,6 +1094,20 @@ export const invitesApi = {
 };
 
 export const assetsApi = {
+  vpicYears: () =>
+    api<{ years: string[]; source: string }>('/assets/vpic/years'),
+  vpicMakes: (vehicleType: 'truck' | 'trailer' | 'equipment') =>
+    api<{ makes: string[]; vehicleType: string; source: string }>(
+      `/assets/vpic/makes?vehicleType=${encodeURIComponent(vehicleType)}`,
+    ),
+  vpicModels: (make: string, year: string) =>
+    api<{ models: string[]; make: string; year: string; source: string }>(
+      `/assets/vpic/models?make=${encodeURIComponent(make)}&year=${encodeURIComponent(year)}`,
+    ),
+  vpicDecode: (vin: string) =>
+    api<VpicDecodeResult>(
+      `/assets/vpic/decode/${encodeURIComponent(vin.trim())}`,
+    ),
   list: (companyId: string, type?: string) => {
     const q = new URLSearchParams({ companyId });
     if (type) q.set('type', type);

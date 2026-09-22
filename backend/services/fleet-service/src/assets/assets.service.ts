@@ -10,6 +10,10 @@ import { CreateAssetDto } from './dto/create-asset.dto';
 import { ListAssetsDto } from './dto/list-assets.dto';
 import { UpdateAssetDto } from './dto/update-asset.dto';
 import {
+  assetUnitPrefix,
+  nextSequenceFromValues,
+} from '@tripsheet/shared';
+import {
   DEFAULT_EQUIPMENT_TYPES,
   normalizeAssetStatus,
 } from './asset-status';
@@ -30,12 +34,13 @@ export class AssetsService {
 
   async create(dto: CreateAssetDto) {
     const status = normalizeAssetStatus(dto.status ?? 'available');
+    const unitNo = await this.allocateUnitNo(dto.companyId, dto.type);
     try {
       return await this.prisma.asset.create({
         data: {
           companyId: dto.companyId,
           type: dto.type,
-          unitNo: dto.unitNo.trim(),
+          unitNo,
           year: dto.year,
           make: dto.make,
           model: dto.model,
@@ -58,11 +63,26 @@ export class AssetsService {
         err.code === 'P2002'
       ) {
         throw new ConflictException(
-          `Unit No. ${dto.unitNo} already exists for this company`,
+          `Unit No. ${unitNo} already exists for this company`,
         );
       }
       throw err;
     }
+  }
+
+  private async allocateUnitNo(
+    companyId: string,
+    type: 'truck' | 'trailer' | 'equipment',
+  ): Promise<string> {
+    const prefix = assetUnitPrefix(type);
+    const rows = await this.prisma.asset.findMany({
+      where: { companyId, type },
+      select: { unitNo: true },
+    });
+    return nextSequenceFromValues(
+      rows.map((r) => r.unitNo),
+      prefix,
+    );
   }
 
   async update(id: string, dto: UpdateAssetDto) {
@@ -72,7 +92,6 @@ export class AssetsService {
         where: { id },
         data: {
           type: dto.type,
-          unitNo: dto.unitNo?.trim(),
           year: dto.year,
           make: dto.make,
           model: dto.model,
@@ -105,9 +124,7 @@ export class AssetsService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2002'
       ) {
-        throw new ConflictException(
-          `Unit No. ${dto.unitNo} already exists for this company`,
-        );
+        throw new ConflictException('Unit number conflict for this company');
       }
       throw err;
     }

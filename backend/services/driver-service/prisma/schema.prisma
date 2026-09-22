@@ -51,6 +51,7 @@ model Driver {
   trainingRecords DriverTrainingRecord[]
 
   @@unique([companyId, email])
+  @@unique([companyId, employeeNumber])
   @@index([companyId])
   @@index([branchId])
   @@index([lifecycleStatus])

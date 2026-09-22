@@ -9,7 +9,8 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { Client } from 'pg';
 import { PrismaService } from '../prisma/prisma.service';
-import { decryptSecret } from '../platform/crypto.util';
+import { ConfigService } from '@nestjs/config';
+import { resolveTenantConnectionUrl } from '../platform/tenant-connection.util';
 import { AuditService } from '../audit/audit.module';
 import {
   isCustomRoleBaseRole,
@@ -58,23 +59,19 @@ export class TenantLocalService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService,
   ) {}
 
   private async tenantClient(companyId: string): Promise<Client> {
     const row = await this.prisma.tenantDatabase.findUnique({
       where: { companyId },
     });
-    if (!row?.connectionCiphertext || row.status !== 'active') {
+    if (!row || row.status !== 'active') {
       throw new BadRequestException(
         'Tenant database not active — provision the company first',
       );
     }
-    let url: string;
-    try {
-      url = decryptSecret(row.connectionCiphertext);
-    } catch {
-      throw new BadRequestException('Failed to decrypt tenant connection');
-    }
+    const url = await resolveTenantConnectionUrl(this.prisma, row, this.config);
     const client = new Client({ connectionString: url });
     await client.connect();
     return client;
@@ -385,6 +382,17 @@ export class TenantLocalService {
     }
   }
 
+  /** Company-scoped auto IDs: trip / employee backfill + unique indexes (019). */
+  async ensureCompanySequenceIdsSchema(companyId: string) {
+    const client = await this.tenantClient(companyId);
+    try {
+      const sql = this.loadSql('019_company_sequence_ids.sql');
+      await client.query(sql);
+    } finally {
+      await client.end().catch(() => undefined);
+    }
+  }
+
   /** Apply all org-side tenant SQL migrations (idempotent). */
   async ensureAllTenantOrgSchemas(companyId: string) {
     await this.ensurePhase5Schema(companyId);
@@ -404,6 +412,7 @@ export class TenantLocalService {
     await this.ensureAccountingNotificationParitySchema(companyId);
     await this.ensureDriverChapter6Schema(companyId);
     await this.ensureDriverChapter6Phase4567Schema(companyId);
+    await this.ensureCompanySequenceIdsSchema(companyId);
   }
 
   private loadSql(name: string): string {

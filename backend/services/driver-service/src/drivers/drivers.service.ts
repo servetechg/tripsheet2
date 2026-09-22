@@ -13,6 +13,8 @@ import {
   lifecycleAllowsDispatch,
   syncActiveFromLifecycle,
   type DriverLifecycleStatus,
+  nextSequenceFromValues,
+  SEQUENCE_PREFIX,
 } from '@tripsheet/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthSyncService } from '../auth-sync/auth-sync.service';
@@ -98,12 +100,13 @@ export class DriversService {
 
   async create(dto: CreateDriverDto) {
     await this.assertDriverQuota(dto.companyId);
-    const { password: _password, ...data } = dto;
+    const { password: _password, employeeNumber: _emp, ...data } = dto;
     const lifecycleStatus =
       data.lifecycleStatus ??
       (data.active === false ? 'suspended' : 'active');
+    const employeeNumber = await this.allocateEmployeeNumber(dto.companyId);
     const driver = await this.prisma.driver.create({
-      data: this.driverCreateData(data, lifecycleStatus),
+      data: this.driverCreateData(data, lifecycleStatus, employeeNumber),
       include: {
         documents: true,
         contracts: true,
@@ -439,9 +442,21 @@ export class DriversService {
     return this.withLegacyActive(driver);
   }
 
+  private async allocateEmployeeNumber(companyId: string): Promise<string> {
+    const rows = await this.prisma.driver.findMany({
+      where: { companyId },
+      select: { employeeNumber: true },
+    });
+    return nextSequenceFromValues(
+      rows.map((r) => r.employeeNumber),
+      SEQUENCE_PREFIX.employee,
+    );
+  }
+
   private driverCreateData(
-    data: Omit<CreateDriverDto, 'password'>,
+    data: Omit<CreateDriverDto, 'password' | 'employeeNumber'>,
     lifecycleStatus: DriverLifecycleStatus,
+    employeeNumber: string,
   ) {
     return {
       companyId: data.companyId,
@@ -463,7 +478,7 @@ export class DriversService {
       active: syncActiveFromLifecycle(lifecycleStatus),
       availabilityStatus: data.availabilityStatus ?? 'available',
       driverType: data.driverType ?? 'company',
-      employeeNumber: data.employeeNumber,
+      employeeNumber,
       employmentStatus: data.employmentStatus ?? 'active',
       hireDate: data.hireDate,
       probationEndDate: data.probationEndDate,
@@ -497,7 +512,6 @@ export class DriversService {
       branchId: dto.branchId,
       availabilityStatus: dto.availabilityStatus,
       driverType: dto.driverType,
-      employeeNumber: dto.employeeNumber,
       employmentStatus: dto.employmentStatus,
       hireDate: dto.hireDate,
       probationEndDate: dto.probationEndDate,
