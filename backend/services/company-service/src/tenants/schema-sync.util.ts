@@ -40,6 +40,11 @@ function resolveSchemaDirs(): { schema: string; prismaDir: string }[] {
   return SCHEMA_DIRS.filter(({ prismaDir }) => existsSync(prismaDir));
 }
 
+function isAcceptDataLossError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /accept-data-loss/i.test(msg);
+}
+
 function prismaDbPush(
   prismaDir: string,
   url: string,
@@ -169,16 +174,28 @@ export async function pushTenantOpsSchemas(
         );
       } catch (firstErr) {
         if (await schemaHasRows(admin, schema)) {
-          throw firstErr;
+          if (isAcceptDataLossError(firstErr)) {
+            prismaDbPush(
+              prismaDir,
+              withSchema(tenantUrl, schema),
+              ['--accept-data-loss'],
+              opts?.quiet,
+            );
+          } else {
+            throw firstErr;
+          }
+        } else {
+          await admin.query(
+            `DROP SCHEMA IF EXISTS ${quoteIdent(schema)} CASCADE`,
+          );
+          await admin.query(`CREATE SCHEMA ${quoteIdent(schema)}`);
+          prismaDbPush(
+            prismaDir,
+            withSchema(tenantUrl, schema),
+            ['--accept-data-loss'],
+            opts?.quiet,
+          );
         }
-        await admin.query(`DROP SCHEMA IF EXISTS ${quoteIdent(schema)} CASCADE`);
-        await admin.query(`CREATE SCHEMA ${quoteIdent(schema)}`);
-        prismaDbPush(
-          prismaDir,
-          withSchema(tenantUrl, schema),
-          ['--accept-data-loss'],
-          opts?.quiet,
-        );
       }
     }
   } finally {

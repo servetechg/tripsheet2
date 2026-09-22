@@ -6,6 +6,7 @@ import {
   TenantConnectionMiddleware,
 } from '@tripsheet/tenant-runtime';
 import { AssetsModule } from './assets/assets.module';
+import { VpicModule } from './vpic/vpic.module';
 import { DvirModule } from './dvir/dvir.module';
 import { HealthController } from './health/health.controller';
 import { LoadsModule } from './loads/loads.module';
@@ -18,6 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
     TenantRuntimeModule.forRoot({ enforceScope: true }),
     PrismaModule,
     AssetsModule,
+    VpicModule,
     LoadsModule,
     MaintenanceModule,
     DvirModule,

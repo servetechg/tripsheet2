@@ -23,6 +23,10 @@ import {
   TenantStore,
 } from '@tripsheet/tenant-runtime';
 import { Invite } from '@prisma/client';
+import {
+  nextSequenceFromValues,
+  SEQUENCE_PREFIX,
+} from '@tripsheet/shared';
 
 const MAX_INLINE_FILE_CHARS = 1_500_000; // ~1MB raw ≈ base64 data URL ceiling without Cloudinary
 
@@ -321,6 +325,15 @@ export class InvitesService {
           );
         }
 
+        const empRows = await tx.driver.findMany({
+          where: { companyId: invite.companyId },
+          select: { employeeNumber: true },
+        });
+        const employeeNumber = nextSequenceFromValues(
+          empRows.map((r) => r.employeeNumber),
+          SEQUENCE_PREFIX.employee,
+        );
+
         const driver = await tx.driver.create({
           data: {
             companyId: invite.companyId,
@@ -341,7 +354,7 @@ export class InvitesService {
             active: false,
             employmentStatus: 'active',
             driverType: emptyToNull(dto.profile.driverType) ?? 'company',
-            employeeNumber: emptyToNull(dto.profile.employeeNumber),
+            employeeNumber,
             hireDate: emptyToNull(dto.profile.hireDate),
           },
         });

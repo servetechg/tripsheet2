@@ -9,9 +9,10 @@ export class CreateAssetDto {
   @IsIn(['truck', 'trailer', 'equipment'])
   type!: 'truck' | 'trailer' | 'equipment';
 
+  /** Ignored on create — server assigns TRK-/TRL-/EQP-###### per company. */
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  unitNo!: string;
+  unitNo?: string;
 
   @IsOptional()
   @IsString()
