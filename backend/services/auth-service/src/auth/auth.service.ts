@@ -1177,17 +1177,6 @@ export class AuthService {
         meta: { reason: input.reason },
       });
     }
-    if (input.user && input.success) {
-      void this.emitSecurityNotify({
-        type: 'security.login',
-        to: input.user.email,
-        companyId: input.user.companyId,
-        userId: input.user.id,
-        ip: input.meta.ip,
-        userAgent: input.meta.userAgent,
-        detail: input.reason !== 'ok' ? `Via ${input.reason}.` : undefined,
-      });
-    }
     if (input.user && input.reason === 'lockout') {
       void this.emitSecurityNotify({
         type: 'security.lockout',

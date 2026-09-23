@@ -765,8 +765,30 @@ export function DispatchTab({
     Object.keys(formValidationErrors).length === 0 &&
     Object.keys(stopFieldErrors).length === 0;
 
+  const formLooksComplete =
+    !blank(f.driverId) &&
+    !blank(f.truckId) &&
+    !blank(f.origin) &&
+    !blank(f.destination) &&
+    !blank(f.pickupTime);
+
+  const blockingValidationMessages = formLooksComplete
+    ? [
+        ...new Set(
+          [
+            ...Object.values(formValidationErrors),
+            ...Object.values(stopFieldErrors),
+          ].filter((m): m is string => Boolean(m)),
+        ),
+      ]
+    : [];
+
   const showErr = (k: keyof FormErrors): string | undefined => {
-    return touched[k] || fieldErr[k] ? formValidationErrors[k] || fieldErr[k] : undefined;
+    const err = formValidationErrors[k] || fieldErr[k];
+    if (!err) return undefined;
+    if (touched[k] || fieldErr[k]) return err;
+    if (formLooksComplete && formValidationErrors[k]) return err;
+    return undefined;
   };
 
   const showStopErr = (index: number): string | undefined => {
@@ -1908,6 +1930,11 @@ export function DispatchTab({
             error={showErr('notes')}
             hint={`${f.notes.length}/500`}
           />
+          {blockingValidationMessages.length > 0 && (
+            <Err
+              msg={`Fix before assigning: ${blockingValidationMessages.join(' · ')}`}
+            />
+          )}
           <div style={{ display: 'flex', gap: 10 }}>
             <Btn
               onClick={save}

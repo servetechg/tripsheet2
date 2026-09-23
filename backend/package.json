@@ -32,7 +32,7 @@
     "infra:logs": "docker compose logs -f postgres redis",
     "dbs:phase3": "powershell -NoProfile -File scripts/create-phase3-dbs.ps1",
     "install:all": "npm install --prefix gateway && npm install --prefix services/auth-service && npm install --prefix services/company-service && npm install --prefix services/driver-service && npm install --prefix services/fleet-service && npm install --prefix services/manifest-service && npm install --prefix services/tripsheet-service && npm install --prefix services/accounting-service && npm install --prefix services/notification-service",
-    "prestart:dev": "node scripts/ensure-shared-built.mjs",
+    "prestart:dev": "node scripts/ensure-shared-built.mjs && node scripts/ensure-nest-build-ready.mjs",
     "start:dev": "concurrently -n gateway,auth,company,driver,fleet,manifest,tripsheet,accounting,notify -c blue,magenta,cyan,green,yellow,red,white,brightBlue,brightMagenta \"npm run start:dev --prefix gateway\" \"npm run start:dev --prefix services/auth-service\" \"npm run start:dev --prefix services/company-service\" \"npm run start:dev --prefix services/driver-service\" \"npm run start:dev --prefix services/fleet-service\" \"npm run start:dev --prefix services/manifest-service\" \"npm run start:dev --prefix services/tripsheet-service\" \"npm run start:dev --prefix services/accounting-service\" \"npm run start:dev --prefix services/notification-service\"",
     "start:gateway": "npm run start:dev --prefix gateway",
     "start:auth": "npm run start:dev --prefix services/auth-service",

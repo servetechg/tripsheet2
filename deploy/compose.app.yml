@@ -113,6 +113,8 @@ services:
       PORT: 3004
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/fleet_db?schema=public
       COMPANY_SERVICE_URL: http://${COLOR}-company-service:3002
+      AUTH_SERVICE_URL: http://${COLOR}-auth-service:3001
+      NOTIFICATION_SERVICE_URL: http://${COLOR}-notification-service:3008
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?INTERNAL_API_KEY is required}
       TENANT_DB_SCHEMA: fleet
       TENANT_CACHE_TTL_MS: ${TENANT_CACHE_TTL_MS:-60000}

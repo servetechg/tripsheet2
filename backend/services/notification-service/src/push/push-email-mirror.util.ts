@@ -5,8 +5,11 @@ export const EMAIL_MIRROR_SKIP_TYPES = new Set([
   'email_delivery_test',
 ]);
 
-/** FCM only — routine sign-in is email/in-app, not browser push. */
+/** FCM only — routine sign-in is not pushed to the browser. */
 export const FCM_PUSH_SKIP_TYPES = new Set(['security.login']);
+
+/** In-app bell — routine successful sign-in is not shown (audit/login events still recorded). */
+export const IN_APP_MIRROR_SKIP_TYPES = new Set(['security.login']);
 
 export function resolvePushUserIdFromEmailMeta(
   meta: Record<string, unknown> | undefined,
@@ -69,6 +72,7 @@ export function shouldMirrorEmailToInApp(
 ): boolean {
   const type = meta?.type ? String(meta.type) : '';
   if (EMAIL_MIRROR_SKIP_TYPES.has(type)) return false;
+  if (IN_APP_MIRROR_SKIP_TYPES.has(type)) return false;
   return resolvePushUserIdFromEmailMeta(meta) !== null;
 }
 
