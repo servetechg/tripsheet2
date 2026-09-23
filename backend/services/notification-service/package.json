@@ -41,7 +41,7 @@
     "@types/node": "^22.10.0",
     "@types/nodemailer": "^8.0.1",
     "jest": "^30.4.2",
-    "prisma": "^8.0.0-rc.15",
+    "prisma": "^6.1.0",
     "ts-jest": "^29.4.11",
     "typescript": "^5.7.2"
   }
