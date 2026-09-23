@@ -5,7 +5,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { BottomNav } from './BottomNav';
 import { SideNav } from './SideNav';
 import { UserMenu } from './UserMenu';
-import { NotificationBell } from './NotificationBell';
+import { NotificationInboxBell } from '@/components/notifications/NotificationInboxBell';
 import { BrandLogo } from '@/components/brand/BrandLogo';
 import {
   HEADER_HEIGHT,
@@ -123,10 +123,7 @@ export function AppShell({
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: SPACE.sm }}>
           {topRight}
-          {showNotifications && (
-            /* In-app inbox (header) — separate from FCM web push; wired in a later phase */
-            <NotificationBell hasUnread={false} />
-          )}
+          {showNotifications && <NotificationInboxBell />}
           {showUserMenu && (
             <UserMenu
               name={userName}

@@ -38,6 +38,8 @@ export function MessagesTab({
       if (loadId) {
         const cm = await commentsApi.list(company.id, 'load', loadId);
         setComments(cm);
+      } else {
+        setComments([]);
       }
     } catch (e: unknown) {
       setLoadErr(
@@ -100,7 +102,6 @@ export function MessagesTab({
         body: c.body,
       });
       setC({ body: '' });
-      setLoadId('');
       notify('Comment added');
       await refresh();
     } catch (e: unknown) {
@@ -192,6 +193,19 @@ export function MessagesTab({
 
       <Card>
         <SectionTitle>Load Comments</SectionTitle>
+        <p
+          style={{
+            margin: '0 0 12px',
+            fontSize: 12,
+            color: G.muted,
+            lineHeight: 1.45,
+          }}
+        >
+          Internal notes on a trip (dispatch / office). They stay on this load here
+          on Messages — they do not go to the driver notification bell. To notify a
+          driver, use <strong style={{ color: G.text }}>Driver / internal messages</strong>{' '}
+          above.
+        </p>
         <Sel
           label="Load"
           value={loadId}
@@ -210,11 +224,30 @@ export function MessagesTab({
           onChange={(e) => setC({ body: e.target.value })}
         />
         <Btn onClick={() => void addComment()}>Add Comment</Btn>
-        {comments.map((cm) => (
-          <div key={cm.id} style={{ fontSize: 13, padding: '6px 0' }}>
-            <strong>{cm.userName}</strong>: {cm.body}
+        {!loadId ? (
+          <div style={{ fontSize: 13, color: G.muted, marginTop: 12 }}>
+            Select a load to view or add comments.
           </div>
-        ))}
+        ) : comments.length === 0 ? (
+          <div style={{ fontSize: 13, color: G.muted, marginTop: 12 }}>
+            No comments on this load yet.
+          </div>
+        ) : (
+          <div style={{ marginTop: 12 }}>
+            {comments.map((cm) => (
+              <div
+                key={cm.id}
+                style={{
+                  fontSize: 13,
+                  padding: '8px 0',
+                  borderTop: `1px solid ${G.border}`,
+                }}
+              >
+                <strong>{cm.userName}</strong>: {cm.body}
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card>

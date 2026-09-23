@@ -15,5 +15,6 @@ export * from './invite-status';
 export * from './settlement-status';
 export * from './notification-channel';
 export * from './push';
+export * from './in-app-notifications';
 export * from './models';
 export * from './company-sequences';

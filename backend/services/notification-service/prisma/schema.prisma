@@ -69,3 +69,19 @@ model FcmDevice {
   @@index([companyId, userId])
   @@index([userId])
 }
+
+model InAppNotification {
+  id        String    @id @default(cuid())
+  companyId String
+  userId    String
+  title     String
+  body      String
+  link      String?
+  type      String    @default("general")
+  readAt    DateTime?
+  meta      Json?
+  createdAt DateTime  @default(now())
+
+  @@index([companyId, userId, createdAt])
+  @@index([userId, readAt])
+}

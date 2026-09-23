@@ -12,7 +12,23 @@ import {
   readFirebaseVapidKey,
   readFirebaseWebConfig,
 } from '@/lib/firebase';
+import { requestInAppInboxRefresh } from '@/lib/inAppInboxEvents';
 import { pushApi } from '@/lib/api';
+
+function showForegroundPush(title: string, body: string): void {
+  if (
+    typeof Notification !== 'undefined' &&
+    Notification.permission === 'granted'
+  ) {
+    try {
+      new Notification(title, { body, icon: '/favicon.ico' });
+      return;
+    } catch {
+      /* fall through to toast */
+    }
+  }
+  notify(body ? `${title}: ${body}` : title, 'info');
+}
 
 const PUSH_OFFER_KEY = 'ts_push_permission_offered';
 
@@ -187,7 +203,8 @@ export function useWebPush(enabled: boolean) {
     const unsub = onMessage(messaging, (payload) => {
       const title = payload.notification?.title || 'FleetQuix';
       const body = payload.notification?.body || '';
-      notify(body ? `${title}: ${body}` : title, 'info');
+      showForegroundPush(title, body);
+      requestInAppInboxRefresh();
     });
     return () => unsub();
   }, [enabled, configured]);

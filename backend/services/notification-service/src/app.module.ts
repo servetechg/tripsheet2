@@ -11,6 +11,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PushModule } from './push/push.module';
+import { InAppNotificationsModule } from './in-app-notifications/in-app-notifications.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { PushModule } from './push/push.module';
     NotificationsModule,
     MessagingModule,
     PushModule,
+    InAppNotificationsModule,
   ],
   controllers: [HealthController],
 })

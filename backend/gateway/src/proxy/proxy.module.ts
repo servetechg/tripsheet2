@@ -21,6 +21,7 @@ import { SettlementsProxyController } from './settlements.proxy.controller';
 import { ReportsProxyController } from './reports.proxy.controller';
 import { NotificationsProxyController } from './notifications.proxy.controller';
 import { PushProxyController } from './push.proxy.controller';
+import { InAppNotificationsProxyController } from './in-app-notifications.proxy.controller';
 import {
   AccountsProxyController,
   AuditProxyController,
@@ -69,6 +70,7 @@ import {
     ReportsProxyController,
     NotificationsProxyController,
     PushProxyController,
+    InAppNotificationsProxyController,
     MaintenanceProxyController,
     DvirProxyController,
     InvoicesProxyController,

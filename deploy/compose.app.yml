@@ -36,6 +36,7 @@ services:
       TRIPSHEET_SERVICE_URL: http://${COLOR}-tripsheet-service:3006
       ACCOUNTING_SERVICE_URL: http://${COLOR}-accounting-service:3007
       NOTIFICATION_SERVICE_URL: http://${COLOR}-notification-service:3008
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
     networks:
       - tripsheet-net
     depends_on:
