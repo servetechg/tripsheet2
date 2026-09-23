@@ -4,6 +4,7 @@ import { ConfirmProvider } from '@/context/ConfirmContext';
 import { SessionProvider } from '@/context/SessionContext';
 import { AppRoutes } from '@/routes/AppRoutes';
 import { PushNotificationProvider } from '@/components/push/PushNotificationProvider';
+import { InAppNotificationProvider } from '@/components/notifications/InAppNotificationProvider';
 
 /** Shell — providers + router. */
 export default function App() {
@@ -12,9 +13,11 @@ export default function App() {
       <ConfirmProvider>
         <AppDataProvider>
           <SessionProvider>
-            <PushNotificationProvider>
-              <AppRoutes />
-            </PushNotificationProvider>
+            <InAppNotificationProvider>
+              <PushNotificationProvider>
+                <AppRoutes />
+              </PushNotificationProvider>
+            </InAppNotificationProvider>
           </SessionProvider>
         </AppDataProvider>
       </ConfirmProvider>

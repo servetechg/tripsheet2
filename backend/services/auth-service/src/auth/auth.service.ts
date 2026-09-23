@@ -1595,6 +1595,28 @@ export class AuthService {
     };
   }
 
+  /** Staff to notify for dispatch / fleet events (in-app bell). */
+  async listCompanyNotifyRecipients(companyId: string): Promise<string[]> {
+    const notifyRoles = [
+      'company_owner',
+      'general_manager',
+      'dispatcher',
+      'dispatcher_supervisor',
+      'fleet_manager',
+    ] as const;
+    const rows = await this.prisma.user.findMany({
+      where: {
+        companyId,
+        status: 'active',
+        deletedAt: null,
+        role: { in: [...notifyRoles] },
+      },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((r) => r.id);
+  }
+
   /** Internal invite duplicate guard. */
   async lookupUserByEmail(email: string) {
     const normalized = email.toLowerCase().trim();

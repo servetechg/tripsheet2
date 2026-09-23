@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { getTenantStore } from '@tripsheet/tenant-runtime';
+import { getTenantStore, TENANT_HEADERS, tenantAls, type TenantStore } from '@tripsheet/tenant-runtime';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assetAssignmentBlockReason,
@@ -161,9 +161,11 @@ export class LoadsService {
         customsPars: Boolean(dto.customsPars),
       },
     });
-      void this.notifyDriverLoadAssigned(load).catch((e) =>
-        this.logger.warn(`load assigned push failed: ${String(e)}`),
-      );
+      try {
+        await this.notifyDriverLoadAssigned(load);
+      } catch (e) {
+        this.logger.warn(`load assigned notify failed: ${String(e)}`);
+      }
       return load;
     } catch (err: unknown) {
       if (
@@ -333,9 +335,11 @@ export class LoadsService {
         updated.status as (typeof ACTIVE_STATUSES)[number],
       );
     if (driverChanged) {
-      void this.notifyDriverLoadAssigned(updated).catch((e) =>
-        this.logger.warn(`load reassigned push failed: ${String(e)}`),
-      );
+      try {
+        await this.notifyDriverLoadAssigned(updated);
+      } catch (e) {
+        this.logger.warn(`load reassigned notify failed: ${String(e)}`);
+      }
     }
     return updated;
   }
@@ -344,7 +348,7 @@ export class LoadsService {
     const existing = await this.ensureExists(id);
     this.assertTransition(existing.status, dto.status);
 
-    return this.prisma.load.update({
+    const updated = await this.prisma.load.update({
       where: { id },
       data: {
         status: dto.status,
@@ -353,6 +357,47 @@ export class LoadsService {
           : {}),
       },
     });
+
+    const alsStore = getTenantStore();
+
+    if (dto.status === 'in_transit' && existing.status === 'assigned') {
+      const actorIsDriver = alsStore?.role === 'driver';
+      if (actorIsDriver) {
+        this.voidNotifyWithTenant(alsStore, () =>
+          this.notifyCompanyStaffTripStarted(updated),
+        'trip started notify (→ company)');
+      } else {
+        this.voidNotifyWithTenant(alsStore, () =>
+          this.notifyDriverTripStartedByDispatch(updated),
+        'trip started notify (→ driver)');
+      }
+    }
+
+    if (dto.status === 'delivered' && existing.status === 'in_transit') {
+      const actorIsDriver = alsStore?.role === 'driver';
+      if (actorIsDriver) {
+        this.voidNotifyWithTenant(alsStore, () =>
+          this.notifyCompanyStaffTripDelivered(updated),
+        'trip delivered notify (→ company)');
+      } else {
+        this.voidNotifyWithTenant(alsStore, () =>
+          this.notifyDriverTripDeliveredByDispatch(updated),
+        'trip delivered notify (→ driver)');
+      }
+    }
+
+    if (
+      dto.status === 'cancelled' &&
+      updated.driverId &&
+      (existing.status === 'assigned' || existing.status === 'in_transit') &&
+      alsStore?.role !== 'driver'
+    ) {
+      this.voidNotifyWithTenant(alsStore, () =>
+        this.notifyDriverTripCancelledByDispatch(updated),
+      'trip cancelled notify (→ driver)');
+    }
+
+    return updated;
   }
 
   async simulateTrack(id: string) {
@@ -408,6 +453,48 @@ export class LoadsService {
     }
   }
 
+  private tenantForwardHeaders(companyId: string): Record<string, string> {
+    const store = getTenantStore();
+    const headers: Record<string, string> = {
+      [TENANT_HEADERS.companyId]: companyId,
+    };
+    if (store?.userId) headers[TENANT_HEADERS.userId] = store.userId;
+    if (store?.role) headers[TENANT_HEADERS.userRole] = store.role;
+    if (store?.email) headers[TENANT_HEADERS.userEmail] = store.email;
+    if (store?.driverId) headers[TENANT_HEADERS.driverId] = store.driverId;
+    if (store?.tenantKey) headers[TENANT_HEADERS.tenantKey] = store.tenantKey;
+    if (store?.tenantStatus) {
+      headers[TENANT_HEADERS.tenantStatus] = store.tenantStatus;
+    }
+    if (store?.routingMode) {
+      headers[TENANT_HEADERS.routingMode] = store.routingMode;
+    }
+    if (store?.connectionUrl) {
+      headers[TENANT_HEADERS.connectionUrl] = store.connectionUrl;
+    }
+    if (store?.dbName) headers[TENANT_HEADERS.dbName] = store.dbName;
+    return headers;
+  }
+
+  /** Preserve gateway tenant ALS for async status notifications. */
+  private voidNotifyWithTenant(
+    store: TenantStore | undefined,
+    task: () => Promise<void>,
+    label: string,
+  ): void {
+    void (async () => {
+      try {
+        if (store) {
+          await tenantAls.run(store, task);
+        } else {
+          await task();
+        }
+      } catch (e) {
+        this.logger.warn(`${label}: ${String(e)}`);
+      }
+    })();
+  }
+
   private async resolveDriverRecordId(
     driverId: string,
     companyId: string,
@@ -415,12 +502,7 @@ export class LoadsService {
     const base =
       this.config.get<string>('DRIVER_SERVICE_URL') ||
       'http://localhost:3003';
-    const headers: Record<string, string> = {
-      'x-company-id': companyId,
-      ...(getTenantStore()?.userId
-        ? { 'x-user-id': getTenantStore()!.userId! }
-        : {}),
-    };
+    const headers = this.tenantForwardHeaders(companyId);
     try {
       const res = await fetch(
         `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}`,
@@ -490,12 +572,7 @@ export class LoadsService {
     const base =
       this.config.get<string>('DRIVER_SERVICE_URL') ||
       'http://localhost:3003';
-    const headers: Record<string, string> = {
-      'x-company-id': companyId,
-      ...(getTenantStore()?.userId
-        ? { 'x-user-id': getTenantStore()!.userId! }
-        : {}),
-    };
+    const headers = this.tenantForwardHeaders(companyId);
     try {
       const detailRes = await fetch(
         `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}`,
@@ -594,12 +671,7 @@ export class LoadsService {
     const base =
       this.config.get<string>('DRIVER_SERVICE_URL') ||
       'http://localhost:3003';
-    const headers: Record<string, string> = {
-      'x-company-id': companyId,
-      ...(getTenantStore()?.userId
-        ? { 'x-user-id': getTenantStore()!.userId! }
-        : {}),
-    };
+    const headers = this.tenantForwardHeaders(companyId);
     try {
       const res = await fetch(
         `${base.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverId)}/border-eligible`,
@@ -664,6 +736,163 @@ export class LoadsService {
     }
   }
 
+  private internalApiKey(): string {
+    return (
+      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev'
+    );
+  }
+
+  private async verifyAuthUserInCompany(
+    candidateId: string,
+    companyId: string,
+  ): Promise<string | null> {
+    const id = candidateId.trim();
+    if (!id) return null;
+    void companyId;
+    const authUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
+    try {
+      const res = await fetch(
+        `${authUrl.replace(/\/$/, '')}/internal/users/${encodeURIComponent(id)}/session`,
+        { headers: { 'x-internal-api-key': this.internalApiKey() } },
+      );
+      if (!res.ok) return null;
+      const row = (await res.json()) as {
+        authAllowed?: boolean;
+        status?: string | null;
+      };
+      if (row.status === null && row.authAllowed === false) return null;
+      return id;
+    } catch {
+      return null;
+    }
+  }
+
+  private async lookupAuthUserIdByEmail(
+    email: string,
+    companyId: string,
+  ): Promise<string | null> {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return null;
+    const authUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
+    try {
+      const res = await fetch(
+        `${authUrl.replace(/\/$/, '')}/internal/users/lookup?email=${encodeURIComponent(normalized)}`,
+        { headers: { 'x-internal-api-key': this.internalApiKey() } },
+      );
+      if (!res.ok) return null;
+      const row = (await res.json()) as {
+        found?: boolean;
+        id?: string;
+        companyId?: string | null;
+      };
+      if (!row.found || !row.id) return null;
+      if (row.companyId && row.companyId !== companyId) return null;
+      return String(row.id);
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveDriverAuthUser(
+    driverRecordId: string,
+    companyId: string,
+  ): Promise<{ userId: string | null; name: string | null }> {
+    const driverBase =
+      this.config.get<string>('DRIVER_SERVICE_URL') ||
+      'http://localhost:3003';
+    const tenantHeaders = this.tenantForwardHeaders(companyId);
+    try {
+      const res = await fetch(
+        `${driverBase.replace(/\/$/, '')}/drivers/${encodeURIComponent(driverRecordId)}`,
+        { headers: tenantHeaders },
+      );
+      if (!res.ok) {
+        this.logger.warn(
+          `resolveDriverAuthUser HTTP ${res.status} driverId=${driverRecordId}`,
+        );
+        const fallback = await this.verifyAuthUserInCompany(
+          driverRecordId,
+          companyId,
+        );
+        if (fallback) {
+          return { userId: fallback, name: null };
+        }
+        return { userId: null, name: null };
+      }
+      const row = (await res.json()) as {
+        userId?: string | null;
+        name?: string | null;
+        email?: string | null;
+      };
+      let userId = row?.userId ? String(row.userId) : null;
+      if (!userId && row?.email) {
+        userId = await this.lookupAuthUserIdByEmail(String(row.email), companyId);
+        if (userId) {
+          this.logger.log(
+            `Resolved driver ${driverRecordId} notify userId via email lookup`,
+          );
+        }
+      }
+      if (!userId) {
+        userId = await this.verifyAuthUserInCompany(driverRecordId, companyId);
+      }
+      if (!userId) {
+        this.logger.warn(
+          `No auth userId for driver ${driverRecordId} — in-app notify skipped`,
+        );
+      }
+      return {
+        userId,
+        name: row?.name ? String(row.name) : null,
+      };
+    } catch (e) {
+      this.logger.warn(`resolveDriverAuthUser failed: ${String(e)}`);
+      return { userId: null, name: null };
+    }
+  }
+
+  private async postInAppNotify(input: {
+    companyId: string;
+    userId: string;
+    title: string;
+    body: string;
+    link?: string;
+    type?: string;
+  }): Promise<void> {
+    const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
+    if (!notifyUrl) {
+      this.logger.warn('NOTIFICATION_SERVICE_URL not set — in-app notify skipped');
+      return;
+    }
+    const res = await fetch(
+      `${notifyUrl.replace(/\/$/, '')}/in-app-notifications/internal/notify`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-api-key': this.internalApiKey(),
+        },
+        body: JSON.stringify({
+          companyId: input.companyId,
+          userId: input.userId,
+          title: input.title,
+          body: input.body,
+          link: input.link ?? '/',
+          type: input.type ?? 'general',
+        }),
+      },
+    );
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => '')).slice(0, 300);
+      this.logger.warn(
+        `in-app notify HTTP ${res.status} userId=${input.userId}: ${detail}`,
+      );
+      throw new Error(`in-app notify HTTP ${res.status}`);
+    }
+  }
+
   private async notifyDriverLoadAssigned(load: {
     id: string;
     companyId: string;
@@ -673,53 +902,225 @@ export class LoadsService {
     destination: string;
   }): Promise<void> {
     if (!load.driverId) return;
+    const { userId } = await this.resolveDriverAuthUser(
+      load.driverId,
+      load.companyId,
+    );
+    if (!userId) return;
+
+    const tripLabel = load.tripNo ? `Trip #${load.tripNo}` : 'New load';
+    const body = `${tripLabel}: ${load.origin} → ${load.destination}`;
+
+    await this.postInAppNotify({
+      companyId: load.companyId,
+      userId,
+      title: 'Load assigned',
+      body,
+      link: '/driver/status',
+      type: 'load.assigned',
+    }).catch((e) =>
+      this.logger.warn(`load assigned in-app failed: ${String(e)}`),
+    );
+
     const notifyUrl = this.config.get<string>('NOTIFICATION_SERVICE_URL');
     if (!notifyUrl) return;
 
-    const driverBase =
-      this.config.get<string>('DRIVER_SERVICE_URL') ||
-      'http://localhost:3003';
-    const tenantHeaders: Record<string, string> = {
-      'x-company-id': load.companyId,
-      ...(getTenantStore()?.userId
-        ? { 'x-user-id': getTenantStore()!.userId! }
-        : {}),
-    };
-    let userId: string | null = null;
-    try {
-      const res = await fetch(
-        `${driverBase.replace(/\/$/, '')}/drivers/${encodeURIComponent(load.driverId)}`,
-        { headers: tenantHeaders },
-      );
-      if (res.ok) {
-        const row = (await res.json()) as { userId?: string | null };
-        userId = row?.userId ? String(row.userId) : null;
-      }
-    } catch {
-      return;
-    }
-    if (!userId) return;
-
-    const internalKey =
-      this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
-    const tripLabel = load.tripNo ? `Trip #${load.tripNo}` : 'New load';
     await fetch(`${notifyUrl.replace(/\/$/, '')}/push/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-internal-api-key': internalKey,
+        'x-internal-api-key': this.internalApiKey(),
       },
       body: JSON.stringify({
         companyId: load.companyId,
         userId,
         title: 'Load assigned',
-        body: `${tripLabel}: ${load.origin} → ${load.destination}`,
+        body,
         data: {
           type: 'load.assigned',
           loadId: load.id,
-          link: '/',
+          link: '/driver/status',
         },
       }),
+    });
+  }
+
+  private tripRouteLabel(load: {
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): string {
+    const tripLabel = load.tripNo ? `Trip #${load.tripNo}` : 'Load';
+    return `${tripLabel}: ${load.origin} → ${load.destination}`;
+  }
+
+  private async listCompanyNotifyRecipientIds(companyId: string): Promise<string[]> {
+    const authUrl =
+      this.config.get<string>('AUTH_SERVICE_URL') || 'http://localhost:3001';
+    try {
+      const res = await fetch(
+        `${authUrl.replace(/\/$/, '')}/internal/companies/${encodeURIComponent(companyId)}/notify-recipients`,
+        {
+          headers: { 'x-internal-api-key': this.internalApiKey() },
+        },
+      );
+      if (!res.ok) return [];
+      const data = (await res.json()) as unknown;
+      return Array.isArray(data)
+        ? data.filter((id): id is string => typeof id === 'string')
+        : [];
+    } catch (e) {
+      this.logger.warn(`notify recipients lookup failed: ${String(e)}`);
+      return [];
+    }
+  }
+
+  private async notifyCompanyStaffInApp(input: {
+    companyId: string;
+    title: string;
+    body: string;
+    type: string;
+    link?: string;
+  }): Promise<void> {
+    const recipientIds = await this.listCompanyNotifyRecipientIds(input.companyId);
+    if (!recipientIds.length) return;
+    await Promise.all(
+      recipientIds.map((userId) =>
+        this.postInAppNotify({
+          companyId: input.companyId,
+          userId,
+          title: input.title,
+          body: input.body,
+          link: input.link ?? '/app/dispatch',
+          type: input.type,
+        }).catch((e) =>
+          this.logger.warn(`company in-app notify failed: ${String(e)}`),
+        ),
+      ),
+    );
+  }
+
+  private async notifyDriverInApp(input: {
+    companyId: string;
+    driverId: string | null;
+    title: string;
+    body: string;
+    type: string;
+    link?: string;
+  }): Promise<void> {
+    if (!input.driverId) return;
+    const { userId } = await this.resolveDriverAuthUser(
+      input.driverId,
+      input.companyId,
+    );
+    if (!userId) return;
+    await this.postInAppNotify({
+      companyId: input.companyId,
+      userId,
+      title: input.title,
+      body: input.body,
+      link: input.link ?? '/',
+      type: input.type,
+    }).catch((e) =>
+      this.logger.warn(`driver in-app notify failed: ${String(e)}`),
+    );
+  }
+
+  /** Driver started trip → company staff only. */
+  private async notifyCompanyStaffTripStarted(load: {
+    id: string;
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    const driver = load.driverId
+      ? await this.resolveDriverAuthUser(load.driverId, load.companyId)
+      : { userId: null, name: null };
+    const driverLabel = driver.name?.trim() || 'Driver';
+    const route = this.tripRouteLabel(load);
+    await this.notifyCompanyStaffInApp({
+      companyId: load.companyId,
+      title: 'Trip started',
+      body: `${driverLabel} started ${route}`,
+      type: 'load.started',
+    });
+  }
+
+  /** Dispatch started trip → assigned driver only. */
+  private async notifyDriverTripStartedByDispatch(load: {
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    const route = this.tripRouteLabel(load);
+    await this.notifyDriverInApp({
+      companyId: load.companyId,
+      driverId: load.driverId,
+      title: 'Trip started',
+      body: `Dispatch started ${route}`,
+      type: 'load.started.by_dispatch',
+    });
+  }
+
+  /** Driver marked delivered → company staff only. */
+  private async notifyCompanyStaffTripDelivered(load: {
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    const driver = load.driverId
+      ? await this.resolveDriverAuthUser(load.driverId, load.companyId)
+      : { userId: null, name: null };
+    const driverLabel = driver.name?.trim() || 'Driver';
+    const route = this.tripRouteLabel(load);
+    await this.notifyCompanyStaffInApp({
+      companyId: load.companyId,
+      title: 'Trip delivered',
+      body: `${driverLabel} delivered ${route}`,
+      type: 'load.delivered',
+    });
+  }
+
+  /** Dispatch closed trip → assigned driver only. */
+  private async notifyDriverTripDeliveredByDispatch(load: {
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    const route = this.tripRouteLabel(load);
+    await this.notifyDriverInApp({
+      companyId: load.companyId,
+      driverId: load.driverId,
+      title: 'Trip delivered',
+      body: `Dispatch marked ${route} as delivered`,
+      type: 'load.delivered.by_dispatch',
+    });
+  }
+
+  /** Dispatch cancelled trip → assigned driver only. */
+  private async notifyDriverTripCancelledByDispatch(load: {
+    companyId: string;
+    driverId: string | null;
+    tripNo: string;
+    origin: string;
+    destination: string;
+  }): Promise<void> {
+    const route = this.tripRouteLabel(load);
+    await this.notifyDriverInApp({
+      companyId: load.companyId,
+      driverId: load.driverId,
+      title: 'Trip cancelled',
+      body: `Dispatch cancelled ${route}`,
+      link: '/driver/status',
+      type: 'load.cancelled',
     });
   }
 

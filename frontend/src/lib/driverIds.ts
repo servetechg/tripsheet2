@@ -37,3 +37,21 @@ export function pickCurrentDriverLoad(
     null
   );
 }
+
+type DriverLike = {
+  id: string;
+  name?: string | null;
+  driverRecordId?: string | null;
+};
+
+/** Resolve load.driverId (record or auth id) to a row with a display name. */
+export function resolveDriverForLoad(
+  loadDriverId: string | null | undefined,
+  drivers: DriverLike[],
+  users: DriverLike[],
+): DriverLike | null {
+  if (!loadDriverId) return null;
+  const fromDrivers = drivers.find((d) => matchesDriverRef(loadDriverId, d));
+  if (fromDrivers) return fromDrivers;
+  return users.find((u) => u.id === loadDriverId) ?? null;
+}

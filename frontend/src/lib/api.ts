@@ -1341,6 +1341,27 @@ export const notificationsApi = {
     }),
 };
 
+export const inAppNotificationsApi = {
+  list: (limit = 40) =>
+    api<import('@tripsheet/shared').InAppNotificationListResponse>(
+      `/in-app-notifications?limit=${limit}`,
+    ),
+  markRead: (id: string) =>
+    api<import('@tripsheet/shared').InAppNotification>(
+      `/in-app-notifications/${encodeURIComponent(id)}/read`,
+      { method: 'PATCH' },
+    ),
+  markAllRead: () =>
+    api<{ updated: number }>('/in-app-notifications/read-all', {
+      method: 'POST',
+    }),
+};
+
+export function apiOrigin(): string {
+  const base = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+  return base.replace(/\/api\/?$/, '');
+}
+
 export const pushApi = {
   status: () => api<import('@tripsheet/shared').PushStatusResponse>('/push/status'),
   register: (body: import('@tripsheet/shared').PushRegisterRequest) =>

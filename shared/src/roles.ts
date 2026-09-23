@@ -49,6 +49,15 @@ export function isSuperAdminRole(role: string | undefined | null): boolean {
   return role === 'superadmin';
 }
 
+/** Staff who receive dispatch/fleet in-app alerts (e.g. driver started trip). */
+export const DISPATCH_IN_APP_NOTIFY_ROLES: readonly Role[] = [
+  'company_owner',
+  'general_manager',
+  'dispatcher',
+  'dispatcher_supervisor',
+  'fleet_manager',
+];
+
 /** Roles that use the company app shell (/app), not Super Admin or driver. */
 export const COMPANY_APP_ROLES = ROLES.filter(
   (r) => r !== 'superadmin' && r !== 'driver',

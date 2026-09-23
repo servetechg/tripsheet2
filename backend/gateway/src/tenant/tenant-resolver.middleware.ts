@@ -63,6 +63,12 @@ export class TenantResolverMiddleware implements NestMiddleware {
       req.originalUrl || req.url || req.path || '',
     );
 
+    // Socket.IO (default + /in-app namespace): auth is handshake JWT, not Bearer header.
+    if (path.includes('/socket.io') || path.startsWith('/in-app')) {
+      next();
+      return;
+    }
+
     if (PUBLIC_PATHS.some((re) => re.test(path))) {
       next();
       return;

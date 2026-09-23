@@ -10,10 +10,19 @@ import { RedisService } from '../redis/redis.service';
 import { EmailService } from '../email/email.service';
 import { SmsService } from '../sms/sms.service';
 import { PushService } from '../push/push.service';
+import { InAppNotificationsService } from '../in-app-notifications/in-app-notifications.service';
 import {
   isTenantSchemaDriftError,
   repairTenantOrgSchemas,
 } from '@tripsheet/tenant-runtime';
+import {
+  pushBodyFromEmailBody,
+  pushLinkForEmailType,
+  pushTitleFromEmailMeta,
+  resolvePushUserIdFromEmailMeta,
+  shouldMirrorEmailToInApp,
+  shouldMirrorEmailToPush,
+} from '../push/push-email-mirror.util';
 
 @Injectable()
 export class NotificationsService {
@@ -25,6 +34,7 @@ export class NotificationsService {
     private readonly emailService: EmailService,
     private readonly smsService: SmsService,
     private readonly pushService: PushService,
+    private readonly inAppNotifications: InAppNotificationsService,
   ) {}
 
   async findAll(companyId?: string, limit = 50) {
@@ -82,6 +92,22 @@ export class NotificationsService {
       void this.pushService
         .mirrorFromEmailLog({ companyId, body: text, meta })
         .catch(() => undefined);
+      if (companyId && shouldMirrorEmailToInApp(meta)) {
+        const userId = resolvePushUserIdFromEmailMeta(meta);
+        if (userId) {
+          const type = meta.type ? String(meta.type) : 'email';
+          void this.inAppNotifications
+            .notifyUser({
+              companyId,
+              userId,
+              title: pushTitleFromEmailMeta(meta, text),
+              body: pushBodyFromEmailBody(text),
+              link: pushLinkForEmailType(type),
+              type,
+            })
+            .catch(() => undefined);
+        }
+      }
       return logRow;
     }
     return this.prisma.notificationLog.create({

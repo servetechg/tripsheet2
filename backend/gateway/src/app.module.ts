@@ -4,6 +4,7 @@ import { HttpModule } from '@nestjs/axios';
 import { HealthController } from './health/health.controller';
 import { ProxyModule } from './proxy/proxy.module';
 import { TenantModule } from './tenant/tenant.module';
+import { InAppModule } from './in-app/in-app.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { TenantModule } from './tenant/tenant.module';
     }),
     TenantModule,
     ProxyModule,
+    InAppModule,
   ],
   controllers: [HealthController],
 })

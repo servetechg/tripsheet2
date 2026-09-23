@@ -29,6 +29,7 @@ jobs:
   build-and-push:
     needs: meta
     runs-on: ubuntu-latest
+    environment: staging
     timeout-minutes: 45
     environment: staging
     permissions:

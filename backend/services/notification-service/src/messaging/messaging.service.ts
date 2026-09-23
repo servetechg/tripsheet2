@@ -1,12 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PushService } from '../push/push.service';
+import { InAppNotificationsService } from '../in-app-notifications/in-app-notifications.service';
 
 @Injectable()
 export class MessagingService {
+  private readonly logger = new Logger(MessagingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly push: PushService,
+    private readonly inApp: InAppNotificationsService,
   ) {}
 
   listMessages(companyId?: string, toUserId?: string) {
@@ -44,6 +48,21 @@ export class MessagingService {
 
     const toUserId = created.toUserId;
     if (toUserId) {
+      void this.inApp
+        .notifyUser({
+          companyId,
+          userId: toUserId,
+          title: 'New message',
+          body: text.slice(0, 200),
+          link: '/',
+          type: 'message.created',
+          meta: { messageId: created.id },
+        })
+        .catch((e) =>
+          this.logger.warn(
+            `In-app notify failed for message ${created.id}: ${String(e)}`,
+          ),
+        );
       void this.push
         .sendToUser({
           companyId,

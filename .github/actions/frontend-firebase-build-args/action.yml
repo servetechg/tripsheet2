@@ -1,45 +1,54 @@
 name: Frontend Firebase build args
-description: Pass VITE_FIREBASE_* into Docker build (values from workflow inputs)
+description: Export VITE_FIREBASE_* as Docker build-args for the frontend image (values from workflow inputs).
+
 inputs:
   vite_firebase_api_key:
+    description: Firebase web API key (VITE_FIREBASE_API_KEY)
     required: false
     default: ''
   vite_firebase_auth_domain:
+    description: Firebase auth domain (VITE_FIREBASE_AUTH_DOMAIN)
     required: false
     default: ''
   vite_firebase_project_id:
+    description: Firebase project id (VITE_FIREBASE_PROJECT_ID)
     required: false
     default: ''
   vite_firebase_storage_bucket:
+    description: Firebase storage bucket (VITE_FIREBASE_STORAGE_BUCKET)
     required: false
     default: ''
   vite_firebase_messaging_sender_id:
+    description: Firebase messaging sender id (VITE_FIREBASE_MESSAGING_SENDER_ID)
     required: false
     default: ''
   vite_firebase_app_id:
+    description: Firebase app id (VITE_FIREBASE_APP_ID)
     required: false
     default: ''
   vite_firebase_measurement_id:
+    description: Optional Firebase Analytics measurement id (VITE_FIREBASE_MEASUREMENT_ID)
     required: false
     default: ''
   vite_firebase_vapid_key:
+    description: Web push VAPID public key (VITE_FIREBASE_VAPID_KEY)
     required: false
     default: ''
+
 runs:
   using: composite
   steps:
-    - shell: bash
+    - name: Export VITE_FIREBASE build args
+      shell: bash
       run: |
-        cat >> "$GITHUB_ENV" <<EOF
-        FRONTEND_BUILD_ARGS<<BUILDARGS
-        VITE_API_URL=/api
-        VITE_FIREBASE_API_KEY=${{ inputs.vite_firebase_api_key }}
-        VITE_FIREBASE_AUTH_DOMAIN=${{ inputs.vite_firebase_auth_domain }}
-        VITE_FIREBASE_PROJECT_ID=${{ inputs.vite_firebase_project_id }}
-        VITE_FIREBASE_STORAGE_BUCKET=${{ inputs.vite_firebase_storage_bucket }}
-        VITE_FIREBASE_MESSAGING_SENDER_ID=${{ inputs.vite_firebase_messaging_sender_id }}
-        VITE_FIREBASE_APP_ID=${{ inputs.vite_firebase_app_id }}
-        VITE_FIREBASE_MEASUREMENT_ID=${{ inputs.vite_firebase_measurement_id }}
-        VITE_FIREBASE_VAPID_KEY=${{ inputs.vite_firebase_vapid_key }}
-        BUILDARGS
-        EOF
+        set -euo pipefail
+        {
+          echo "VITE_FIREBASE_API_KEY=${{ inputs.vite_firebase_api_key }}"
+          echo "VITE_FIREBASE_AUTH_DOMAIN=${{ inputs.vite_firebase_auth_domain }}"
+          echo "VITE_FIREBASE_PROJECT_ID=${{ inputs.vite_firebase_project_id }}"
+          echo "VITE_FIREBASE_STORAGE_BUCKET=${{ inputs.vite_firebase_storage_bucket }}"
+          echo "VITE_FIREBASE_MESSAGING_SENDER_ID=${{ inputs.vite_firebase_messaging_sender_id }}"
+          echo "VITE_FIREBASE_APP_ID=${{ inputs.vite_firebase_app_id }}"
+          echo "VITE_FIREBASE_MEASUREMENT_ID=${{ inputs.vite_firebase_measurement_id }}"
+          echo "VITE_FIREBASE_VAPID_KEY=${{ inputs.vite_firebase_vapid_key }}"
+        } >> "$GITHUB_ENV"

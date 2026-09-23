@@ -1,9 +1,12 @@
 /** Email meta types that should not trigger web push (no account yet, or test-only). */
-export const EMAIL_PUSH_SKIP_TYPES = new Set([
+export const EMAIL_MIRROR_SKIP_TYPES = new Set([
   'driver_invite',
   'staff_invite',
   'email_delivery_test',
 ]);
+
+/** FCM only — routine sign-in is email/in-app, not browser push. */
+export const FCM_PUSH_SKIP_TYPES = new Set(['security.login']);
 
 export function resolvePushUserIdFromEmailMeta(
   meta: Record<string, unknown> | undefined,
@@ -61,10 +64,20 @@ export function pushLinkForEmailType(type: string): string {
   }
 }
 
-export function shouldMirrorEmailToPush(
+export function shouldMirrorEmailToInApp(
   meta: Record<string, unknown> | undefined,
 ): boolean {
   const type = meta?.type ? String(meta.type) : '';
-  if (EMAIL_PUSH_SKIP_TYPES.has(type)) return false;
+  if (EMAIL_MIRROR_SKIP_TYPES.has(type)) return false;
   return resolvePushUserIdFromEmailMeta(meta) !== null;
+}
+
+/** Web push (FCM) mirror from transactional email. */
+export function shouldMirrorEmailToPush(
+  meta: Record<string, unknown> | undefined,
+): boolean {
+  if (!shouldMirrorEmailToInApp(meta)) return false;
+  const type = meta?.type ? String(meta.type) : '';
+  if (FCM_PUSH_SKIP_TYPES.has(type)) return false;
+  return true;
 }

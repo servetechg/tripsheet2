@@ -31,7 +31,7 @@ import { useConfirm } from '@/context/ConfirmContext';
 import { DRIVER_DOC_TYPES } from '@/lib/docTypes';
 import { loadsApi, driversApi, notificationsApi, companiesApi } from '@/lib/api';
 import { lifecycleAllowsDispatch, availabilityAllowsDispatch, DRIVER_LIFECYCLE_LABELS, AVAILABILITY_LABELS } from '@/lib/driverLifecycle';
-import { matchesDriverRef, driverRecordIdOf } from '@/lib/driverIds';
+import { matchesDriverRef, driverRecordIdOf, resolveDriverForLoad } from '@/lib/driverIds';
 import { canAssignAsset } from '@/lib/assetStatus';
 import { useCan } from '@/lib/permissions';
 import { useSmsEnabled } from '@/hooks/useSmsEnabled';
@@ -1947,7 +1947,7 @@ export function DispatchTab({
         </Card>
       ) : (
         loads.map((l) => {
-          const driver = users.find((u) => u.id === l.driverId);
+          const driver = resolveDriverForLoad(l.driverId, drivers, users);
           const sc = statusColor[l.status] || G.muted;
           const { rev, cost, margin } = loadMargin(l);
           const stops = Array.isArray(l.stops) ? l.stops : [];

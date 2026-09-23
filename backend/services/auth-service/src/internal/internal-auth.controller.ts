@@ -104,6 +104,15 @@ export class InternalAuthController {
     return this.authService.getCompanySenderEmail(companyId);
   }
 
+  @Get('companies/:companyId/notify-recipients')
+  companyNotifyRecipients(
+    @Headers('x-internal-api-key') key: string | undefined,
+    @Param('companyId') companyId: string,
+  ) {
+    this.assertKey(key);
+    return this.authService.listCompanyNotifyRecipients(companyId);
+  }
+
   private assertKey(key: string | undefined) {
     const expected =
       this.config.get<string>('INTERNAL_API_KEY') || 'tripsheet-internal-dev';
