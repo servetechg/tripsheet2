@@ -14,6 +14,10 @@
 		reverse_proxy {$ACTIVE_COLOR}-gateway:3000
 	}
 
+	handle /in-app* {
+		reverse_proxy {$ACTIVE_COLOR}-gateway:3000
+	}
+
 	handle /health {
 		reverse_proxy {$ACTIVE_COLOR}-gateway:3000
 	}
@@ -32,6 +36,10 @@
 	}
 
 	handle /api* {
+		reverse_proxy staging-gateway:3000
+	}
+
+	handle /in-app* {
 		reverse_proxy staging-gateway:3000
 	}
 
